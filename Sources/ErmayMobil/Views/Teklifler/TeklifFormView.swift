@@ -76,8 +76,8 @@ public struct TeklifFormView: View {
                     let newKalem = TeklifKalem(
                         stokId: s.id,
                         stokAdi: s.stokAdi,
-                        birim: s.birim,
                         miktar: 1.0,
+                        birim: s.birim,
                         birimFiyat: s.satisFiyati,
                         kdvOrani: s.kdvOrani
                     )
@@ -308,7 +308,7 @@ public struct TeklifFormView: View {
                                 }
                             }
                         } label: {
-                            Text(kalemler[idx].birim)
+                            Text(kalemler[idx].birim ?? "Adet")
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundColor(AppTheme.textPrimary)
                                 .padding(.horizontal, 6)
