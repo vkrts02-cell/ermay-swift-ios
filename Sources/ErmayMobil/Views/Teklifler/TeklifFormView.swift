@@ -232,7 +232,7 @@ public struct TeklifFormView: View {
                     
                     let newKalem = TeklifKalem(
                         id: UUID().uuidString,
-                        stokAdi: selectedStok.ad,
+                        stokAdi: selectedStok.stokAdi,
                         miktar: miktar,
                         birim: selectedStok.birim,
                         birimFiyat: birimFiyat,

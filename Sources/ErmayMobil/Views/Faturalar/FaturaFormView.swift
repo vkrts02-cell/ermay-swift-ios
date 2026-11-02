@@ -294,11 +294,11 @@ public struct FaturaFormView: View {
                 StokPickerSheet { selectedStok in
                     let kalem = FaturaKalem(
                         stokAdi: selectedStok.stokAdi,
+                        birim: selectedStok.birim,
                         miktar: 1.0,
                         birimFiyat: selectedStok.satisFiyati,
                         kdvOrani: selectedStok.kdvOrani,
-                        iskontoOrani: 0.0,
-                        birim: selectedStok.birim
+                        iskontoOrani: 0.0
                     )
                     self.kalemler.append(kalem)
                 }

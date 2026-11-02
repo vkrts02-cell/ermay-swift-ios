@@ -296,11 +296,11 @@ public struct DashboardView: View {
                                             }
                                             
                                             VStack(alignment: .leading, spacing: 2) {
-                                                Text(tx.aciklama ?? tx.islemTuru)
+                                                Text(tx.aciklama ?? (tx.islemTuru ?? "İşlem"))
                                                     .font(.system(size: 12, weight: .bold))
                                                     .foregroundColor(AppTheme.textPrimary)
                                                     .lineLimit(1)
-                                                Text("\(tx.islemTuru) • \(tx.tarih) • 15 G")
+                                                Text("\((tx.islemTuru ?? "İşlem")) • \((tx.tarih ?? "02.11.2026")) • 15 G")
                                                     .font(.system(size: 10))
                                                     .foregroundColor(AppTheme.textMuted)
                                             }
