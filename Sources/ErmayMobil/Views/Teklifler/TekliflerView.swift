@@ -11,8 +11,8 @@ public struct TekliflerView: View {
     public var filteredTeklifler: [Teklif] {
         teklifler.filter { t in
             searchText.isEmpty ||
-            t.teklifNo.localizedCaseInsensitiveContains(searchText) ||
-            (t.cariUnvan?.localizedCaseInsensitiveContains(searchText) ?? false)
+                t.teklifNo.localizedCaseInsensitiveContains(searchText) ||
+                (t.cariUnvan?.localizedCaseInsensitiveContains(searchText) ?? false)
         }
     }
     
@@ -22,9 +22,10 @@ public struct TekliflerView: View {
                 AppTheme.background.ignoresSafeArea()
                 
                 VStack(spacing: 14) {
+                    // Header Bar (Exact match to TekliflerScreen.tsx)
                     HStack {
-                        Text("Teklifler")
-                            .font(.system(size: 24, weight: .bold))
+                        Text("Fiyat Teklifleri")
+                            .font(.system(size: 24, weight: .black))
                             .foregroundColor(AppTheme.textPrimary)
                         
                         Spacer()
@@ -32,15 +33,23 @@ public struct TekliflerView: View {
                         Button {
                             showForm = true
                         } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 28))
-                                .foregroundColor(AppTheme.primary)
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus")
+                                Text("Yeni Teklif")
+                            }
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color(hex: "BF5AF2"))
+                            .cornerRadius(10)
                         }
                     }
                     .padding(.horizontal)
                     .padding(.top, 8)
                     
-                    SearchBarView(text: $searchText, placeholder: "Teklif No veya cari ara...")
+                    // Search Bar
+                    SearchBarView(text: $searchText, placeholder: "Cari veya teklif no ara...")
                         .padding(.horizontal)
                     
                     if isLoading && teklifler.isEmpty {
@@ -50,10 +59,10 @@ public struct TekliflerView: View {
                     } else if filteredTeklifler.isEmpty {
                         Spacer()
                         VStack(spacing: 8) {
-                            Image(systemName: "doc.text.fill")
+                            Image(systemName: "doc.badge.arrow.up")
                                 .font(.system(size: 40))
                                 .foregroundColor(AppTheme.textMuted)
-                            Text("Teklif bulunamadı")
+                            Text("Fiyat teklifi bulunamadı")
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundColor(AppTheme.textSecondary)
                         }
@@ -62,7 +71,7 @@ public struct TekliflerView: View {
                         List {
                             ForEach(filteredTeklifler) { teklif in
                                 NavigationLink(destination: TeklifDetailView(teklif: teklif)) {
-                                    TeklifRowItem(teklif: teklif)
+                                    ExactTeklifCard(teklif: teklif)
                                 }
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
@@ -80,8 +89,8 @@ public struct TekliflerView: View {
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showForm) {
-                TeklifFormView { yeniTeklif in
-                    teklifler.insert(yeniTeklif, at: 0)
+                TeklifFormView { newTeklif in
+                    teklifler.insert(newTeklif, at: 0)
                 }
             }
             .task {
@@ -93,16 +102,16 @@ public struct TekliflerView: View {
     private func loadTeklifler() async {
         isLoading = true
         do {
-            let items: [Teklif] = try await SupabaseService.shared.fetch(from: "teklifler", orderBy: "tarih.desc")
+            let items: [Teklif] = try await SupabaseService.shared.fetch(from: "teklifler")
             await MainActor.run {
                 self.teklifler = items
             }
         } catch {
-            print("Teklif fetch error: \(error)")
-            if teklifler.isEmpty {
-                teklifler = [
-                    Teklif(id: "1", teklifNo: "TKL-2026-042", cariUnvan: "Yıldız Lojistik Antrepo", tarih: "02.11.2026", gecerlilikTarihi: "16.11.2026", araToplam: 65000, kdvToplami: 13000, genelToplam: 78000, durum: "GONDERILDI"),
-                    Teklif(id: "2", teklifNo: "TKL-2026-041", cariUnvan: "Kaya Metal Döküm", tarih: "29.10.2026", gecerlilikTarihi: "12.11.2026", araToplam: 120000, kdvToplami: 24000, genelToplam: 144000, durum: "ONAYLANDI")
+            await MainActor.run {
+                self.teklifler = [
+                    Teklif(teklifNo: "TKF-391048", cariId: "1", cariUnvan: "Ermay Bilişim Ltd. Şti.", tarih: "2026-11-01", gecerlilikTarihi: "2026-11-15", durum: "Bekliyor", genelToplam: 62000.0),
+                    Teklif(teklifNo: "TKF-810294", cariId: "2", cariUnvan: "Kaya Metal A.Ş.", tarih: "2026-10-29", gecerlilikTarihi: "2026-11-12", durum: "Siparişleşti", genelToplam: 84500.0),
+                    Teklif(teklifNo: "TKF-492019", cariId: "3", cariUnvan: "Yıldız Lojistik", tarih: "2026-10-20", gecerlilikTarihi: "2026-11-03", durum: "Reddedildi", genelToplam: 19800.0)
                 ]
             }
         }
@@ -110,45 +119,50 @@ public struct TekliflerView: View {
     }
 }
 
-struct TeklifRowItem: View {
+struct ExactTeklifCard: View {
     let teklif: Teklif
     
     var durumColor: Color {
         switch teklif.durum {
-        case "ONAYLANDI": return AppTheme.success
-        case "GONDERILDI": return AppTheme.primary
-        case "REDDEDILDI": return AppTheme.danger
-        default: return AppTheme.warning
+        case "Siparişleşti":
+            return Color(hex: "10B981")
+        case "Reddedildi":
+            return Color(hex: "EF4444")
+        default:
+            return Color(hex: "F59E0B")
         }
     }
     
     var body: some View {
         GlassCard(cornerRadius: 14, padding: 14) {
-            VStack(spacing: 8) {
-                HStack {
-                    Text(teklif.teklifNo)
-                        .font(.system(size: 13, weight: .bold))
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(teklif.cariUnvan ?? "İsimsiz Cari")
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundColor(AppTheme.textPrimary)
-                    Spacer()
-                    StatusBadge(title: teklif.durum, color: durumColor)
+                        .lineLimit(1)
+                    
+                    Text("Teklif No: \(teklif.teklifNo)")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.textSecondary)
+                    
+                    Text("Tarih: \(teklif.tarih) • Geçerlilik: \(teklif.gecerlilikTarihi)")
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.textMuted)
                 }
                 
-                HStack(alignment: .bottom) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(teklif.cariUnvan ?? "Cari Belirtilmemiş")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(AppTheme.textPrimary)
-                        Text("Geçerlilik: \(teklif.gecerlilikTarihi ?? "-")")
-                            .font(.system(size: 11))
-                            .foregroundColor(AppTheme.textMuted)
-                    }
-                    Spacer()
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
                     Text(AppFormatters.money(teklif.genelToplam))
-                        .font(.system(size: 16, weight: .heavy))
+                        .font(.system(size: 14, weight: .heavy))
                         .foregroundColor(AppTheme.textPrimary)
+                    
+                    Text(teklif.durum)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(durumColor)
                 }
             }
         }
     }
 }
-

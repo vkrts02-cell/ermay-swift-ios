@@ -1,7 +1,30 @@
 import SwiftUI
 
+struct MoreModuleItem: Identifiable {
+    let id = UUID()
+    let title: String
+    let icon: String
+    let color: Color
+    let destination: AnyView
+}
+
 public struct MoreStackView: View {
     public init() {}
+    
+    private var menuItems: [MoreModuleItem] {
+        [
+            MoreModuleItem(title: "Faturalar", icon: "doc.text.fill", color: Color(hex: "30D158"), destination: AnyView(FaturalarView())),
+            MoreModuleItem(title: "Stoklar", icon: "shippingbox.fill", color: Color(hex: "0A84FF"), destination: AnyView(StoklarView())),
+            MoreModuleItem(title: "Müşteri Takip", icon: "folder.fill", color: Color(hex: "3B82F6"), destination: AnyView(MusteriTakipView())),
+            MoreModuleItem(title: "Finans", icon: "creditcard.fill", color: Color(hex: "FF416C"), destination: AnyView(FinansView())),
+            MoreModuleItem(title: "Vade Takibi", icon: "calendar", color: Color(hex: "8B5CF6"), destination: AnyView(VadeTakipView())),
+            MoreModuleItem(title: "Raporlar", icon: "chart.pie.fill", color: Color(hex: "0061FF"), destination: AnyView(RaporlarView())),
+            MoreModuleItem(title: "Görev Panosu", icon: "square.grid.2x2.fill", color: Color(hex: "00FF87"), destination: AnyView(KanbanView())),
+            MoreModuleItem(title: "Hesap Makinası", icon: "function", color: Color(hex: "0D9488"), destination: AnyView(MaliyetHesaplamaView())),
+            MoreModuleItem(title: "Araçlar", icon: "wrench.and.screwdriver.fill", color: Color(hex: "F59E0B"), destination: AnyView(AraclarView())),
+            MoreModuleItem(title: "Ayarlar", icon: "gearshape.fill", color: Color(hex: "94A3B8"), destination: AnyView(AyarlarView()))
+        ]
+    }
     
     public var body: some View {
         NavigationStack {
@@ -9,129 +32,62 @@ public struct MoreStackView: View {
                 AppTheme.background.ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 16) {
-                        HStack {
-                            Text("Daha Fazla Modül")
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(AppTheme.textPrimary)
-                            Spacer()
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 8)
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Header
+                        Text("Diğer Modüller")
+                            .font(.system(size: 24, weight: .heavy))
+                            .foregroundColor(AppTheme.textPrimary)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 16)
                         
-                        VStack(spacing: 10) {
-                            NavigationLink(destination: FaturalarView()) {
-                                MoreMenuItem(title: "Faturalar", subtitle: "Satış & Alış faturaları, e-Fatura PDF", icon: "doc.text.fill", color: AppTheme.primary)
-                            }
-                            
-                            NavigationLink(destination: StoklarView()) {
-                                MoreMenuItem(title: "Stok Kartları & Envanter", subtitle: "Ürünler, sayım, barkod, gruplar", icon: "shippingbox.fill", color: AppTheme.purple)
-                            }
-                            
-                            NavigationLink(destination: FinansView()) {
-                                MoreMenuItem(title: "Finans & Kasa", subtitle: "Nakit akışı, tahsilat ve tediye", icon: "banknote.fill", color: AppTheme.success)
-                            }
-                            
-                            NavigationLink(destination: KasaSayimView()) {
-                                MoreMenuItem(title: "Günlük Kasa Sayımı", subtitle: "Banknot sayımı, mutabakat ve kasa fişi", icon: "centsign.circle.fill", color: Color(hex: "10B981"))
-                            }
-                            
-                            NavigationLink(destination: BankaListView()) {
-                                MoreMenuItem(title: "Banka Hesapları & EFT", subtitle: "Banka bakiyeleri, IBAN kopyalama, EFT", icon: "building.columns.fill", color: Color(hex: "0A84FF"))
-                            }
-                            
-                            NavigationLink(destination: CekSenetListView()) {
-                                MoreMenuItem(title: "Çek & Senet Takibi", subtitle: "Portföy, bankada, tahsilat, karşılıksız", icon: "newspaper.fill", color: Color(hex: "FF9F0A"))
-                            }
-                            
-                            NavigationLink(destination: VadeTakipView()) {
-                                MoreMenuItem(title: "Vade & Tahsilat Takibi", subtitle: "Vadesi yaklaşan ve geciken bakiyeler", icon: "clock.badge.checkmark.fill", color: AppTheme.warning)
-                            }
-                            
-                            NavigationLink(destination: BorcHatirlaticiView()) {
-                                MoreMenuItem(title: "Borç & Vade Hatırlatıcı", subtitle: "WhatsApp hatırlatma, alarm kurma", icon: "bell.badge.fill", color: Color(hex: "F43F5E"))
-                            }
-                            
-                            NavigationLink(destination: MusteriLimitView()) {
-                                MoreMenuItem(title: "Müşteri Risk & Limit Takibi", subtitle: "Açık hesap limiti, risk puanı, gecikme", icon: "shield.lefthalf.filled", color: Color(hex: "EF4444"))
-                            }
-                            
-                            NavigationLink(destination: MusteriTakipView()) {
-                                MoreMenuItem(title: "Müşteri Takip (CRM)", subtitle: "Ziyaretler, görüşmeler, aksiyonlar", icon: "person.crop.rectangle.stack.fill", color: AppTheme.info)
-                            }
-                            
-                            NavigationLink(destination: DovizView()) {
-                                MoreMenuItem(title: "Döviz Kurları & Çevirici", subtitle: "Canlı TCMB kurları, USD/EUR/TL", icon: "coloncurrencysign.circle.fill", color: Color(hex: "10B981"))
-                            }
-                            
-                            NavigationLink(destination: KanbanView()) {
-                                MoreMenuItem(title: "Görev Panosu (Kanban)", subtitle: "İş takibi, yapılacaklar listesi", icon: "square.grid.3x1.folder.fill.badge.plus", color: Color(hex: "EC4899"))
-                            }
-                            
-                            NavigationLink(destination: RaporlarView()) {
-                                MoreMenuItem(title: "Finans & Muhasebe Raporları", subtitle: "Gelir-Gider, KDV beyan, stok değeri", icon: "chart.bar.fill", color: Color(hex: "06B6D4"))
-                            }
-                            
-                            NavigationLink(destination: AraclarView()) {
-                                MoreMenuItem(title: "Finansal Araçlar & KDV", subtitle: "KDV hesaplayıcı, maliyet simülatörü", icon: "function", color: Color(hex: "F97316"))
-                            }
-                            
-                            NavigationLink(destination: FaturaTasarimView()) {
-                                MoreMenuItem(title: "Fatura & PDF Tasarımı", subtitle: "Firma başlığı, banka IBAN ve dipnot şablonu", icon: "paintbrush.fill", color: Color(hex: "8B5CF6"))
-                            }
-                            
-                            NavigationLink(destination: BildirimlerView()) {
-                                MoreMenuItem(title: "Bildirim Merkezi", subtitle: "Kritik stok, vade ve sistem uyarıları", icon: "app.badge.fill", color: Color(hex: "06B6D4"))
-                            }
-                            
-                            NavigationLink(destination: AyarlarView()) {
-                                MoreMenuItem(title: "Ayarlar & Sistem", subtitle: "Firma profili, kilit, bulut bağlantısı", icon: "gearshape.fill", color: AppTheme.textSecondary)
+                        // Menü Kartı (Tekli Grup Kapsayıcısı)
+                        VStack(spacing: 0) {
+                            ForEach(Array(menuItems.enumerated()), id: \.element.id) { index, item in
+                                NavigationLink(destination: item.destination) {
+                                    HStack(spacing: 14) {
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(item.color.opacity(0.15))
+                                                .frame(width: 38, height: 38)
+                                            Image(systemName: item.icon)
+                                                .font(.system(size: 18, weight: .semibold))
+                                                .foregroundColor(item.color)
+                                        }
+                                        
+                                        Text(item.title)
+                                            .font(.system(size: 15, weight: .semibold))
+                                            .foregroundColor(Color(hex: "E2E8F0"))
+                                        
+                                        Spacer()
+                                        
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundColor(Color(hex: "64748B"))
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 13)
+                                }
+                                
+                                if index < menuItems.count - 1 {
+                                    Divider()
+                                        .background(Color.white.opacity(0.06))
+                                        .padding(.leading, 68)
+                                }
                             }
                         }
-                        .padding(.horizontal)
+                        .background(Color(hex: "121216"))
+                        .cornerRadius(20)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                        )
+                        .padding(.horizontal, 16)
                         
-                        Spacer().frame(height: 80)
+                        Spacer().frame(height: 100)
                     }
                 }
             }
             .navigationBarHidden(true)
-        }
-    }
-}
-
-struct MoreMenuItem: View {
-    let title: String
-    let subtitle: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        GlassCard(cornerRadius: 14, padding: 14) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(color.opacity(0.15))
-                        .frame(width: 40, height: 40)
-                    Image(systemName: icon)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(color)
-                }
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(AppTheme.textPrimary)
-                    Text(subtitle)
-                        .font(.system(size: 11))
-                        .foregroundColor(AppTheme.textSecondary)
-                }
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(AppTheme.textMuted)
-            }
         }
     }
 }

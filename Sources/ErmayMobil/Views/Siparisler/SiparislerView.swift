@@ -3,28 +3,16 @@ import SwiftUI
 public struct SiparislerView: View {
     @State private var siparisler: [Siparis] = []
     @State private var searchText: String = ""
-    @State private var selectedTab: String = "Tümü"
     @State private var showForm: Bool = false
     @State private var isLoading: Bool = false
-    
-    private let tabs = ["Tümü", "Alınan", "Verilen"]
     
     public init() {}
     
     public var filteredSiparisler: [Siparis] {
         siparisler.filter { s in
-            let matchSearch = searchText.isEmpty ||
+            searchText.isEmpty ||
                 s.siparisNo.localizedCaseInsensitiveContains(searchText) ||
                 (s.cariUnvan?.localizedCaseInsensitiveContains(searchText) ?? false)
-            
-            if !matchSearch { return false }
-            
-            if selectedTab == "Alınan" {
-                return s.siparisTuru.uppercased().contains("ALINAN")
-            } else if selectedTab == "Verilen" {
-                return s.siparisTuru.uppercased().contains("VERILEN")
-            }
-            return true
         }
     }
     
@@ -34,9 +22,10 @@ public struct SiparislerView: View {
                 AppTheme.background.ignoresSafeArea()
                 
                 VStack(spacing: 14) {
+                    // Header Bar (Exact match to SiparislerScreen.tsx)
                     HStack {
-                        Text("Siparişler")
-                            .font(.system(size: 24, weight: .bold))
+                        Text("Sipariş Yönetimi")
+                            .font(.system(size: 24, weight: .black))
                             .foregroundColor(AppTheme.textPrimary)
                         
                         Spacer()
@@ -44,24 +33,24 @@ public struct SiparislerView: View {
                         Button {
                             showForm = true
                         } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 28))
-                                .foregroundColor(AppTheme.primary)
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus")
+                                Text("Yeni Sipariş")
+                            }
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color(hex: "0061FF"))
+                            .cornerRadius(10)
                         }
                     }
                     .padding(.horizontal)
                     .padding(.top, 8)
                     
-                    SearchBarView(text: $searchText, placeholder: "Sipariş No veya cari ara...")
+                    // Search Bar
+                    SearchBarView(text: $searchText, placeholder: "Cari veya sipariş no ara...")
                         .padding(.horizontal)
-                    
-                    Picker("Tür", selection: $selectedTab) {
-                        ForEach(tabs, id: \.self) { tab in
-                            Text(tab).tag(tab)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
                     
                     if isLoading && siparisler.isEmpty {
                         Spacer()
@@ -82,7 +71,7 @@ public struct SiparislerView: View {
                         List {
                             ForEach(filteredSiparisler) { siparis in
                                 NavigationLink(destination: SiparisDetailView(siparis: siparis)) {
-                                    SiparisRowItem(siparis: siparis)
+                                    ExactSiparisCard(siparis: siparis)
                                 }
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
@@ -100,8 +89,8 @@ public struct SiparislerView: View {
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showForm) {
-                SiparisFormView { yeniSiparis in
-                    siparisler.insert(yeniSiparis, at: 0)
+                SiparisFormView { newSip in
+                    siparisler.insert(newSip, at: 0)
                 }
             }
             .task {
@@ -113,16 +102,16 @@ public struct SiparislerView: View {
     private func loadSiparisler() async {
         isLoading = true
         do {
-            let items: [Siparis] = try await SupabaseService.shared.fetch(from: "siparisler", orderBy: "tarih.desc")
+            let items: [Siparis] = try await SupabaseService.shared.fetch(from: "siparisler")
             await MainActor.run {
                 self.siparisler = items
             }
         } catch {
-            print("Siparis fetch error: \(error)")
-            if siparisler.isEmpty {
-                siparisler = [
-                    Siparis(id: "1", siparisNo: "SIP-2026-088", siparisTuru: "ALINAN", cariUnvan: "Ermay Ltd. Şti.", tarih: "02.11.2026", teslimTarihi: "05.11.2026", araToplam: 18000, kdvToplami: 3600, iskontoToplami: 0, genelToplam: 21600, durum: "HAZIRLANIYOR"),
-                    Siparis(id: "2", siparisNo: "SIP-2026-087", siparisTuru: "VERILEN", cariUnvan: "Akıncılar Çelik Döküm", tarih: "01.11.2026", teslimTarihi: "10.11.2026", araToplam: 32000, kdvToplami: 6400, iskontoToplami: 0, genelToplam: 38400, durum: "BEKLIYOR")
+            await MainActor.run {
+                self.siparisler = [
+                    Siparis(siparisNo: "SIP-842910", siparisTuru: "ALINAN", cariId: "1", cariUnvan: "Ermay Bilişim Ltd. Şti.", tarih: "2026-11-01", teslimTarihi: "2026-11-08", durum: "Bekliyor", genelToplam: 48500.0),
+                    Siparis(siparisNo: "SIP-529104", siparisTuru: "ALINAN", cariId: "2", cariUnvan: "Akıncılar Çelik Döküm", tarih: "2026-10-28", teslimTarihi: "2026-11-04", durum: "Faturalandı", genelToplam: 112000.0),
+                    Siparis(siparisNo: "SIP-194025", siparisTuru: "VERILEN", cariId: "3", cariUnvan: "Mega Plastik San.", tarih: "2026-10-25", teslimTarihi: "2026-10-30", durum: "İptal", genelToplam: 16400.0)
                 ]
             }
         }
@@ -130,57 +119,50 @@ public struct SiparislerView: View {
     }
 }
 
-struct SiparisRowItem: View {
+struct ExactSiparisCard: View {
     let siparis: Siparis
     
     var durumColor: Color {
         switch siparis.durum {
-        case "TAMAMLANDI": return AppTheme.success
-        case "HAZIRLANIYOR": return AppTheme.primary
-        case "SEVK_EDILDI": return AppTheme.purple
-        case "IPTAL": return AppTheme.danger
-        default: return AppTheme.warning
+        case "Faturalandı":
+            return Color(hex: "10B981")
+        case "İptal":
+            return Color(hex: "EF4444")
+        default:
+            return Color(hex: "F59E0B")
         }
     }
     
     var body: some View {
         GlassCard(cornerRadius: 14, padding: 14) {
-            VStack(spacing: 8) {
-                HStack {
-                    StatusBadge(
-                        title: siparis.siparisTuru == "ALINAN" ? "ALINAN SİPARİŞ" : "VERİLEN SİPARİŞ",
-                        color: siparis.siparisTuru == "ALINAN" ? AppTheme.primary : AppTheme.purple
-                    )
-                    
-                    Text(siparis.siparisNo)
-                        .font(.system(size: 13, weight: .bold))
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(siparis.cariUnvan ?? "İsimsiz Cari")
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundColor(AppTheme.textPrimary)
+                        .lineLimit(1)
                     
-                    Spacer()
+                    Text("Sipariş No: \(siparis.siparisNo)")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.textSecondary)
                     
-                    StatusBadge(title: siparis.durum, color: durumColor)
+                    Text("Tarih: \(siparis.tarih) • Teslimat: \(siparis.teslimTarihi)")
+                        .font(.system(size: 11))
+                        .foregroundColor(AppTheme.textMuted)
                 }
                 
-                HStack(alignment: .bottom) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(siparis.cariUnvan ?? "Cari Belirtilmemiş")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(AppTheme.textPrimary)
-                            .lineLimit(1)
-                        
-                        Text("Teslim: \(siparis.teslimTarihi ?? "-")")
-                            .font(.system(size: 11))
-                            .foregroundColor(AppTheme.textMuted)
-                    }
-                    
-                    Spacer()
-                    
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
                     Text(AppFormatters.money(siparis.genelToplam))
-                        .font(.system(size: 16, weight: .heavy))
+                        .font(.system(size: 14, weight: .heavy))
                         .foregroundColor(AppTheme.textPrimary)
+                    
+                    Text(siparis.durum)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(durumColor)
                 }
             }
         }
     }
 }
-

@@ -20,7 +20,8 @@ public struct FaturaFormView: View {
     @State private var showStokPicker: Bool = false
     @State private var showAddKalemSheet: Bool = false
     
-    public init(onSave: ((Fatura) -> Void)? = nil) {
+    public init(initialTur: String = "SATIS", onSave: ((Fatura) -> Void)? = nil) {
+        self._faturaTuru = State(initialValue: initialTur)
         self.onSave = onSave
     }
     

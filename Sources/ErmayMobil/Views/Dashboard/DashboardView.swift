@@ -10,11 +10,20 @@ struct WeeklyGoalData: Identifiable {
     let actual: Double
 }
 
+struct DashboardListItem: Identifiable {
+    let id: String
+    let title: String
+    let description: String
+    let date: String
+    let vadeGun: Int?
+    let amount: Double
+    let type: String // "In" or "Out"
+}
+
 public struct DashboardView: View {
     @State private var alacaklar: Double = 98400.00
     @State private var borclar: Double = 34200.00
     @State private var kasaBanka: Double = 245850.50
-    @State private var sonHareketler: [CariHareket] = []
     @State private var activeTab: String = "recents" // "recents", "alacak", "borc"
     @State private var isWeekly: Bool = true
     @State private var isLoading: Bool = false
@@ -24,6 +33,10 @@ public struct DashboardView: View {
     @State private var showAlisFaturaForm: Bool = false
     @State private var showSiparisForm: Bool = false
     @State private var showTeklifForm: Bool = false
+    
+    // Loaded Data
+    @State private var carilerList: [CariKart] = []
+    @State private var faturalarList: [Fatura] = []
     
     // Hedef Verileri
     @State private var goalData: [WeeklyGoalData] = [
@@ -51,6 +64,90 @@ public struct DashboardView: View {
     public var completionRate: Int {
         guard toplamHedef > 0 else { return 0 }
         return min(100, Int((toplamGerceklesen / toplamHedef) * 100))
+    }
+    
+    // Format cari name cleanly for mobile dashboard
+    private func formatCariName(_ raw: String) -> String {
+        return raw
+            .replacingOccurrences(of: "SANAYİ VE TİCARET LİMİTED ŞİRKETİ", with: "LTD.")
+            .replacingOccurrences(of: "SANAYİ VE TİCARET ANONİM ŞİRKETİ", with: "A.Ş.")
+            .replacingOccurrences(of: "SAN. VE TİC. LTD. ŞTİ.", with: "LTD.")
+            .replacingOccurrences(of: "SAN. VE TİC. A.Ş.", with: "A.Ş.")
+            .replacingOccurrences(of: "LİMİTED ŞİRKETİ", with: "LTD.")
+            .replacingOccurrences(of: "ANONİM ŞİRKETİ", with: "A.Ş.")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    private var currentListData: [DashboardListItem] {
+        switch activeTab {
+        case "alacak":
+            let items = carilerList.filter { $0.bakiyeTuru == "A" && $0.bakiye > 0 }
+                .sorted { $0.bakiye > $1.bakiye }
+                .prefix(5)
+            if !items.isEmpty {
+                return items.map { c in
+                    DashboardListItem(
+                        id: c.id,
+                        title: formatCariName(c.unvan),
+                        description: "Müşteri",
+                        date: "Alacak",
+                        vadeGun: 15,
+                        amount: c.bakiye,
+                        type: "In"
+                    )
+                }
+            } else {
+                return [
+                    DashboardListItem(id: "a1", title: "Ermay Bilişim Sanayi Ltd.", description: "Müşteri", date: "Alacak", vadeGun: 12, amount: 45200.0, type: "In"),
+                    DashboardListItem(id: "a2", title: "Mega Plastik San.", description: "Müşteri", date: "Alacak", vadeGun: 28, amount: 28400.0, type: "In"),
+                    DashboardListItem(id: "a3", title: "Kaya Metal A.Ş.", description: "Müşteri", date: "Alacak", vadeGun: 5, amount: 24800.0, type: "In")
+                ]
+            }
+        case "borc":
+            let items = carilerList.filter { $0.bakiyeTuru == "B" && $0.bakiye > 0 }
+                .sorted { $0.bakiye > $1.bakiye }
+                .prefix(5)
+            if !items.isEmpty {
+                return items.map { c in
+                    DashboardListItem(
+                        id: c.id,
+                        title: formatCariName(c.unvan),
+                        description: "Tedarikçi",
+                        date: "Borç",
+                        vadeGun: 8,
+                        amount: c.bakiye,
+                        type: "Out"
+                    )
+                }
+            } else {
+                return [
+                    DashboardListItem(id: "b1", title: "Akıncılar Çelik Döküm A.Ş.", description: "Tedarikçi", date: "Borç", vadeGun: 14, amount: 22800.0, type: "Out"),
+                    DashboardListItem(id: "b2", title: "Özkanlar Ambalaj Ltd.", description: "Tedarikçi", date: "Borç", vadeGun: 3, amount: 11400.0, type: "Out")
+                ]
+            }
+        default: // recents
+            if !faturalarList.isEmpty {
+                return faturalarList.prefix(5).map { f in
+                    let isIn = f.faturaTuru.uppercased().contains("SATIS") || f.faturaTuru.uppercased().contains("SATIŞ")
+                    return DashboardListItem(
+                        id: f.id,
+                        title: formatCariName(f.cariUnvan),
+                        description: "\(f.faturaTuru) Faturası",
+                        date: f.tarih,
+                        vadeGun: nil,
+                        amount: f.genelToplam,
+                        type: isIn ? "In" : "Out"
+                    )
+                }
+            } else {
+                return [
+                    DashboardListItem(id: "r1", title: "Ermay Bilişim Ltd. Şti.", description: "Satış Faturası", date: "02.11.2026", vadeGun: 15, amount: 14500.0, type: "In"),
+                    DashboardListItem(id: "r2", title: "Kaya Metal A.Ş.", description: "Tahsilat", date: "01.11.2026", vadeGun: nil, amount: 35000.0, type: "In"),
+                    DashboardListItem(id: "r3", title: "Akıncılar Çelik Döküm", description: "Tediye", date: "31.10.2026", vadeGun: nil, amount: 6200.0, type: "Out"),
+                    DashboardListItem(id: "r4", title: "Mega Plastik San.", description: "Alış Faturası", date: "30.10.2026", vadeGun: 22, amount: 22800.0, type: "Out")
+                ]
+            }
+        }
     }
     
     public var body: some View {
@@ -121,30 +218,31 @@ public struct DashboardView: View {
                                         Image(systemName: "chart.line.uptrend.xyaxis")
                                             .foregroundColor(Color(hex: "00FF87"))
                                     }
-                                    Text("+" + AppFormatters.money(netLikidite))
+                                    Text(AppFormatters.money(netLikidite))
                                         .font(.system(size: 16, weight: .heavy))
                                         .foregroundColor(Color(hex: "00FF87"))
-                                    Text("Net Likidite")
+                                    Text("Net Likidite Durumu")
                                         .font(.system(size: 10))
-                                        .foregroundColor(AppTheme.textMuted)
+                                        .foregroundColor(Color(hex: "00FF87").opacity(0.85))
                                 }
                             }
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16)
-                                    .stroke(Color(hex: "00FF87").opacity(0.3), lineWidth: 1)
+                                    .stroke(Color(hex: "00FF87").opacity(0.3), lineWidth: 1.5)
                             )
                         }
                         .padding(.horizontal)
                         
-                        // HIZLI İŞLEMLER (4 Buton)
-                        GlassCard(cornerRadius: 16, padding: 14) {
-                            VStack(alignment: .leading, spacing: 10) {
+                        // HIZLI İŞLEMLER Bölümü
+                        GlassCard(cornerRadius: 18, padding: 16) {
+                            VStack(alignment: .leading, spacing: 12) {
                                 Text("HIZLI İŞLEMLER")
                                     .font(.system(size: 11, weight: .bold))
                                     .foregroundColor(AppTheme.textSecondary)
+                                    .tracking(0.5)
                                 
                                 HStack(spacing: 8) {
-                                    QuickActionBox(title: "Alış Faturası", icon: "doc.badge.plus", color: Color(hex: "FF9F0A")) {
+                                    QuickActionBox(title: "Alış Faturası", icon: "doc.text.fill", color: Color(hex: "FF9F0A")) {
                                         showAlisFaturaForm = true
                                     }
                                     QuickActionBox(title: "Satış Faturası", icon: "doc.text.fill", color: Color(hex: "30D158")) {
@@ -268,10 +366,10 @@ public struct DashboardView: View {
                         }
                         .padding(.horizontal)
                         
-                        // Son İşlemler (3 Sekmeli Liste)
+                        // Son İşlemler (3 Sekmeli Liste: Son İşlemler / Alacak Takibi / Borç Takibi)
                         GlassCard(cornerRadius: 18, padding: 16) {
                             VStack(spacing: 12) {
-                                HStack {
+                                HStack(spacing: 6) {
                                     TabFilterButton(title: "Son İşlemler", isSelected: activeTab == "recents") {
                                         activeTab = "recents"
                                     }
@@ -283,35 +381,55 @@ public struct DashboardView: View {
                                     }
                                 }
                                 
-                                VStack(spacing: 8) {
-                                    ForEach(sampleTransactions) { tx in
-                                        HStack(spacing: 10) {
-                                            ZStack {
-                                                RoundedRectangle(cornerRadius: 8)
-                                                    .fill((tx.alacak > 0 ? Color(hex: "00FF87") : Color(hex: "FF416C")).opacity(0.15))
-                                                    .frame(width: 32, height: 32)
-                                                Text(tx.alacak > 0 ? "G" : "Ç")
-                                                    .font(.system(size: 13, weight: .bold))
-                                                    .foregroundColor(tx.alacak > 0 ? Color(hex: "00FF87") : Color(hex: "FF416C"))
-                                            }
-                                            
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(tx.aciklama ?? (tx.islemTuru ?? "İşlem"))
-                                                    .font(.system(size: 12, weight: .bold))
-                                                    .foregroundColor(AppTheme.textPrimary)
-                                                    .lineLimit(1)
-                                                Text("\((tx.islemTuru ?? "İşlem")) • \((tx.tarih ?? "02.11.2026")) • 15 G")
-                                                    .font(.system(size: 10))
+                                VStack(spacing: 10) {
+                                    if currentListData.isEmpty {
+                                        Text("Kayıt bulunamadı.")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(AppTheme.textMuted)
+                                            .padding(.vertical, 20)
+                                    } else {
+                                        ForEach(currentListData) { item in
+                                            HStack(spacing: 12) {
+                                                ZStack {
+                                                    RoundedRectangle(cornerRadius: 10)
+                                                        .fill((item.type == "In" ? Color(hex: "00FF87") : Color(hex: "FF416C")).opacity(0.15))
+                                                        .frame(width: 36, height: 36)
+                                                    Text(item.type == "In" ? "G" : "Ç")
+                                                        .font(.system(size: 14, weight: .bold))
+                                                        .foregroundColor(item.type == "In" ? Color(hex: "00FF87") : Color(hex: "FF416C"))
+                                                }
+                                                
+                                                VStack(alignment: .leading, spacing: 3) {
+                                                    Text(item.title)
+                                                        .font(.system(size: 13, weight: .bold))
+                                                        .foregroundColor(AppTheme.textPrimary)
+                                                        .lineLimit(1)
+                                                    
+                                                    HStack(spacing: 4) {
+                                                        Text(item.description)
+                                                        Text("•")
+                                                        Text(item.date)
+                                                        if let vg = item.vadeGun {
+                                                            Text("•")
+                                                            Text("\(vg) G")
+                                                        }
+                                                    }
+                                                    .font(.system(size: 11))
                                                     .foregroundColor(AppTheme.textMuted)
+                                                }
+                                                
+                                                Spacer()
+                                                
+                                                Text((item.type == "In" ? "+" : "-") + AppFormatters.money(item.amount))
+                                                    .font(.system(size: 13, weight: .heavy))
+                                                    .foregroundColor(item.type == "In" ? Color(hex: "00FF87") : Color(hex: "FF416C"))
                                             }
+                                            .padding(.vertical, 4)
                                             
-                                            Spacer()
-                                            
-                                            Text((tx.alacak > 0 ? "+" : "-") + AppFormatters.money(tx.alacak > 0 ? tx.alacak : tx.borc))
-                                                .font(.system(size: 12, weight: .heavy))
-                                                .foregroundColor(tx.alacak > 0 ? Color(hex: "00FF87") : Color(hex: "FF416C"))
+                                            if item.id != currentListData.last?.id {
+                                                Divider().background(AppTheme.border.opacity(0.6))
+                                            }
                                         }
-                                        .padding(.vertical, 2)
                                     }
                                 }
                             }
@@ -323,8 +441,11 @@ public struct DashboardView: View {
                 }
             }
             .navigationBarHidden(true)
+            .sheet(isPresented: $showAlisFaturaForm) {
+                FaturaFormView(initialTur: "ALIS")
+            }
             .sheet(isPresented: $showSatisFaturaForm) {
-                FaturaFormView()
+                FaturaFormView(initialTur: "SATIS")
             }
             .sheet(isPresented: $showSiparisForm) {
                 SiparisFormView()
@@ -342,10 +463,14 @@ public struct DashboardView: View {
         isLoading = true
         do {
             let cariler: [CariKart] = try await SupabaseService.shared.fetch(from: "cariler")
+            let faturalar: [Fatura] = (try? await SupabaseService.shared.fetch(from: "faturalar")) ?? []
+            
             let alacak = cariler.filter { $0.bakiyeTuru == "A" }.reduce(0.0) { $0 + $1.bakiye }
             let borc = cariler.filter { $0.bakiyeTuru == "B" }.reduce(0.0) { $0 + $1.bakiye }
             
             await MainActor.run {
+                self.carilerList = cariler
+                self.faturalarList = faturalar
                 if alacak > 0 { self.alacaklar = alacak }
                 if borc > 0 { self.borclar = borc }
             }
@@ -353,15 +478,6 @@ public struct DashboardView: View {
             print("Dashboard fetch error: \(error.localizedDescription)")
         }
         isLoading = false
-    }
-    
-    private var sampleTransactions: [CariHareket] {
-        [
-            CariHareket(id: "1", tarih: "02.11.2026", belgeNo: "FTR-2026-004", islemTuru: "Satış Faturası", aciklama: "Ermay Bilişim Ltd. Şti.", alacak: 14500.0),
-            CariHareket(id: "2", tarih: "01.11.2026", belgeNo: "THS-089", islemTuru: "Tahsilat", aciklama: "Kaya Metal A.Ş.", alacak: 35000.0),
-            CariHareket(id: "3", tarih: "31.10.2026", belgeNo: "TED-042", islemTuru: "Tediye", aciklama: "Akıncılar Çelik Döküm", borc: 6200.0),
-            CariHareket(id: "4", tarih: "30.10.2026", belgeNo: "FTR-2026-003", islemTuru: "Alış Faturası", aciklama: "Mega Plastik San.", borc: 22800.0)
-        ]
     }
 }
 
