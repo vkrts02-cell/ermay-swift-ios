@@ -202,9 +202,9 @@ public struct CariFormView: View {
         
         Task {
             do {
-                let saved: CariKart = try await SupabaseService.shared.insert(into: "cariler", item: newCari)
+                try await SupabaseService.shared.insert(into: "cariler", item: newCari)
                 await MainActor.run {
-                    onSave?(saved)
+                    onSave?(newCari)
                     isSaving = false
                     dismiss()
                 }

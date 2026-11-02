@@ -32,6 +32,38 @@ public struct Teklif: Identifiable, Codable, Hashable {
         case syncGuid = "sync_guid"
         case tenantId = "tenant_id"
     }
+    
+    public init(
+        id: String = UUID().uuidString,
+        teklifNo: String = "",
+        cariId: String? = nil,
+        cariUnvan: String? = nil,
+        tarih: String = AppFormatters.isoDate.string(from: Date()),
+        gecerlilikTarihi: String? = nil,
+        araToplam: Double = 0.0,
+        kdvToplami: Double = 0.0,
+        genelToplam: Double = 0.0,
+        durum: String = "TASLAK",
+        aciklama: String? = nil,
+        kalemler: [TeklifKalem]? = nil,
+        syncGuid: String? = nil,
+        tenantId: String? = nil
+    ) {
+        self.id = id
+        self.teklifNo = teklifNo
+        self.cariId = cariId
+        self.cariUnvan = cariUnvan
+        self.tarih = tarih
+        self.gecerlilikTarihi = gecerlilikTarihi
+        self.araToplam = araToplam
+        self.kdvToplami = kdvToplami
+        self.genelToplam = genelToplam
+        self.durum = durum
+        self.aciklama = aciklama
+        self.kalemler = kalemler
+        self.syncGuid = syncGuid
+        self.tenantId = tenantId
+    }
 }
 
 public struct TeklifKalem: Identifiable, Codable, Hashable {
@@ -56,5 +88,26 @@ public struct TeklifKalem: Identifiable, Codable, Hashable {
         case kdvOrani = "kdv_orani"
         case tutar
     }
+    
+    public init(
+        id: String = UUID().uuidString,
+        teklifId: String? = nil,
+        stokId: String? = nil,
+        stokAdi: String,
+        miktar: Double = 1.0,
+        birim: String? = "Adet",
+        birimFiyat: Double = 0.0,
+        kdvOrani: Double = 20.0,
+        tutar: Double = 0.0
+    ) {
+        self.id = id
+        self.teklifId = teklifId
+        self.stokId = stokId
+        self.stokAdi = stokAdi
+        self.miktar = miktar
+        self.birim = birim
+        self.birimFiyat = birimFiyat
+        self.kdvOrani = kdvOrani
+        self.tutar = tutar
+    }
 }
-

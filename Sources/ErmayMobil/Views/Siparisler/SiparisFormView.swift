@@ -246,9 +246,9 @@ public struct SiparisFormView: View {
         
         Task {
             do {
-                let saved: Siparis = try await SupabaseService.shared.insert(into: "siparisler", item: newS)
+                try await SupabaseService.shared.insert(into: "siparisler", item: newS)
                 await MainActor.run {
-                    onSave?(saved)
+                    onSave?(newS)
                     dismiss()
                 }
             } catch {

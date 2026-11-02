@@ -229,9 +229,9 @@ public struct StokPickerSheet: View {
         } catch {
             if stoklar.isEmpty {
                 stoklar = [
-                    StokKart(stokKodu: "STK-001", stokAdi: "Endüstriyel Rulman 6204-2RS", birim: "Adet", alisFiyati: 280.0, satisFiyati: 450.0, mevcutMiktar: 120.0, kdvOrani: 20),
-                    StokKart(stokKodu: "STK-002", stokAdi: "Paslanmaz Çelik Civata M8x30", birim: "Adet", alisFiyati: 12.0, satisFiyati: 24.0, mevcutMiktar: 450.0, kdvOrani: 20),
-                    StokKart(stokKodu: "STK-003", stokAdi: "Yüksek Basınç Hidrolik Yağı 20L", birim: "Teneke", alisFiyati: 1400.0, satisFiyati: 2100.0, mevcutMiktar: 15.0, kdvOrani: 20)
+                    StokKart(stokKodu: "STK-001", stokAdi: "Endüstriyel Rulman 6204-2RS", birim: "Adet", alisFiyati: 280.0, satisFiyati: 450.0, kdvOrani: 20, mevcutMiktar: 120.0),
+                    StokKart(stokKodu: "STK-002", stokAdi: "Paslanmaz Çelik Civata M8x30", birim: "Adet", alisFiyati: 12.0, satisFiyati: 24.0, kdvOrani: 20, mevcutMiktar: 450.0),
+                    StokKart(stokKodu: "STK-003", stokAdi: "Yüksek Basınç Hidrolik Yağı 20L", birim: "Teneke", alisFiyati: 1400.0, satisFiyati: 2100.0, kdvOrani: 20, mevcutMiktar: 15.0)
                 ]
             }
         }

@@ -159,8 +159,10 @@ public struct TeklifDetailView: View {
             SiparisKalem(
                 stokAdi: k.stokAdi,
                 miktar: k.miktar,
+                birim: k.birim,
                 birimFiyat: k.birimFiyat,
-                kdvOrani: k.kdvOrani
+                kdvOrani: k.kdvOrani,
+                tutar: k.tutar
             )
         }
         
@@ -176,7 +178,7 @@ public struct TeklifDetailView: View {
         )
         
         Task {
-            _ = try? await SupabaseService.shared.insert(into: "siparisler", item: yeniSiparis)
+            try? await SupabaseService.shared.insert(into: "siparisler", item: yeniSiparis)
             try? await SupabaseService.shared.update(table: "teklifler", id: teklif.id, item: ["durum": "ONAYLANDI"])
             await MainActor.run {
                 teklif.durum = "ONAYLANDI"

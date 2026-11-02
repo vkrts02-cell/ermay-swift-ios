@@ -79,6 +79,11 @@ public final class SupabaseService: @unchecked Sendable {
     }
     
     // MARK: - PostgREST Insert
+    public func insert<T: Encodable>(into table: String, item: T) async throws {
+        let data = try encoder.encode(item)
+        try await insertRaw(into: table, data: data)
+    }
+    
     public func insert<T: Encodable, R: Decodable>(into table: String, item: T) async throws -> R {
         guard let url = URL(string: "\(baseUrl)/rest/v1/\(table)") else {
             throw URLError(.badURL)

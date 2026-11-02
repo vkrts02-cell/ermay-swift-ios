@@ -36,6 +36,42 @@ public struct Siparis: Identifiable, Codable, Hashable {
         case syncGuid = "sync_guid"
         case tenantId = "tenant_id"
     }
+    
+    public init(
+        id: String = UUID().uuidString,
+        siparisNo: String = "",
+        siparisTuru: String = "ALINAN",
+        cariId: String? = nil,
+        cariUnvan: String? = nil,
+        tarih: String = AppFormatters.isoDate.string(from: Date()),
+        teslimTarihi: String? = nil,
+        araToplam: Double = 0.0,
+        kdvToplami: Double = 0.0,
+        iskontoToplami: Double = 0.0,
+        genelToplam: Double = 0.0,
+        durum: String = "BEKLIYOR",
+        aciklama: String? = nil,
+        kalemler: [SiparisKalem]? = nil,
+        syncGuid: String? = nil,
+        tenantId: String? = nil
+    ) {
+        self.id = id
+        self.siparisNo = siparisNo
+        self.siparisTuru = siparisTuru
+        self.cariId = cariId
+        self.cariUnvan = cariUnvan
+        self.tarih = tarih
+        self.teslimTarihi = teslimTarihi
+        self.araToplam = araToplam
+        self.kdvToplami = kdvToplami
+        self.iskontoToplami = iskontoToplami
+        self.genelToplam = genelToplam
+        self.durum = durum
+        self.aciklama = aciklama
+        self.kalemler = kalemler
+        self.syncGuid = syncGuid
+        self.tenantId = tenantId
+    }
 }
 
 public struct SiparisKalem: Identifiable, Codable, Hashable {
@@ -60,5 +96,26 @@ public struct SiparisKalem: Identifiable, Codable, Hashable {
         case kdvOrani = "kdv_orani"
         case tutar
     }
+    
+    public init(
+        id: String = UUID().uuidString,
+        siparisId: String? = nil,
+        stokId: String? = nil,
+        stokAdi: String,
+        miktar: Double = 1.0,
+        birim: String? = "Adet",
+        birimFiyat: Double = 0.0,
+        kdvOrani: Double = 20.0,
+        tutar: Double = 0.0
+    ) {
+        self.id = id
+        self.siparisId = siparisId
+        self.stokId = stokId
+        self.stokAdi = stokAdi
+        self.miktar = miktar
+        self.birim = birim
+        self.birimFiyat = birimFiyat
+        self.kdvOrani = kdvOrani
+        self.tutar = tutar
+    }
 }
-

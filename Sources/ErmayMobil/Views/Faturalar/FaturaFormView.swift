@@ -342,9 +342,9 @@ public struct FaturaFormView: View {
         
         Task {
             do {
-                let saved: Fatura = try await SupabaseService.shared.insert(into: "faturalar", item: newFatura)
+                try await SupabaseService.shared.insert(into: "faturalar", item: newFatura)
                 await MainActor.run {
-                    onSave?(saved)
+                    onSave?(newFatura)
                     dismiss()
                 }
             } catch {

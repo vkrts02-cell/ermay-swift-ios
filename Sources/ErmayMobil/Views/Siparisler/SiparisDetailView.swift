@@ -145,7 +145,7 @@ public struct SiparisDetailView: View {
         )
         
         Task {
-            _ = try? await SupabaseService.shared.insert(into: "faturalar", item: yeniFatura)
+            try? await SupabaseService.shared.insert(into: "faturalar", item: yeniFatura)
             try? await SupabaseService.shared.update(table: "siparisler", id: siparis.id, item: ["durum": "TAMAMLANDI"])
             await MainActor.run {
                 siparis.durum = "TAMAMLANDI"

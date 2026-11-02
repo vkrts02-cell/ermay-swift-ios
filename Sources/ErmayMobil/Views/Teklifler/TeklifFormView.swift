@@ -283,7 +283,7 @@ public struct TeklifFormView: View {
             kalemler: kalemler
         )
         Task {
-            _ = try? await SupabaseService.shared.insert(into: "teklifler", item: newTeklif)
+            try? await SupabaseService.shared.insert(into: "teklifler", item: newTeklif)
             await MainActor.run {
                 onSave?(newTeklif)
                 dismiss()

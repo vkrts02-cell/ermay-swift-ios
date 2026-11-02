@@ -42,6 +42,38 @@ public struct SearchBarView: View {
     }
 }
 
+public struct FormField: View {
+    public let label: String
+    @Binding public var text: String
+    public var placeholder: String
+    
+    public init(label: String, text: Binding<String>, placeholder: String = "") {
+        self.label = label
+        self._text = text
+        self.placeholder = placeholder
+    }
+    
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(AppTheme.textSecondary)
+            
+            TextField(placeholder, text: $text)
+                .font(.system(size: 14))
+                .foregroundColor(AppTheme.textPrimary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(AppTheme.cardBackground)
+                .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(AppTheme.border, lineWidth: 1)
+                )
+        }
+    }
+}
+
 public struct StatusBadge: View {
     public let title: String
     public let color: Color
@@ -95,4 +127,3 @@ public struct ActionButton: View {
         }
     }
 }
-

@@ -91,11 +91,11 @@ public struct RaporDetayView: View {
     }
     
     public var hesaplananKDV: Double {
-        faturalar.filter { $0.faturaTuru.uppercased().contains("SATIS") }.reduce(0.0) { $0 + $1.kdvTutari }
+        faturalar.filter { $0.faturaTuru.uppercased().contains("SATIS") }.reduce(0.0) { $0 + $1.kdvToplami }
     }
     
     public var indirilecekKDV: Double {
-        faturalar.filter { $0.faturaTuru.uppercased().contains("ALIS") }.reduce(0.0) { $0 + $1.kdvTutari }
+        faturalar.filter { $0.faturaTuru.uppercased().contains("ALIS") }.reduce(0.0) { $0 + $1.kdvToplami }
     }
     
     public var toplamStokAlisDegeri: Double {
