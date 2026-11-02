@@ -18,7 +18,7 @@ public struct StoklarView: View {
         stoklar.filter { s in
             let matchSearch = searchText.isEmpty ||
                 s.stokAdi.localizedCaseInsensitiveContains(searchText) ||
-                s.stokKodu.localizedCaseInsensitiveContains(searchText) ||
+                (s.stokKodu?.localizedCaseInsensitiveContains(searchText) ?? false) ||
                 (s.barkod?.localizedCaseInsensitiveContains(searchText) ?? false) ||
                 (s.kategori?.localizedCaseInsensitiveContains(searchText) ?? false)
             
@@ -257,7 +257,7 @@ public struct AppleStokRow: View {
                     .lineLimit(1)
                 
                 HStack(spacing: 6) {
-                    Text(stok.stokKodu)
+                    Text(stok.stokKodu ?? "STK")
                         .font(.system(size: 11))
                         .foregroundColor(Color(hex: "94A3B8"))
                     
@@ -275,7 +275,7 @@ public struct AppleStokRow: View {
             Spacer()
             
             VStack(alignment: .trailing, spacing: 3) {
-                Text("\(String(format: "%.0f", stok.bakiye)) \(stok.birim)")
+                Text("\(String(format: "%.0f", stok.bakiye)) \(stok.birim ?? "Adet")")
                     .font(.system(size: 13, weight: .heavy))
                     .foregroundColor(stok.bakiye <= 0 ? Color(hex: "EF4444") : Color(hex: "00FF87"))
                 

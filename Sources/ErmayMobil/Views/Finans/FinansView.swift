@@ -41,7 +41,7 @@ public struct FinansView: View {
     public var filteredHareketler: [KasaHareket] {
         hareketler.filter { h in
             searchText.isEmpty ||
-                h.aciklama.localizedCaseInsensitiveContains(searchText) ||
+                (h.aciklama?.localizedCaseInsensitiveContains(searchText) ?? false) ||
                 h.islemTuru.localizedCaseInsensitiveContains(searchText) ||
                 (h.belgeNo?.localizedCaseInsensitiveContains(searchText) ?? false)
         }
@@ -174,7 +174,7 @@ public struct FinansView: View {
                                 }
                                 
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(h.aciklama)
+                                    Text(h.aciklama ?? h.islemTuru)
                                         .font(.system(size: 13, weight: .bold))
                                         .foregroundColor(.white)
                                         .lineLimit(1)
@@ -282,7 +282,7 @@ public struct FinansView: View {
                     }
                     
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(h.aciklama)
+                        Text(h.aciklama ?? h.islemTuru)
                             .font(.system(size: 13, weight: .bold))
                             .foregroundColor(.white)
                             .lineLimit(1)

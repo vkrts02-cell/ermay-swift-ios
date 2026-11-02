@@ -17,6 +17,17 @@ public struct StokKart: Identifiable, Codable, Hashable {
     public var syncGuid: String?
     public var tenantId: String?
     
+    // Compatibility properties
+    public var kategori: String? {
+        get { grupAdi }
+        set { grupAdi = newValue }
+    }
+    
+    public var bakiye: Double {
+        get { mevcutMiktar }
+        set { mevcutMiktar = newValue }
+    }
+    
     enum CodingKeys: String, CodingKey {
         case id
         case stokKodu = "stok_kodu"
@@ -40,11 +51,13 @@ public struct StokKart: Identifiable, Codable, Hashable {
         stokKodu: String? = nil,
         stokAdi: String,
         barkod: String? = nil,
-        grupAdi: String? = "Genel",
         birim: String? = "Adet",
         alisFiyati: Double = 0.0,
         satisFiyati: Double = 0.0,
         kdvOrani: Double = 20.0,
+        bakiye: Double = 0.0,
+        kategori: String? = "Genel",
+        grupAdi: String? = "Genel",
         mevcutMiktar: Double = 0.0,
         kritikMiktar: Double? = 5.0,
         aciklama: String? = nil,
@@ -56,12 +69,12 @@ public struct StokKart: Identifiable, Codable, Hashable {
         self.stokKodu = stokKodu
         self.stokAdi = stokAdi
         self.barkod = barkod
-        self.grupAdi = grupAdi
+        self.grupAdi = (kategori != "Genel") ? (kategori ?? grupAdi) : grupAdi
         self.birim = birim
         self.alisFiyati = alisFiyati
         self.satisFiyati = satisFiyati
         self.kdvOrani = kdvOrani
-        self.mevcutMiktar = mevcutMiktar
+        self.mevcutMiktar = bakiye > 0 ? bakiye : mevcutMiktar
         self.kritikMiktar = kritikMiktar
         self.aciklama = aciklama
         self.aktif = aktif
@@ -69,48 +82,3 @@ public struct StokKart: Identifiable, Codable, Hashable {
         self.tenantId = tenantId
     }
 }
-
-public struct StokHareket: Identifiable, Codable, Hashable {
-    public var id: String
-    public var stokId: String?
-    public var tarih: String?
-    public var islemTuru: String? // "Giriş", "Çıkış", "Sayım Fazlası", "Sayım Eksiği"
-    public var belgeNo: String?
-    public var miktar: Double
-    public var birimFiyat: Double
-    public var toplamTutar: Double
-    public var aciklama: String?
-    public var syncGuid: String?
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case stokId = "stok_id"
-        case tarih
-        case islemTuru = "islem_turu"
-        case belgeNo = "belge_no"
-        case miktar
-        case birimFiyat = "birim_fiyat"
-        case toplamTutar = "toplam_tutar"
-        case aciklama
-        case syncGuid = "sync_guid"
-    }
-}
-
-public struct StokGrup: Identifiable, Codable, Hashable {
-    public var id: String
-    public var grupAdi: String
-    public var aciklama: String?
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case grupAdi = "grup_adi"
-        case aciklama
-    }
-    
-    public init(id: String = UUID().uuidString, grupAdi: String, aciklama: String? = nil) {
-        self.id = id
-        self.grupAdi = grupAdi
-        self.aciklama = aciklama
-    }
-}
-
