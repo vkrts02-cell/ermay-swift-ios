@@ -4,6 +4,7 @@ public struct SiparislerView: View {
     @State private var siparisler: [Siparis] = []
     @State private var searchText: String = ""
     @State private var showForm: Bool = false
+    @State private var selectedSiparis: Siparis? = nil
     @State private var isLoading: Bool = false
     
     public init() {}
@@ -49,8 +50,26 @@ public struct SiparislerView: View {
                     .padding(.top, 8)
                     
                     // Search Bar
-                    SearchBarView(text: $searchText, placeholder: "Cari veya sipariş no ara...")
-                        .padding(.horizontal)
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(Color(hex: "94A3B8"))
+                        TextField("Cari veya sipariş no ara...", text: $searchText)
+                            .foregroundColor(.white)
+                            .font(.system(size: 14))
+                        if !searchText.isEmpty {
+                            Button {
+                                searchText = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(Color(hex: "94A3B8"))
+                            }
+                        }
+                    }
+                    .padding(12)
+                    .background(Color(hex: "121216"))
+                    .cornerRadius(12)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                    .padding(.horizontal)
                     
                     if isLoading && siparisler.isEmpty {
                         Spacer()
@@ -70,9 +89,12 @@ public struct SiparislerView: View {
                     } else {
                         List {
                             ForEach(filteredSiparisler) { siparis in
-                                NavigationLink(destination: SiparisDetailView(siparis: siparis)) {
+                                Button {
+                                    selectedSiparis = siparis
+                                } label: {
                                     ExactSiparisCard(siparis: siparis)
                                 }
+                                .buttonStyle(.plain)
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
                                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
@@ -92,6 +114,11 @@ public struct SiparislerView: View {
                 SiparisFormView { newSip in
                     siparisler.insert(newSip, at: 0)
                 }
+                .enableSwipeBack()
+            }
+            .sheet(item: $selectedSiparis) { sip in
+                SiparisDetailView(siparis: sip)
+                    .enableSwipeBack()
             }
             .task {
                 await loadSiparisler()
@@ -119,50 +146,61 @@ public struct SiparislerView: View {
     }
 }
 
-struct ExactSiparisCard: View {
-    let siparis: Siparis
+// MARK: - ExactSiparisCard (Exact match to SiparislerScreen.tsx)
+public struct ExactSiparisCard: View {
+    public let siparis: Siparis
     
-    var durumColor: Color {
-        switch siparis.durum {
-        case "Faturalandı":
+    public init(siparis: Siparis) {
+        self.siparis = siparis
+    }
+    
+    private var durumColor: Color {
+        switch siparis.durum.uppercased() {
+        case "FATURALANDI", "FATURALANDIRILDI", "TAMAMLANDI":
             return Color(hex: "10B981")
-        case "İptal":
+        case "IPTAL", "İPTAL", "REDDEDILDI":
             return Color(hex: "EF4444")
         default:
             return Color(hex: "F59E0B")
         }
     }
     
-    var body: some View {
-        GlassCard(cornerRadius: 14, padding: 14) {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(siparis.cariUnvan ?? "İsimsiz Cari")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(AppTheme.textPrimary)
-                        .lineLimit(1)
-                    
-                    Text("Sipariş No: \(siparis.siparisNo)")
-                        .font(.system(size: 12))
-                        .foregroundColor(AppTheme.textSecondary)
-                    
-                    Text("Tarih: \(siparis.tarih) • Teslimat: \(siparis.teslimTarihi)")
-                        .font(.system(size: 11))
-                        .foregroundColor(AppTheme.textMuted)
-                }
+    public var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(siparis.cariUnvan ?? "Cari Belirtilmedi")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
                 
-                Spacer()
+                Text("Sipariş No: \(siparis.siparisNo)")
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "94A3B8"))
                 
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(AppFormatters.money(siparis.genelToplam))
-                        .font(.system(size: 14, weight: .heavy))
-                        .foregroundColor(AppTheme.textPrimary)
-                    
-                    Text(siparis.durum)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(durumColor)
-                }
+                Text("Tarih: \(siparis.tarih) • Teslimat: \(siparis.teslimTarihi ?? "-")")
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "64748B"))
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(AppFormatters.money(siparis.genelToplam))
+                    .font(.system(size: 14, weight: .heavy))
+                    .foregroundColor(.white)
+                
+                Text(siparis.durum)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(durumColor)
+                    .textCase(.uppercase)
             }
         }
+        .padding(16)
+        .background(Color(hex: "0F0F0F"))
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
     }
 }

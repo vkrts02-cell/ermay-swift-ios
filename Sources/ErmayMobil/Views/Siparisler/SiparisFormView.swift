@@ -8,19 +8,23 @@ public struct SiparisFormView: View {
     @State private var durum: String = "Bekliyor" // "Bekliyor", "İptal"
     @State private var oncelik: String = "Orta" // "Düşük", "Orta", "Yüksek"
     @State private var odemeBilgisi: String = ""
-    @State private var tarih: Date = Date()
-    @State private var teslimatTarihi: Date = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+    @State private var tarihStr: String = ""
+    @State private var teslimatTarihiStr: String = ""
     @State private var baglantiEvrakNo: String = ""
     @State private var pdfNotlar: String = ""
+    @State private var aciklama: String = ""
+    
+    // Cari
     @State private var cariUnvan: String = ""
     @State private var cariId: String? = nil
     
     // Items
     @State private var kalemler: [SiparisKalem] = []
     
-    // Overlays & Sheets
+    // Overlays & Pickers
     @State private var showCariPicker: Bool = false
     @State private var showStokPicker: Bool = false
+    @State private var selectedItemForUnitIndex: Int? = nil
     @State private var isSaving: Bool = false
     @State private var errorMessage: String? = nil
     
@@ -45,33 +49,411 @@ public struct SiparisFormView: View {
     public var body: some View {
         NavigationStack {
             ZStack {
-                AppTheme.background.ignoresSafeArea()
+                Color.black.ignoresSafeArea()
                 
                 ScrollView {
                     VStack(spacing: 16) {
-                        headerSection
+                        // Header
+                        HStack {
+                            Text("Yeni Sipariş Oluştur")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.white)
+                            Spacer()
+                            Button {
+                                dismiss()
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(8)
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 12)
                         
                         if let err = errorMessage {
-                            errorBanner(err)
+                            Text(err)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.red)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(10)
+                                .background(Color.red.opacity(0.15))
+                                .cornerRadius(8)
+                                .padding(.horizontal)
                         }
                         
-                        cariSection
-                        siparisNoAndDurumRow
-                        oncelikAndOdemeRow
-                        tarihRow
-                        baglantiRow
-                        kalemlerSection
-                        summarySection
-                        saveButtonSection
+                        // Cari Kart Seçin Card
+                        Button {
+                            showCariPicker = true
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "person.circle.fill")
+                                    .font(.system(size: 22))
+                                    .foregroundColor(Color(hex: "0061FF"))
+                                Text(cariUnvan.isEmpty ? "Cari Kart Seçin *" : cariUnvan)
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.white)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(Color(hex: "64748B"))
+                            }
+                            .padding(14)
+                            .background(Color(hex: "121216"))
+                            .cornerRadius(12)
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                        }
+                        .padding(.horizontal)
+                        
+                        // 2 Kolon: Sipariş No & Durum
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("SİPARİŞ NO")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(Color(hex: "94A3B8"))
+                                TextField("Sipariş No", text: $siparisNo)
+                                    .padding(12)
+                                    .background(Color(hex: "121216"))
+                                    .cornerRadius(10)
+                                    .foregroundColor(.white)
+                                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                            }
+                            .frame(maxWidth: .infinity)
+                            
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("DURUM")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(Color(hex: "94A3B8"))
+                                HStack(spacing: 4) {
+                                    ForEach(["Bekliyor", "İptal"], id: \.self) { st in
+                                        Button {
+                                            durum = st
+                                        } label: {
+                                            Text(st)
+                                                .font(.system(size: 11, weight: .bold))
+                                                .foregroundColor(durum == st ? .white : Color(hex: "94A3B8"))
+                                                .frame(maxWidth: .infinity)
+                                                .frame(height: 42)
+                                                .background(durum == st ? Color(hex: "0061FF") : Color.white.opacity(0.04))
+                                                .cornerRadius(8)
+                                        }
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .padding(.horizontal)
+                        
+                        // 2 Kolon: Öncelik & Ödeme Bilgisi
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("ÖNCELİK")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(Color(hex: "94A3B8"))
+                                HStack(spacing: 4) {
+                                    ForEach(["Düşük", "Orta", "Yüksek"], id: \.self) { p in
+                                        Button {
+                                            oncelik = p
+                                        } label: {
+                                            Text(p)
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundColor(oncelik == p ? .white : Color(hex: "94A3B8"))
+                                                .frame(maxWidth: .infinity)
+                                                .frame(height: 42)
+                                                .background(oncelik == p ? Color(hex: "0061FF") : Color.white.opacity(0.04))
+                                                .cornerRadius(8)
+                                        }
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("ÖDEME BİLGİSİ")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(Color(hex: "94A3B8"))
+                                TextField("Peşin, Vade vb.", text: $odemeBilgisi)
+                                    .padding(12)
+                                    .background(Color(hex: "121216"))
+                                    .cornerRadius(10)
+                                    .foregroundColor(.white)
+                                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .padding(.horizontal)
+                        
+                        // 2 Kolon: Tarihler
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("SİPARİŞ TARİHİ")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(Color(hex: "94A3B8"))
+                                TextField("YYYY-MM-DD", text: $tarihStr)
+                                    .padding(12)
+                                    .background(Color(hex: "121216"))
+                                    .cornerRadius(10)
+                                    .foregroundColor(.white)
+                                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                            }
+                            .frame(maxWidth: .infinity)
+                            
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("TESLİMAT TARİHİ")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(Color(hex: "94A3B8"))
+                                TextField("YYYY-MM-DD", text: $teslimatTarihiStr)
+                                    .padding(12)
+                                    .background(Color(hex: "121216"))
+                                    .cornerRadius(10)
+                                    .foregroundColor(.white)
+                                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .padding(.horizontal)
+                        
+                        // 2 Kolon: Bağlantı Evrak No & PDF Notlar
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("BAĞLANTI EVRAK NO")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(Color(hex: "94A3B8"))
+                                TextField("Teklif No vb.", text: $baglantiEvrakNo)
+                                    .padding(12)
+                                    .background(Color(hex: "121216"))
+                                    .cornerRadius(10)
+                                    .foregroundColor(.white)
+                                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                            }
+                            .frame(maxWidth: .infinity)
+                            
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("PDF ÖZEL NOTLAR")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(Color(hex: "94A3B8"))
+                                TextField("Belgede çıkacak not...", text: $pdfNotlar)
+                                    .padding(12)
+                                    .background(Color(hex: "121216"))
+                                    .cornerRadius(10)
+                                    .foregroundColor(.white)
+                                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .padding(.horizontal)
+                        
+                        // Sipariş Kalemleri Bölümü
+                        VStack(spacing: 10) {
+                            HStack {
+                                Text("Sipariş Kalemleri")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.white)
+                                Spacer()
+                                Button {
+                                    showStokPicker = true
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "plus")
+                                        Text("Kalem Ekle")
+                                    }
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(Color(hex: "00FF87"))
+                                }
+                            }
+                            
+                            if kalemler.isEmpty {
+                                Text("Henüz kalem eklenmedi.")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(Color(hex: "64748B"))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 16)
+                            } else {
+                                ForEach(Array(kalemler.enumerated()), id: \.offset) { index, item in
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack {
+                                            Text(item.stokAdi)
+                                                .font(.system(size: 13, weight: .bold))
+                                                .foregroundColor(.white)
+                                            Spacer()
+                                            Button {
+                                                kalemler.remove(at: index)
+                                            } label: {
+                                                Image(systemName: "trash.fill")
+                                                    .font(.system(size: 14))
+                                                    .foregroundColor(Color(hex: "EF4444"))
+                                            }
+                                        }
+                                        
+                                        HStack(spacing: 8) {
+                                            // Miktar & Birim
+                                            HStack(spacing: 2) {
+                                                TextField("0", value: Binding(
+                                                    get: { kalemler[index].miktar },
+                                                    set: { kalemler[index].miktar = $0 }
+                                                ), formatter: NumberFormatter())
+                                                .keyboardType(.decimalPad)
+                                                .padding(8)
+                                                .background(Color(hex: "2A2A2A"))
+                                                .cornerRadius(6)
+                                                .foregroundColor(.white)
+                                                .frame(width: 60)
+                                                
+                                                Menu {
+                                                    ForEach(birimler, id: \.self) { b in
+                                                        Button(b) {
+                                                            kalemler[index].birim = b
+                                                        }
+                                                    }
+                                                } label: {
+                                                    HStack(spacing: 2) {
+                                                        Text(kalemler[index].birim ?? "Adet")
+                                                            .font(.system(size: 11, weight: .semibold))
+                                                            .foregroundColor(.white)
+                                                        Image(systemName: "chevron.down")
+                                                            .font(.system(size: 8))
+                                                            .foregroundColor(Color(hex: "94A3B8"))
+                                                    }
+                                                    .padding(.horizontal, 6)
+                                                    .padding(.vertical, 8)
+                                                    .background(Color(hex: "2A2A2A"))
+                                                    .cornerRadius(6)
+                                                }
+                                            }
+                                            
+                                            // Fiyat
+                                            TextField("0.00", value: Binding(
+                                                get: { kalemler[index].birimFiyat },
+                                                set: { kalemler[index].birimFiyat = $0 }
+                                            ), formatter: NumberFormatter())
+                                            .keyboardType(.decimalPad)
+                                            .padding(8)
+                                            .background(Color(hex: "2A2A2A"))
+                                            .cornerRadius(6)
+                                            .foregroundColor(.white)
+                                            
+                                            // KDV
+                                            Text("%\(Int(kalemler[index].kdvOrani))")
+                                                .font(.system(size: 11, weight: .bold))
+                                                .foregroundColor(Color(hex: "10B981"))
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 8)
+                                                .background(Color.white.opacity(0.06))
+                                                .cornerRadius(6)
+                                        }
+                                        
+                                        // Kalem Açıklaması
+                                        TextField("Kalem notu...", text: Binding(
+                                            get: { kalemler[index].aciklama ?? "" },
+                                            set: { kalemler[index].aciklama = $0 }
+                                        ))
+                                        .font(.system(size: 12))
+                                        .padding(8)
+                                        .background(Color(hex: "2A2A2A"))
+                                        .cornerRadius(6)
+                                        .foregroundColor(.white)
+                                    }
+                                    .padding(12)
+                                    .background(Color(hex: "121216"))
+                                    .cornerRadius(12)
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        
+                        // Açıklama
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("AÇIKLAMA")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(Color(hex: "94A3B8"))
+                            TextField("Sipariş hakkında not...", text: $aciklama, axis: .vertical)
+                                .lineLimit(3...5)
+                                .padding(12)
+                                .background(Color(hex: "121216"))
+                                .cornerRadius(10)
+                                .foregroundColor(.white)
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                        }
+                        .padding(.horizontal)
+                        
+                        // Toplam Bilgi Kartı (Exact to SiparisFormScreen.tsx)
+                        VStack(spacing: 8) {
+                            HStack {
+                                Text("Ara Toplam:")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(Color(hex: "94A3B8"))
+                                Spacer()
+                                Text(AppFormatters.money(araToplam))
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(.white)
+                            }
+                            HStack {
+                                Text("KDV Toplamı:")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(Color(hex: "94A3B8"))
+                                Spacer()
+                                Text(AppFormatters.money(kdvToplami))
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(.white)
+                            }
+                            Divider().background(Color.white.opacity(0.1))
+                            HStack {
+                                Text("Genel Toplam:")
+                                    .font(.system(size: 15, weight: .bold))
+                                    .foregroundColor(.white)
+                                Spacer()
+                                Text(AppFormatters.money(genelToplam))
+                                    .font(.system(size: 18, weight: .heavy))
+                                    .foregroundColor(Color(hex: "00FF87"))
+                            }
+                        }
+                        .padding(16)
+                        .background(Color(hex: "121216"))
+                        .cornerRadius(16)
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                        .padding(.horizontal)
+                        
+                        // Kaydet Butonu
+                        Button {
+                            handleSave()
+                        } label: {
+                            HStack(spacing: 8) {
+                                if isSaving {
+                                    ProgressView().tint(.white)
+                                } else {
+                                    Image(systemName: "square.and.arrow.down.fill")
+                                    Text("Siparişi Kaydet")
+                                }
+                            }
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(Color(hex: "0061FF"))
+                            .cornerRadius(12)
+                        }
+                        .disabled(isSaving)
+                        .padding(.horizontal)
+                        .padding(.bottom, 30)
                     }
                 }
             }
             .navigationBarHidden(true)
+            .enableSwipeBack()
+            .onAppear {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd"
+                tarihStr = formatter.string(from: Date())
+                let deliveryDate = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+                teslimatTarihiStr = formatter.string(from: deliveryDate)
+            }
             .sheet(isPresented: $showCariPicker) {
                 CariPickerSheet { c in
                     self.cariId = c.id
                     self.cariUnvan = c.unvan
                 }
+                .enableSwipeBack()
             }
             .sheet(isPresented: $showStokPicker) {
                 StokPickerSheet { s in
@@ -85,432 +467,40 @@ public struct SiparisFormView: View {
                     )
                     kalemler.append(newKalem)
                 }
+                .enableSwipeBack()
             }
         }
     }
     
-    // MARK: - Subviews
-    private var headerSection: some View {
-        HStack {
-            Text("Yeni Sipariş Oluştur")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(AppTheme.textPrimary)
-            Spacer()
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 24))
-                    .foregroundColor(AppTheme.textMuted)
-            }
-        }
-        .padding(.horizontal)
-        .padding(.top, 12)
-    }
-    
-    private func errorBanner(_ err: String) -> some View {
-        Text(err)
-            .font(.system(size: 13, weight: .bold))
-            .foregroundColor(AppTheme.danger)
-            .padding()
-            .frame(maxWidth: .infinity)
-            .background(AppTheme.dangerMuted.opacity(0.4))
-            .cornerRadius(10)
-            .padding(.horizontal)
-    }
-    
-    private var cariSection: some View {
-        Button {
-            showCariPicker = true
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "person.crop.circle.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(Color(hex: "0061FF"))
-                Text(cariUnvan.isEmpty ? "Cari Kart Seçin *" : cariUnvan)
-                    .font(.system(size: 14, weight: cariUnvan.isEmpty ? .regular : .bold))
-                    .foregroundColor(cariUnvan.isEmpty ? AppTheme.textMuted : AppTheme.textPrimary)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.textMuted)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 14)
-            .background(Color(hex: "121216"))
-            .cornerRadius(12)
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08), lineWidth: 1))
-        }
-        .padding(.horizontal)
-    }
-    
-    private var siparisNoAndDurumRow: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Sipariş No")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.textSecondary)
-                TextField("SIP-000", text: $siparisNo)
-                    .font(.system(size: 13, weight: .medium))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(Color(hex: "121216"))
-                    .cornerRadius(8)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 1))
-                    .foregroundColor(AppTheme.textPrimary)
-            }
-            .frame(maxWidth: .infinity)
-            
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Durum")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.textSecondary)
-                HStack(spacing: 4) {
-                    ForEach(["Bekliyor", "İptal"], id: \.self) { st in
-                        Button {
-                            durum = st
-                        } label: {
-                            Text(st)
-                                .font(.system(size: 11, weight: durum == st ? .bold : .medium))
-                                .foregroundColor(durum == st ? .white : AppTheme.textSecondary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 9)
-                                .background(durum == st ? (st == "Bekliyor" ? Color(hex: "F59E0B") : Color(hex: "EF4444")) : Color(hex: "121216"))
-                                .cornerRadius(8)
-                        }
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .padding(.horizontal)
-    }
-    
-    private var oncelikAndOdemeRow: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Öncelik")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.textSecondary)
-                HStack(spacing: 2) {
-                    ForEach(["Düşük", "Orta", "Yüksek"], id: \.self) { p in
-                        Button {
-                            oncelik = p
-                        } label: {
-                            Text(p)
-                                .font(.system(size: 10, weight: oncelik == p ? .bold : .medium))
-                                .foregroundColor(oncelik == p ? .white : AppTheme.textSecondary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 9)
-                                .background(oncelik == p ? Color(hex: "0A84FF") : Color(hex: "121216"))
-                                .cornerRadius(8)
-                        }
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity)
-            
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Ödeme Bilgisi")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.textSecondary)
-                TextField("Peşin, Vade vb.", text: $odemeBilgisi)
-                    .font(.system(size: 13, weight: .medium))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(Color(hex: "121216"))
-                    .cornerRadius(8)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 1))
-                    .foregroundColor(AppTheme.textPrimary)
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .padding(.horizontal)
-    }
-    
-    private var tarihRow: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Sipariş Tarihi")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.textSecondary)
-                DatePicker("", selection: $tarih, displayedComponents: .date)
-                    .labelsHidden()
-                    .colorScheme(.dark)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(6)
-                    .background(Color(hex: "121216"))
-                    .cornerRadius(8)
-            }
-            .frame(maxWidth: .infinity)
-            
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Teslimat Tarihi")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.textSecondary)
-                DatePicker("", selection: $teslimatTarihi, displayedComponents: .date)
-                    .labelsHidden()
-                    .colorScheme(.dark)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(6)
-                    .background(Color(hex: "121216"))
-                    .cornerRadius(8)
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .padding(.horizontal)
-    }
-    
-    private var baglantiRow: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Bağlantı Evrak No")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.textSecondary)
-                TextField("Teklif No vb.", text: $baglantiEvrakNo)
-                    .font(.system(size: 13, weight: .medium))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(Color(hex: "121216"))
-                    .cornerRadius(8)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 1))
-                    .foregroundColor(AppTheme.textPrimary)
-            }
-            .frame(maxWidth: .infinity)
-            
-            VStack(alignment: .leading, spacing: 6) {
-                Text("PDF Özel Notlar")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(AppTheme.textSecondary)
-                TextField("Belgede çıkacak not...", text: $pdfNotlar)
-                    .font(.system(size: 13, weight: .medium))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(Color(hex: "121216"))
-                    .cornerRadius(8)
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 1))
-                    .foregroundColor(AppTheme.textPrimary)
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .padding(.horizontal)
-    }
-    
-    private var kalemlerSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Sipariş Kalemleri (\(kalemler.count))")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(AppTheme.textPrimary)
-                Spacer()
-                Button {
-                    showStokPicker = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "plus")
-                        Text("Kalem Ekle")
-                    }
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(Color(hex: "00FF87"))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color(hex: "00FF87").opacity(0.12))
-                    .cornerRadius(8)
-                }
-            }
-            
-            if kalemler.isEmpty {
-                Text("Henüz kalem eklenmedi.")
-                    .font(.system(size: 12))
-                    .foregroundColor(AppTheme.textMuted)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 20)
-            } else {
-                ForEach(kalemler.indices, id: \.self) { idx in
-                    kalemCard(idx)
-                }
-            }
-        }
-        .padding(.horizontal)
-    }
-    
-    private func kalemCard(_ idx: Int) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(kalemler[idx].stokAdi)
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(AppTheme.textPrimary)
-                Spacer()
-                Button {
-                    kalemler.remove(at: idx)
-                } label: {
-                    Image(systemName: "trash.fill")
-                        .font(.system(size: 13))
-                        .foregroundColor(AppTheme.danger)
-                }
-            }
-            
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Miktar")
-                        .font(.system(size: 10))
-                        .foregroundColor(AppTheme.textSecondary)
-                    HStack(spacing: 4) {
-                        TextField("0", value: $kalemler[idx].miktar, format: .number)
-                            .keyboardType(.decimalPad)
-                            .font(.system(size: 12, weight: .bold))
-                            .padding(6)
-                            .background(Color.white.opacity(0.06))
-                            .cornerRadius(6)
-                        
-                        Menu {
-                            ForEach(birimler, id: \.self) { b in
-                                Button(b) {
-                                    kalemler[idx].birim = b
-                                }
-                            }
-                        } label: {
-                            Text(kalemler[idx].birim ?? "Adet")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(AppTheme.textPrimary)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 6)
-                                .background(Color.white.opacity(0.08))
-                                .cornerRadius(6)
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Birim Fiyat (₺)")
-                        .font(.system(size: 10))
-                        .foregroundColor(AppTheme.textSecondary)
-                    TextField("0.00", value: $kalemler[idx].birimFiyat, format: .number)
-                        .keyboardType(.decimalPad)
-                        .font(.system(size: 12, weight: .bold))
-                        .padding(6)
-                        .background(Color.white.opacity(0.06))
-                        .cornerRadius(6)
-                }
-                .frame(maxWidth: .infinity)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("KDV")
-                        .font(.system(size: 10))
-                        .foregroundColor(AppTheme.textSecondary)
-                    Text("%\(Int(kalemler[idx].kdvOrani))")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(Color(hex: "10B981"))
-                        .frame(maxWidth: .infinity)
-                        .padding(6)
-                        .background(Color.white.opacity(0.06))
-                        .cornerRadius(6)
-                }
-                .frame(width: 50)
-            }
-        }
-        .padding(12)
-        .background(Color(hex: "121216"))
-        .cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
-    }
-    
-    private var summarySection: some View {
-        GlassCard(cornerRadius: 14, padding: 14) {
-            VStack(spacing: 8) {
-                HStack {
-                    Text("Ara Toplam")
-                        .font(.system(size: 12))
-                        .foregroundColor(AppTheme.textSecondary)
-                    Spacer()
-                    Text(AppFormatters.money(araToplam))
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AppTheme.textPrimary)
-                }
-                HStack {
-                    Text("KDV Toplam")
-                        .font(.system(size: 12))
-                        .foregroundColor(AppTheme.textSecondary)
-                    Spacer()
-                    Text(AppFormatters.money(kdvToplami))
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AppTheme.textPrimary)
-                }
-                Divider().background(AppTheme.border)
-                HStack {
-                    Text("Genel Toplam")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(AppTheme.textPrimary)
-                    Spacer()
-                    Text(AppFormatters.money(genelToplam))
-                        .font(.system(size: 16, weight: .heavy))
-                        .foregroundColor(Color(hex: "00FF87"))
-                }
-            }
-        }
-        .padding(.horizontal)
-    }
-    
-    private var saveButtonSection: some View {
-        Button {
-            saveSiparis()
-        } label: {
-            HStack {
-                if isSaving {
-                    ProgressView().tint(.white)
-                } else {
-                    Image(systemName: "checkmark.circle.fill")
-                    Text("Siparişi Kaydet")
-                }
-            }
-            .font(.system(size: 15, weight: .bold))
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 14)
-            .background(Color(hex: "0A84FF"))
-            .cornerRadius(12)
-        }
-        .disabled(isSaving)
-        .padding(.horizontal)
-        .padding(.bottom, 40)
-    }
-    
-    private func saveSiparis() {
-        guard !cariUnvan.isEmpty else {
+    private func handleSave() {
+        if cariUnvan.isEmpty {
             errorMessage = "Lütfen bir cari kart seçiniz."
             return
         }
-        guard !kalemler.isEmpty else {
+        if kalemler.isEmpty {
             errorMessage = "Lütfen en az bir kalem ekleyiniz."
             return
         }
-        isSaving = true
         
-        let newSiparis = Siparis(
+        isSaving = true
+        let newSip = Siparis(
             siparisNo: siparisNo,
             siparisTuru: "ALINAN",
-            cariId: cariId ?? UUID().uuidString,
+            cariId: cariId ?? "1",
             cariUnvan: cariUnvan,
-            tarih: AppFormatters.isoDate.string(from: tarih),
-            teslimTarihi: AppFormatters.isoDate.string(from: teslimatTarihi),
-            araToplam: araToplam,
-            kdvToplami: kdvToplami,
-            iskontoToplami: 0.0,
+            tarih: tarihStr,
+            teslimTarihi: teslimatTarihiStr,
             genelToplam: genelToplam,
             durum: durum,
+            aciklama: aciklama,
             kalemler: kalemler
         )
         
         Task {
-            do {
-                try await SupabaseService.shared.insert(into: "siparisler", item: newSiparis)
-            } catch {
-                print("Siparis insert notice: \(error.localizedDescription)")
-            }
+            _ = try? await SupabaseService.shared.insert(newSip, into: "siparisler")
             await MainActor.run {
+                onSave?(newSip)
                 isSaving = false
-                onSave?(newSiparis)
                 dismiss()
             }
         }

@@ -50,6 +50,8 @@ jobs:
         run: |
           mkdir -p build/Payload
           cp -r build/ErmayMobil.xcarchive/Products/Applications/ErmayMobil.app build/Payload/
+          # Copy app icons directly into .app bundle root for guaranteed Springboard icon display
+          cp Sources/ErmayMobil/Resources/Assets.xcassets/AppIcon.appiconset/*.png build/Payload/ErmayMobil.app/ || true
           cd build
           zip -qr ErmayMobil.ipa Payload
           ls -lh ErmayMobil.ipa

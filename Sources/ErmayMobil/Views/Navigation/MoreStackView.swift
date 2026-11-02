@@ -13,16 +13,16 @@ public struct MoreStackView: View {
     
     private var menuItems: [MoreModuleItem] {
         [
-            MoreModuleItem(title: "Faturalar", icon: "doc.text.fill", color: Color(hex: "30D158"), destination: AnyView(FaturalarView())),
-            MoreModuleItem(title: "Stoklar", icon: "shippingbox.fill", color: Color(hex: "0A84FF"), destination: AnyView(StoklarView())),
-            MoreModuleItem(title: "Müşteri Takip", icon: "folder.fill", color: Color(hex: "3B82F6"), destination: AnyView(MusteriTakipView())),
-            MoreModuleItem(title: "Finans", icon: "creditcard.fill", color: Color(hex: "FF416C"), destination: AnyView(FinansView())),
-            MoreModuleItem(title: "Vade Takibi", icon: "calendar", color: Color(hex: "8B5CF6"), destination: AnyView(VadeTakipView())),
-            MoreModuleItem(title: "Raporlar", icon: "chart.pie.fill", color: Color(hex: "0061FF"), destination: AnyView(RaporlarView())),
-            MoreModuleItem(title: "Görev Panosu", icon: "square.grid.2x2.fill", color: Color(hex: "00FF87"), destination: AnyView(KanbanView())),
-            MoreModuleItem(title: "Hesap Makinası", icon: "function", color: Color(hex: "0D9488"), destination: AnyView(MaliyetHesaplamaView())),
-            MoreModuleItem(title: "Araçlar", icon: "wrench.and.screwdriver.fill", color: Color(hex: "F59E0B"), destination: AnyView(AraclarView())),
-            MoreModuleItem(title: "Ayarlar", icon: "gearshape.fill", color: Color(hex: "94A3B8"), destination: AnyView(AyarlarView()))
+            MoreModuleItem(title: "Faturalar", icon: "doc.text.fill", color: Color(hex: "30D158"), destination: AnyView(FaturalarView().enableSwipeBack())),
+            MoreModuleItem(title: "Stoklar", icon: "shippingbox.fill", color: Color(hex: "0A84FF"), destination: AnyView(StoklarView().enableSwipeBack())),
+            MoreModuleItem(title: "Müşteri Takip", icon: "folder.fill", color: Color(hex: "3B82F6"), destination: AnyView(MusteriTakipView().enableSwipeBack())),
+            MoreModuleItem(title: "Finans", icon: "creditcard.fill", color: Color(hex: "FF416C"), destination: AnyView(FinansView().enableSwipeBack())),
+            MoreModuleItem(title: "Vade Takibi", icon: "calendar", color: Color(hex: "8B5CF6"), destination: AnyView(VadeTakipView().enableSwipeBack())),
+            MoreModuleItem(title: "Raporlar", icon: "chart.pie.fill", color: Color(hex: "0061FF"), destination: AnyView(RaporlarView().enableSwipeBack())),
+            MoreModuleItem(title: "Görev Panosu", icon: "square.grid.2x2.fill", color: Color(hex: "00FF87"), destination: AnyView(KanbanView().enableSwipeBack())),
+            MoreModuleItem(title: "Hesap Makinası", icon: "plus.forwardslash.minus", color: Color(hex: "0D9488"), destination: AnyView(MaliyetHesaplamaView().enableSwipeBack())),
+            MoreModuleItem(title: "Araçlar", icon: "wrench.and.screwdriver.fill", color: Color(hex: "F59E0B"), destination: AnyView(AraclarView().enableSwipeBack())),
+            MoreModuleItem(title: "Ayarlar", icon: "gearshape.fill", color: Color(hex: "94A3B8"), destination: AnyView(AyarlarView().enableSwipeBack()))
         ]
     }
     
@@ -40,7 +40,7 @@ public struct MoreStackView: View {
                             .padding(.horizontal, 20)
                             .padding(.top, 16)
                         
-                        // Menü Kartı (Tekli Grup Kapsayıcısı)
+                        // Menü Kartı (Exact 10 Items from DahaFazlaScreen.tsx)
                         VStack(spacing: 0) {
                             ForEach(Array(menuItems.enumerated()), id: \.element.id) { index, item in
                                 NavigationLink(destination: item.destination) {

@@ -4,6 +4,7 @@ public struct TekliflerView: View {
     @State private var teklifler: [Teklif] = []
     @State private var searchText: String = ""
     @State private var showForm: Bool = false
+    @State private var selectedTeklif: Teklif? = nil
     @State private var isLoading: Bool = false
     
     public init() {}
@@ -41,7 +42,7 @@ public struct TekliflerView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
-                            .background(Color(hex: "BF5AF2"))
+                            .background(Color(hex: "0061FF"))
                             .cornerRadius(10)
                         }
                     }
@@ -49,8 +50,26 @@ public struct TekliflerView: View {
                     .padding(.top, 8)
                     
                     // Search Bar
-                    SearchBarView(text: $searchText, placeholder: "Cari veya teklif no ara...")
-                        .padding(.horizontal)
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(Color(hex: "94A3B8"))
+                        TextField("Cari veya teklif no ara...", text: $searchText)
+                            .foregroundColor(.white)
+                            .font(.system(size: 14))
+                        if !searchText.isEmpty {
+                            Button {
+                                searchText = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(Color(hex: "94A3B8"))
+                            }
+                        }
+                    }
+                    .padding(12)
+                    .background(Color(hex: "121216"))
+                    .cornerRadius(12)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                    .padding(.horizontal)
                     
                     if isLoading && teklifler.isEmpty {
                         Spacer()
@@ -59,10 +78,10 @@ public struct TekliflerView: View {
                     } else if filteredTeklifler.isEmpty {
                         Spacer()
                         VStack(spacing: 8) {
-                            Image(systemName: "doc.badge.arrow.up")
+                            Image(systemName: "tag.slash.fill")
                                 .font(.system(size: 40))
                                 .foregroundColor(AppTheme.textMuted)
-                            Text("Fiyat teklifi bulunamadı")
+                            Text("Teklif bulunamadı")
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundColor(AppTheme.textSecondary)
                         }
@@ -70,9 +89,12 @@ public struct TekliflerView: View {
                     } else {
                         List {
                             ForEach(filteredTeklifler) { teklif in
-                                NavigationLink(destination: TeklifDetailView(teklif: teklif)) {
+                                Button {
+                                    selectedTeklif = teklif
+                                } label: {
                                     ExactTeklifCard(teklif: teklif)
                                 }
+                                .buttonStyle(.plain)
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
                                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
@@ -89,9 +111,14 @@ public struct TekliflerView: View {
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showForm) {
-                TeklifFormView { newTeklif in
-                    teklifler.insert(newTeklif, at: 0)
+                TeklifFormView { newTek in
+                    teklifler.insert(newTek, at: 0)
                 }
+                .enableSwipeBack()
+            }
+            .sheet(item: $selectedTeklif) { tek in
+                TeklifDetailView(teklif: tek)
+                    .enableSwipeBack()
             }
             .task {
                 await loadTeklifler()
@@ -109,9 +136,9 @@ public struct TekliflerView: View {
         } catch {
             await MainActor.run {
                 self.teklifler = [
-                    Teklif(teklifNo: "TKF-391048", cariId: "1", cariUnvan: "Ermay Bilişim Ltd. Şti.", tarih: "2026-11-01", gecerlilikTarihi: "2026-11-15", genelToplam: 62000.0, durum: "Bekliyor"),
-                    Teklif(teklifNo: "TKF-810294", cariId: "2", cariUnvan: "Kaya Metal A.Ş.", tarih: "2026-10-29", gecerlilikTarihi: "2026-11-12", genelToplam: 84500.0, durum: "Siparişleşti"),
-                    Teklif(teklifNo: "TKF-492019", cariId: "3", cariUnvan: "Yıldız Lojistik", tarih: "2026-10-20", gecerlilikTarihi: "2026-11-03", genelToplam: 19800.0, durum: "Reddedildi")
+                    Teklif(teklifNo: "TKF-102948", cariId: "1", cariUnvan: "Ermay Bilişim Ltd. Şti.", tarih: "2026-11-02", gecerlilikTarihi: "2026-11-17", genelToplam: 64200.0, durum: "Bekliyor"),
+                    Teklif(teklifNo: "TKF-849201", cariId: "2", cariUnvan: "Akıncılar Çelik Döküm", tarih: "2026-10-29", gecerlilikTarihi: "2026-11-13", genelToplam: 89000.0, durum: "Siparişleşti"),
+                    Teklif(teklifNo: "TKF-391024", cariId: "3", cariUnvan: "Kaya Metal A.Ş.", tarih: "2026-10-22", gecerlilikTarihi: "2026-11-05", genelToplam: 21500.0, durum: "Reddedildi")
                 ]
             }
         }
@@ -119,50 +146,61 @@ public struct TekliflerView: View {
     }
 }
 
-struct ExactTeklifCard: View {
-    let teklif: Teklif
+// MARK: - ExactTeklifCard (Exact match to TekliflerScreen.tsx)
+public struct ExactTeklifCard: View {
+    public let teklif: Teklif
     
-    var durumColor: Color {
-        switch teklif.durum {
-        case "Siparişleşti":
+    public init(teklif: Teklif) {
+        self.teklif = teklif
+    }
+    
+    private var durumColor: Color {
+        switch teklif.durum.uppercased() {
+        case "SIPARISLESTI", "SİPARİŞLEŞTİ", "ONAYLANDI", "KABUL":
             return Color(hex: "10B981")
-        case "Reddedildi":
+        case "RED", "REDDEDILDI", "REDDEDİLDİ", "IPTAL":
             return Color(hex: "EF4444")
         default:
             return Color(hex: "F59E0B")
         }
     }
     
-    var body: some View {
-        GlassCard(cornerRadius: 14, padding: 14) {
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(teklif.cariUnvan ?? "İsimsiz Cari")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(AppTheme.textPrimary)
-                        .lineLimit(1)
-                    
-                    Text("Teklif No: \(teklif.teklifNo)")
-                        .font(.system(size: 12))
-                        .foregroundColor(AppTheme.textSecondary)
-                    
-                    Text("Tarih: \(teklif.tarih) • Geçerlilik: \(teklif.gecerlilikTarihi)")
-                        .font(.system(size: 11))
-                        .foregroundColor(AppTheme.textMuted)
-                }
+    public var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(teklif.cariUnvan ?? "Cari Belirtilmedi")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
                 
-                Spacer()
+                Text("Teklif No: \(teklif.teklifNo)")
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "94A3B8"))
                 
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text(AppFormatters.money(teklif.genelToplam))
-                        .font(.system(size: 14, weight: .heavy))
-                        .foregroundColor(AppTheme.textPrimary)
-                    
-                    Text(teklif.durum)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(durumColor)
-                }
+                Text("Tarih: \(teklif.tarih) • Geçerlilik: \(teklif.gecerlilikTarihi ?? "-")")
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "64748B"))
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 4) {
+                Text(AppFormatters.money(teklif.genelToplam))
+                    .font(.system(size: 14, weight: .heavy))
+                    .foregroundColor(.white)
+                
+                Text(teklif.durum)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(durumColor)
+                    .textCase(.uppercase)
             }
         }
+        .padding(16)
+        .background(Color(hex: "0F0F0F"))
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
     }
 }
