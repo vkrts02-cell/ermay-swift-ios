@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: com.ermay
   deploymentTarget:
     iOS: "16.0"
+  xcodeVersion: "15.4"
 settings:
   base:
     SWIFT_VERSION: "5.9"
@@ -23,9 +24,13 @@ targets:
           - "**/.gitkeep"
     dependencies:
       - package: Supabase
+        product: Supabase
       - package: KeychainAccess
+        product: KeychainAccess
       - package: Lottie
+        product: Lottie
       - package: SQLite
+        product: SQLite
     settings:
       base:
         PRODUCT_NAME: "ErmayMobil"
