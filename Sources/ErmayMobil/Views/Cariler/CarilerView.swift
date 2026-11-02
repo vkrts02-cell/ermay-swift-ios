@@ -240,11 +240,11 @@ public struct CarilerView: View {
         } catch {
             await MainActor.run {
                 self.cariler = [
-                    CariKart(id: "1", unvan: "Ermay Bilişim Sanayi Ltd. Şti.", cariKodu: "CARI-001", yetkili: "Ahmet Erdem", telefon: "0532 111 2233", sehir: "İstanbul", bakiye: 45200.0, bakiyeTuru: "A", cariTuru: "Müşteri", grup: "Müşteri"),
-                    CariKart(id: "2", unvan: "Mega Plastik Ambalaj Sanayi A.Ş.", cariKodu: "CARI-002", yetkili: "Mehmet Kaya", telefon: "0542 333 4455", sehir: "Kocaeli", bakiye: 28400.0, bakiyeTuru: "A", cariTuru: "Müşteri", grup: "Müşteri"),
-                    CariKart(id: "3", unvan: "Akıncılar Çelik Döküm A.Ş.", cariKodu: "CARI-003", yetkili: "Hakan Akıncı", telefon: "0505 555 6677", sehir: "Bursa", bakiye: 22800.0, bakiyeTuru: "B", cariTuru: "Tedarikçi", grup: "Tedarikçi"),
-                    CariKart(id: "4", unvan: "Kaya Metal Kalıp Ltd. Şti.", cariKodu: "CARI-004", yetkili: "Selim Kaya", telefon: "0533 777 8899", sehir: "İzmir", bakiye: 24800.0, bakiyeTuru: "A", cariTuru: "Müşteri", grup: "Müşteri"),
-                    CariKart(id: "5", unvan: "Özkanlar Ambalaj ve Koli Sanayi", cariKodu: "CARI-005", yetkili: "Murat Özkan", telefon: "0555 999 0011", sehir: "Ankara", bakiye: 11400.0, bakiyeTuru: "B", cariTuru: "Tedarikçi", grup: "Tedarikçi")
+                    CariKart(id: "1", cariKodu: "CARI-001", unvan: "Ermay Bilişim Sanayi Ltd. Şti.", cariTuru: "Müşteri", yetkili: "Ahmet Erdem", grup: "Müşteri", telefon: "0532 111 2233", sehir: "İstanbul", bakiye: 45200.0, bakiyeTuru: "A"),
+                    CariKart(id: "2", cariKodu: "CARI-002", unvan: "Mega Plastik Ambalaj Sanayi A.Ş.", cariTuru: "Müşteri", yetkili: "Mehmet Kaya", grup: "Müşteri", telefon: "0542 333 4455", sehir: "Kocaeli", bakiye: 28400.0, bakiyeTuru: "A"),
+                    CariKart(id: "3", cariKodu: "CARI-003", unvan: "Akıncılar Çelik Döküm A.Ş.", cariTuru: "Tedarikçi", yetkili: "Hakan Akıncı", grup: "Tedarikçi", telefon: "0505 555 6677", sehir: "Bursa", bakiye: 22800.0, bakiyeTuru: "B"),
+                    CariKart(id: "4", cariKodu: "CARI-004", unvan: "Kaya Metal Kalıp Ltd. Şti.", cariTuru: "Müşteri", yetkili: "Selim Kaya", grup: "Müşteri", telefon: "0533 777 8899", sehir: "İzmir", bakiye: 24800.0, bakiyeTuru: "A"),
+                    CariKart(id: "5", cariKodu: "CARI-005", unvan: "Özkanlar Ambalaj ve Koli Sanayi", cariTuru: "Tedarikçi", yetkili: "Murat Özkan", grup: "Tedarikçi", telefon: "0555 999 0011", sehir: "Ankara", bakiye: 11400.0, bakiyeTuru: "B")
                 ]
             }
         }
