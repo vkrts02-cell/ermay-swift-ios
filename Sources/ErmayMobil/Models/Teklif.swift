@@ -76,6 +76,7 @@ public struct TeklifKalem: Identifiable, Codable, Hashable {
     public var birimFiyat: Double
     public var kdvOrani: Double
     public var tutar: Double
+    public var aciklama: String?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -87,6 +88,7 @@ public struct TeklifKalem: Identifiable, Codable, Hashable {
         case birimFiyat = "birim_fiyat"
         case kdvOrani = "kdv_orani"
         case tutar
+        case aciklama
     }
     
     public init(
@@ -98,7 +100,8 @@ public struct TeklifKalem: Identifiable, Codable, Hashable {
         birim: String? = "Adet",
         birimFiyat: Double = 0.0,
         kdvOrani: Double = 20.0,
-        tutar: Double = 0.0
+        tutar: Double = 0.0,
+        aciklama: String? = nil
     ) {
         self.id = id
         self.teklifId = teklifId
@@ -109,5 +112,6 @@ public struct TeklifKalem: Identifiable, Codable, Hashable {
         self.birimFiyat = birimFiyat
         self.kdvOrani = kdvOrani
         self.tutar = tutar
+        self.aciklama = aciklama
     }
 }

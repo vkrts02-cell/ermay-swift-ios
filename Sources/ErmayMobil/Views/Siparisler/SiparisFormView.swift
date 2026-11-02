@@ -467,6 +467,13 @@ struct SiparisKalemRow: View {
     var birimler: [String]
     var onDelete: () -> Void
     
+    private var aciklamaBinding: Binding<String> {
+        Binding<String>(
+            get: { item.aciklama ?? "" },
+            set: { item.aciklama = $0 }
+        )
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -522,15 +529,12 @@ struct SiparisKalemRow: View {
                     .cornerRadius(6)
             }
             
-            TextField("Kalem notu...", text: Binding(
-                get: { item.aciklama ?? "" },
-                set: { item.aciklama = $0 }
-            ))
-            .font(.system(size: 12))
-            .padding(8)
-            .background(Color(hex: "2A2A2A"))
-            .cornerRadius(6)
-            .foregroundColor(.white)
+            TextField("Kalem notu...", text: aciklamaBinding)
+                .font(.system(size: 12))
+                .padding(8)
+                .background(Color(hex: "2A2A2A"))
+                .cornerRadius(6)
+                .foregroundColor(.white)
         }
         .padding(12)
         .background(Color(hex: "121216"))
