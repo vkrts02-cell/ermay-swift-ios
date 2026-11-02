@@ -19,6 +19,11 @@ public struct Fatura: Identifiable, Codable, Hashable {
     public var syncGuid: String?
     public var tenantId: String?
     
+    public var durum: String {
+        get { odemeDurumu ?? "Açık" }
+        set { odemeDurumu = newValue }
+    }
+    
     enum CodingKeys: String, CodingKey {
         case id
         case faturaNo = "fatura_no"
@@ -53,6 +58,7 @@ public struct Fatura: Identifiable, Codable, Hashable {
         genelToplam: Double = 0.0,
         tevkifatTutari: Double? = 0.0,
         odemeDurumu: String? = "BEKLIYOR",
+        durum: String? = nil,
         aciklama: String? = nil,
         kalemler: [FaturaKalem]? = [],
         syncGuid: String? = UUID().uuidString,
@@ -70,7 +76,7 @@ public struct Fatura: Identifiable, Codable, Hashable {
         self.iskontoToplami = iskontoToplami
         self.genelToplam = genelToplam
         self.tevkifatTutari = tevkifatTutari
-        self.odemeDurumu = odemeDurumu
+        self.odemeDurumu = durum ?? odemeDurumu
         self.aciklama = aciklama
         self.kalemler = kalemler
         self.syncGuid = syncGuid

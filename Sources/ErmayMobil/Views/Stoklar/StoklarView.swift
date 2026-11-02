@@ -190,10 +190,10 @@ public struct StoklarView: View {
         } catch {
             await MainActor.run {
                 self.stoklar = [
-                    StokKart(stokKodu: "STK-001", barkod: "869012345678", stokAdi: "Galvaniz Sac Levha 2mm", grupAdi: "Hammadde", birim: "Kg", alisFiyati: 42.50, satisFiyati: 58.00, kdvOrani: 20.0, mevcutMiktar: 1420.0),
-                    StokKart(stokKodu: "STK-002", barkod: "869012345679", stokAdi: "Alüminyum Profil 40x40", grupAdi: "Profil", birim: "Mt", alisFiyati: 110.00, satisFiyati: 145.00, kdvOrani: 20.0, mevcutMiktar: 85.0),
-                    StokKart(stokKodu: "STK-003", barkod: "869012345680", stokAdi: "Çelik Civata M8x30 (100'lü)", grupAdi: "Bağlantı", birim: "Adet", alisFiyati: 65.00, satisFiyati: 90.00, kdvOrani: 20.0, mevcutMiktar: 4.0, kritikMiktar: 10.0),
-                    StokKart(stokKodu: "STK-004", barkod: "869012345681", stokAdi: "Endüstriyel Epoksi Boya", grupAdi: "Kimyasal", birim: "Kg", alisFiyati: 240.00, satisFiyati: 310.00, kdvOrani: 20.0, mevcutMiktar: 0.0)
+                    StokKart(stokKodu: "STK-001", stokAdi: "Galvaniz Sac Levha 2mm", barkod: "869012345678", grupAdi: "Hammadde", birim: "Kg", alisFiyati: 42.50, satisFiyati: 58.00, kdvOrani: 20.0, mevcutMiktar: 1420.0),
+                    StokKart(stokKodu: "STK-002", stokAdi: "Alüminyum Profil 40x40", barkod: "869012345679", grupAdi: "Profil", birim: "Mt", alisFiyati: 110.00, satisFiyati: 145.00, kdvOrani: 20.0, mevcutMiktar: 85.0),
+                    StokKart(stokKodu: "STK-003", stokAdi: "Çelik Civata M8x30 (100'lü)", barkod: "869012345680", grupAdi: "Bağlantı", birim: "Adet", alisFiyati: 65.00, satisFiyati: 90.00, kdvOrani: 20.0, mevcutMiktar: 4.0, kritikMiktar: 10.0),
+                    StokKart(stokKodu: "STK-004", stokAdi: "Endüstriyel Epoksi Boya", barkod: "869012345681", grupAdi: "Kimyasal", birim: "Kg", alisFiyati: 240.00, satisFiyati: 310.00, kdvOrani: 20.0, mevcutMiktar: 0.0)
                 ]
             }
         }

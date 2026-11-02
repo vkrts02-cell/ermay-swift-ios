@@ -10,7 +10,7 @@ public struct StokSayimView: View {
     @State private var showScanner: Bool = false
     @State private var scannedNotice: String? = nil
     
-    public init(stoklar: [StokKart]) {
+    public init(stoklar: [StokKart] = []) {
         self.stoklar = stoklar
     }
     

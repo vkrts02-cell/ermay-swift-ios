@@ -9,9 +9,9 @@ public struct FinansView: View {
         KasaBanka(id: "3", hesapAdi: "İş Bankası Şirket Hesabı", hesapTuru: "BANKA", bankaAdi: "Türkiye İş Bankası", iban: "TR64 0006 4000 0012 3456 7890 12", bakiye: 46000.00)
     ]
     @State private var hareketler: [KasaHareket] = [
-        KasaHareket(id: "1", tarih: "02.11.2026", evrakNo: "THS-094", islemTuru: "Tahsilat", aciklama: "Ermay Bilişim Nakit Tahsilat", tutar: 15000.0),
-        KasaHareket(id: "2", tarih: "01.11.2026", evrakNo: "EFT-102", islemTuru: "Ödeme", aciklama: "Akıncılar Çelik Döküm Malzeme Bedeli", tutar: 28000.0),
-        KasaHareket(id: "3", tarih: "30.10.2026", evrakNo: "VRM-003", islemTuru: "Virman", aciklama: "Kasadan Bankaya Nakit Yatırma", tutar: 10000.0)
+        KasaHareket(id: "1", tarih: "02.11.2026", islemTuru: "Tahsilat", belgeNo: "THS-094", tutar: 15000.0, aciklama: "Ermay Bilişim Nakit Tahsilat"),
+        KasaHareket(id: "2", tarih: "01.11.2026", islemTuru: "Ödeme", belgeNo: "EFT-102", tutar: 28000.0, aciklama: "Akıncılar Çelik Döküm Malzeme Bedeli"),
+        KasaHareket(id: "3", tarih: "30.10.2026", islemTuru: "Virman", belgeNo: "VRM-003", tutar: 10000.0, aciklama: "Kasadan Bankaya Nakit Yatırma")
     ]
     
     // Sheets

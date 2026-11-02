@@ -80,5 +80,31 @@ public struct KasaHareket: Identifiable, Codable, Hashable {
         case syncGuid = "sync_guid"
         case tenantId = "tenant_id"
     }
+    
+    public init(
+        id: String = UUID().uuidString,
+        hesapId: String? = nil,
+        tarih: String = AppFormatters.isoDate.string(from: Date()),
+        islemTuru: String = "TAHSILAT",
+        cariId: String? = nil,
+        cariUnvan: String? = nil,
+        belgeNo: String? = nil,
+        tutar: Double = 0.0,
+        aciklama: String? = nil,
+        syncGuid: String? = UUID().uuidString,
+        tenantId: String? = nil
+    ) {
+        self.id = id
+        self.hesapId = hesapId
+        self.tarih = tarih
+        self.islemTuru = islemTuru
+        self.cariId = cariId
+        self.cariUnvan = cariUnvan
+        self.belgeNo = belgeNo
+        self.tutar = tutar
+        self.aciklama = aciklama
+        self.syncGuid = syncGuid
+        self.tenantId = tenantId
+    }
 }
 

@@ -109,9 +109,9 @@ public struct TekliflerView: View {
         } catch {
             await MainActor.run {
                 self.teklifler = [
-                    Teklif(teklifNo: "TKF-391048", cariId: "1", cariUnvan: "Ermay Bilişim Ltd. Şti.", tarih: "2026-11-01", gecerlilikTarihi: "2026-11-15", durum: "Bekliyor", genelToplam: 62000.0),
-                    Teklif(teklifNo: "TKF-810294", cariId: "2", cariUnvan: "Kaya Metal A.Ş.", tarih: "2026-10-29", gecerlilikTarihi: "2026-11-12", durum: "Siparişleşti", genelToplam: 84500.0),
-                    Teklif(teklifNo: "TKF-492019", cariId: "3", cariUnvan: "Yıldız Lojistik", tarih: "2026-10-20", gecerlilikTarihi: "2026-11-03", durum: "Reddedildi", genelToplam: 19800.0)
+                    Teklif(teklifNo: "TKF-391048", cariId: "1", cariUnvan: "Ermay Bilişim Ltd. Şti.", tarih: "2026-11-01", gecerlilikTarihi: "2026-11-15", genelToplam: 62000.0, durum: "Bekliyor"),
+                    Teklif(teklifNo: "TKF-810294", cariId: "2", cariUnvan: "Kaya Metal A.Ş.", tarih: "2026-10-29", gecerlilikTarihi: "2026-11-12", genelToplam: 84500.0, durum: "Siparişleşti"),
+                    Teklif(teklifNo: "TKF-492019", cariId: "3", cariUnvan: "Yıldız Lojistik", tarih: "2026-10-20", gecerlilikTarihi: "2026-11-03", genelToplam: 19800.0, durum: "Reddedildi")
                 ]
             }
         }

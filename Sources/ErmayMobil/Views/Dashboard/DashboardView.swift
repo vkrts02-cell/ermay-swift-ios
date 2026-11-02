@@ -131,7 +131,7 @@ public struct DashboardView: View {
                     let isIn = f.faturaTuru.uppercased().contains("SATIS") || f.faturaTuru.uppercased().contains("SATIŞ")
                     return DashboardListItem(
                         id: f.id,
-                        title: formatCariName(f.cariUnvan),
+                        title: formatCariName(f.cariUnvan ?? "İşlem"),
                         description: "\(f.faturaTuru) Faturası",
                         date: f.tarih,
                         vadeGun: nil,
