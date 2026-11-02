@@ -1,0 +1,63 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Package IPA
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode Project
+        run: xcodegen generate
+
+      - name: Resolve Swift Package Dependencies
+        run: |
+          xcodebuild -resolvePackageDependencies -project ErmayMobil.xcodeproj -scheme ErmayMobil
+
+      - name: Archive iOS App
+        run: |
+          xcodebuild -project ErmayMobil.xcodeproj \
+            -scheme ErmayMobil \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/ErmayMobil.xcarchive \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package Payload into IPA
+        run: |
+          mkdir -p build/Payload
+          cp -r build/ErmayMobil.xcarchive/Products/Applications/ErmayMobil.app build/Payload/
+          cd build
+          zip -qr ErmayMobil.ipa Payload
+          ls -la ErmayMobil.ipa
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ErmayMobil-iOS-IPA
+          path: build/ErmayMobil.ipa
+          retention-days: 14
+
+      - name: Create GitHub Release with IPA
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Ermay Mobil iOS v1.0.0 (Build ${{ github.run_number }})
+          files: build/ErmayMobil.ipa
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
