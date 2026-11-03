@@ -82,3 +82,79 @@ public struct StokKart: Identifiable, Codable, Hashable {
         self.tenantId = tenantId
     }
 }
+
+public struct StokMiktarUpdate: Codable {
+    public var mevcut_miktar: Double
+    public init(mevcutMiktar: Double) {
+        self.mevcut_miktar = mevcutMiktar
+    }
+}
+
+public struct StokHareket: Identifiable, Codable, Hashable {
+    public var id: String
+    public var stokId: String?
+    public var tarih: String?
+    public var islemTuru: String? // "Giriş", "Çıkış", "Sayım Fazlası", "Sayım Eksiği"
+    public var belgeNo: String?
+    public var miktar: Double
+    public var birimFiyat: Double
+    public var toplamTutar: Double
+    public var aciklama: String?
+    public var syncGuid: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case stokId = "stok_id"
+        case tarih
+        case islemTuru = "islem_turu"
+        case belgeNo = "belge_no"
+        case miktar
+        case birimFiyat = "birim_fiyat"
+        case toplamTutar = "toplam_tutar"
+        case aciklama
+        case syncGuid = "sync_guid"
+    }
+    
+    public init(
+        id: String = UUID().uuidString,
+        stokId: String? = nil,
+        tarih: String? = nil,
+        belgeNo: String? = nil,
+        islemTuru: String? = nil,
+        miktar: Double = 0.0,
+        birimFiyat: Double = 0.0,
+        toplamTutar: Double = 0.0,
+        aciklama: String? = nil,
+        syncGuid: String? = UUID().uuidString
+    ) {
+        self.id = id
+        self.stokId = stokId
+        self.tarih = tarih
+        self.belgeNo = belgeNo
+        self.islemTuru = islemTuru
+        self.miktar = miktar
+        self.birimFiyat = birimFiyat
+        self.toplamTutar = toplamTutar
+        self.aciklama = aciklama
+        self.syncGuid = syncGuid
+    }
+}
+
+public struct StokGrup: Identifiable, Codable, Hashable {
+    public var id: String
+    public var grupAdi: String
+    public var aciklama: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case grupAdi = "grup_adi"
+        case aciklama
+    }
+    
+    public init(id: String = UUID().uuidString, grupAdi: String, aciklama: String? = nil) {
+        self.id = id
+        self.grupAdi = grupAdi
+        self.aciklama = aciklama
+    }
+}
+

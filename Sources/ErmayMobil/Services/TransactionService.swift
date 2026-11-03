@@ -152,7 +152,7 @@ public final class TransactionService: @unchecked Sendable {
         try await SupabaseService.shared.update(
             table: "cariler",
             id: req.cari.id,
-            item: ["bakiye": abs(yeniBakiye), "bakiye_turu": yeniBakiyeTuru]
+            item: CariBakiyeUpdate(bakiye: abs(yeniBakiye), bakiyeTuru: yeniBakiyeTuru)
         )
         
         // 2. Kasa veya Banka Hareketi
@@ -243,7 +243,7 @@ public final class TransactionService: @unchecked Sendable {
                 if let st = stoklar.first {
                     let delta = isSatis ? -item.miktar : item.miktar
                     let yeniMiktar = max(0, st.mevcutMiktar + delta)
-                    try await SupabaseService.shared.update(table: "stoklar", id: stokId, item: ["mevcut_miktar": yeniMiktar])
+                    try await SupabaseService.shared.update(table: "stoklar", id: stokId, item: StokMiktarUpdate(mevcutMiktar: yeniMiktar))
                 }
             }
         }
@@ -267,7 +267,7 @@ public final class TransactionService: @unchecked Sendable {
         try await SupabaseService.shared.update(
             table: "cariler",
             id: req.cari.id,
-            item: ["bakiye": abs(sonBakiye), "bakiye_turu": sonBakiye >= 0 ? "A" : "B"]
+            item: CariBakiyeUpdate(bakiye: abs(sonBakiye), bakiyeTuru: sonBakiye >= 0 ? "A" : "B")
         )
         
         // 5. Eğer Fatura "Kapalı" ise Kasa/Banka Tahsilatını Anında Yap
@@ -317,7 +317,7 @@ public final class TransactionService: @unchecked Sendable {
                 if let st = stoklar.first {
                     let revertDelta = isSatis ? d.miktar : -d.miktar
                     let yeniMiktar = max(0, st.mevcutMiktar + revertDelta)
-                    try await SupabaseService.shared.update(table: "stoklar", id: stId, item: ["mevcut_miktar": yeniMiktar])
+                    try await SupabaseService.shared.update(table: "stoklar", id: stId, item: StokMiktarUpdate(mevcutMiktar: yeniMiktar))
                 }
             }
         }
@@ -333,7 +333,7 @@ public final class TransactionService: @unchecked Sendable {
                 try await SupabaseService.shared.update(
                     table: "cariler",
                     id: cId,
-                    item: ["bakiye": abs(revertBakiye), "bakiye_turu": revertBakiye >= 0 ? "A" : "B"]
+                    item: CariBakiyeUpdate(bakiye: abs(revertBakiye), bakiyeTuru: revertBakiye >= 0 ? "A" : "B")
                 )
             }
         }

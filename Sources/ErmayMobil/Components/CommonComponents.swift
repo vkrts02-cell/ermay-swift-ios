@@ -98,9 +98,9 @@ public struct ActionButton: View {
     public let title: String
     public let icon: String?
     public let color: Color
-    public let action: () -> Void
+    public let action: @MainActor () -> Void
     
-    public init(title: String, icon: String? = nil, color: Color = AppTheme.primary, action: @escaping () -> Void) {
+    public init(title: String, icon: String? = nil, color: Color = AppTheme.primary, action: @escaping @MainActor () -> Void) {
         self.title = title
         self.icon = icon
         self.color = color

@@ -25,29 +25,41 @@ public final class HardwareService: NSObject, ObservableObject {
     }
     
     // MARK: - Haptic Feedback
-    public func hapticSuccess() {
+    public nonisolated func hapticSuccess() {
         #if canImport(UIKit)
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        DispatchQueue.main.async {
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+        }
         #endif
     }
     
-    public func hapticWarning() {
+    public nonisolated func hapticWarning() {
         #if canImport(UIKit)
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.warning)
+        DispatchQueue.main.async {
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.warning)
+        }
         #endif
     }
     
-    public func hapticError() {
+    public nonisolated func hapticError() {
         #if canImport(UIKit)
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.error)
+        DispatchQueue.main.async {
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.error)
+        }
         #endif
     }
     
-    public func hapticImpact() {
+    public nonisolated func hapticImpact() {
         #if canImport(UIKit)
+        DispatchQueue.main.async {
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+        }
+        #endif
+    }
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
         #endif

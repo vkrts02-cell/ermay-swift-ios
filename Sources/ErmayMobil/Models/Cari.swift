@@ -109,3 +109,64 @@ public struct CariKart: Identifiable, Codable, Hashable {
         self.tenantId = tenantId
     }
 }
+
+public struct CariBakiyeUpdate: Codable {
+    public var bakiye: Double
+    public var bakiye_turu: String
+    
+    public init(bakiye: Double, bakiyeTuru: String) {
+        self.bakiye = bakiye
+        self.bakiye_turu = bakiyeTuru
+    }
+}
+
+public struct CariHareket: Identifiable, Codable, Hashable {
+    public var id: String
+    public var cariId: String?
+    public var tarih: String?
+    public var belgeNo: String?
+    public var islemTuru: String? // "Fatura", "Tahsilat", "Tediye", "Devir"
+    public var aciklama: String?
+    public var borc: Double
+    public var alacak: Double
+    public var bakiye: Double
+    public var syncGuid: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case cariId = "cari_id"
+        case tarih
+        case belgeNo = "belge_no"
+        case islemTuru = "islem_turu"
+        case aciklama
+        case borc
+        case alacak
+        case bakiye
+        case syncGuid = "sync_guid"
+    }
+    
+    public init(
+        id: String = UUID().uuidString,
+        cariId: String? = nil,
+        tarih: String? = nil,
+        belgeNo: String? = nil,
+        islemTuru: String? = nil,
+        aciklama: String? = nil,
+        borc: Double = 0.0,
+        alacak: Double = 0.0,
+        bakiye: Double = 0.0,
+        syncGuid: String? = UUID().uuidString
+    ) {
+        self.id = id
+        self.cariId = cariId
+        self.tarih = tarih
+        self.belgeNo = belgeNo
+        self.islemTuru = islemTuru
+        self.aciklama = aciklama
+        self.borc = borc
+        self.alacak = alacak
+        self.bakiye = bakiye
+        self.syncGuid = syncGuid
+    }
+}
+
