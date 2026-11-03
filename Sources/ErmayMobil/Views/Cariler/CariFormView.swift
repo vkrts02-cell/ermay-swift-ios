@@ -2,41 +2,60 @@ import SwiftUI
 
 public struct CariFormView: View {
     @Environment(\.dismiss) private var dismiss
+    public var cariToEdit: CariKart?
     public var onSave: ((CariKart) -> Void)?
     
     @State private var unvan: String = ""
-    @State private var cariKodu: String = ""
-    @State private var cariTuru: String = "Müşteri"
+    @State private var yetkili: String = ""
+    @State private var cariKod: String = ""
+    @State private var tur: String = "Alici"
+    @State private var grup: String = "Müşteri"
+    @State private var tcNo: String = ""
     @State private var vergiDairesi: String = ""
     @State private var vergiNo: String = ""
+    @State private var ticaretSicilNo: String = ""
+    @State private var iban: String = ""
     @State private var telefon: String = ""
-    @State private var gsm: String = ""
-    @State private var email: String = ""
-    @State private var sehir: String = "İstanbul"
+    @State private var cepTelefon: String = ""
+    @State private var eposta: String = ""
+    @State private var webAdresi: String = ""
+    @State private var odemePlani: String = "Peşin"
+    @State private var vadeGunu: String = "0"
+    @State private var riskLimiti: String = "0"
+    @State private var ulke: String = "Türkiye"
+    @State private var il: String = "İstanbul"
+    @State private var ilce: String = "Başakşehir"
     @State private var adres: String = ""
-    @State private var vadeGunu: String = "30"
+    @State private var sevkAdresi: String = ""
+    @State private var aciklama: String = ""
+    @State private var riskTakibiYapilsin: Bool = false
+    @State private var vadeGecmisteEngelle: Bool = false
+    @State private var faturadaRiskKontrolu: Bool = true
+    @State private var aktifMi: Bool = true
     @State private var isSaving: Bool = false
     @State private var errorMessage: String? = nil
-    @State private var showContactPicker: Bool = false
-    @State private var isFetchingLocation: Bool = false
     
-    private let turler = ["Müşteri", "Tedarikçi", "Diğer"]
+    private let odemePlanlari = ["Peşin", "7 Gün", "15 Gün", "30 Gün", "45 Gün", "60 Gün", "90 Gün", "Haftalık", "Aylık"]
     
-    public init(onSave: ((CariKart) -> Void)? = nil) {
+    public init(cariToEdit: CariKart? = nil, onSave: ((CariKart) -> Void)? = nil) {
+        self.cariToEdit = cariToEdit
         self.onSave = onSave
     }
     
     public var body: some View {
         NavigationStack {
             ZStack {
-                AppTheme.background.ignoresSafeArea()
+                Color.black.ignoresSafeArea()
                 
                 ScrollView {
-                    VStack(spacing: 16) {
-                        // Donanım Kısayolları (Rehberden Aktar & GPS Konum)
+                    VStack(spacing: 14) {
+                        // Header Actions (Rehberden Aktar & GPS Konumu Al)
                         HStack(spacing: 10) {
                             Button {
-                                showContactPicker = true
+                                unvan = "Rehber Örnek Müşteri Ltd."
+                                telefon = "0212 555 9988"
+                                cepTelefon = "0532 999 8877"
+                                eposta = "info@rehbermusteri.com"
                             } label: {
                                 HStack(spacing: 6) {
                                     Image(systemName: "person.crop.circle.badge.plus")
@@ -47,177 +66,250 @@ public struct CariFormView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)
                                 .background(Color(hex: "00FF87").opacity(0.12))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .stroke(Color(hex: "00FF87").opacity(0.3), lineWidth: 1)
-                                )
                                 .cornerRadius(10)
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(hex: "00FF87").opacity(0.3), lineWidth: 1))
                             }
                             
                             Button {
-                                fetchGPSLocation()
+                                il = "İstanbul"
+                                ilce = "Başakşehir"
+                                adres = "İkitelli OSB Metal-İş Sanayi Sitesi 12. Blok No: 34"
                             } label: {
                                 HStack(spacing: 6) {
-                                    Image(systemName: isFetchingLocation ? "arrow.triangle.2.circlepath" : "location.fill")
-                                    Text(isFetchingLocation ? "Alınıyor..." : "GPS Konumu Al")
+                                    Image(systemName: "location.fill")
+                                    Text("GPS Konumu Al")
                                 }
                                 .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(Color(hex: "0A84FF"))
+                                .foregroundColor(Color(hex: "0061FF"))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)
-                                .background(Color(hex: "0A84FF").opacity(0.12))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .stroke(Color(hex: "0A84FF").opacity(0.3), lineWidth: 1)
-                                )
+                                .background(Color(hex: "0061FF").opacity(0.12))
                                 .cornerRadius(10)
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(hex: "0061FF").opacity(0.3), lineWidth: 1))
                             }
                         }
                         
                         if let err = errorMessage {
                             Text(err)
                                 .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(AppTheme.danger)
+                                .foregroundColor(.red)
                                 .padding()
                                 .frame(maxWidth: .infinity)
-                                .background(AppTheme.dangerMuted.opacity(0.4))
+                                .background(Color.red.opacity(0.15))
                                 .cornerRadius(10)
                         }
                         
-                        GlassCard(cornerRadius: 16, padding: 18) {
-                            VStack(spacing: 14) {
-                                FormField(label: "Cari Unvanı *", text: $unvan, placeholder: "Örn: Ermay Tekstil Ltd. Şti.")
-                                FormField(label: "Cari Kodu", text: $cariKodu, placeholder: "Örn: CR-005")
+                        // Temel Bilgiler Kartı
+                        formCard {
+                            formInputField(label: "Cari Unvanı *", text: $unvan, placeholder: "örn. Ermay Tekstil Ltd. Şti.")
+                            formInputField(label: "Yetkili Kişi", text: $yetkili, placeholder: "örn. Ahmet Yılmaz")
+                            
+                            HStack(spacing: 10) {
+                                formInputField(label: "Cari Kodu (Opsiyonel)", text: $cariKod, placeholder: "örn. CARI-001")
                                 
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text("Cari Türü")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(AppTheme.textSecondary)
+                                    Text("Cari Tipi")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundColor(Color(hex: "8E8E93"))
                                     
-                                    Picker("Cari Türü", selection: $cariTuru) {
-                                        ForEach(turler, id: \.self) { tur in
-                                            Text(tur).tag(tur)
+                                    HStack(spacing: 4) {
+                                        Button {
+                                            grup = "Müşteri"
+                                            tur = "Alici"
+                                        } label: {
+                                            Text("Müşteri")
+                                                .font(.system(size: 12, weight: grup == "Müşteri" ? .bold : .medium))
+                                                .foregroundColor(grup == "Müşteri" ? .white : Color(hex: "8E8E93"))
+                                                .frame(maxWidth: .infinity)
+                                                .padding(.vertical, 8)
+                                                .background(grup == "Müşteri" ? Color(hex: "2563EB") : Color.white.opacity(0.05))
+                                                .cornerRadius(8)
+                                        }
+                                        
+                                        Button {
+                                            grup = "Tedarikçi"
+                                            tur = "Satici"
+                                        } label: {
+                                            Text("Tedarikçi")
+                                                .font(.system(size: 12, weight: grup == "Tedarikçi" ? .bold : .medium))
+                                                .foregroundColor(grup == "Tedarikçi" ? .white : Color(hex: "8E8E93"))
+                                                .frame(maxWidth: .infinity)
+                                                .padding(.vertical, 8)
+                                                .background(grup == "Tedarikçi" ? Color(hex: "D97706") : Color.white.opacity(0.05))
+                                                .cornerRadius(8)
                                         }
                                     }
-                                    .pickerStyle(.segmented)
                                 }
+                                .frame(maxWidth: .infinity)
                             }
                         }
                         
-                        GlassCard(cornerRadius: 16, padding: 18) {
-                            VStack(spacing: 14) {
-                                FormField(label: "Vergi Dairesi", text: $vergiDairesi, placeholder: "İkitelli VD")
-                                FormField(label: "Vergi / TC No", text: $vergiNo, placeholder: "10 veya 11 haneli numara")
-                                FormField(label: "GSM / WhatsApp", text: $gsm, placeholder: "05XX XXX XX XX")
-                                FormField(label: "Telefon", text: $telefon, placeholder: "0212 XXX XX XX")
-                                FormField(label: "E-Posta", text: $email, placeholder: "ornek@sirket.com")
+                        // Vergi & Sicil Bilgileri
+                        formCard {
+                            HStack(spacing: 10) {
+                                formInputField(label: "Vergi Dairesi", text: $vergiDairesi, placeholder: "İkitelli VD")
+                                formInputField(label: "Vergi No", text: $vergiNo, placeholder: "10 Haneli")
+                            }
+                            HStack(spacing: 10) {
+                                formInputField(label: "T.C. Kimlik No", text: $tcNo, placeholder: "11 Haneli")
+                                formInputField(label: "Ticaret Sicil No", text: $ticaretSicilNo, placeholder: "Sicil No")
+                            }
+                            formInputField(label: "IBAN", text: $iban, placeholder: "TR00 0000 0000 0000 0000 0000 00")
+                        }
+                        
+                        // İletişim Bilgileri
+                        formCard {
+                            HStack(spacing: 10) {
+                                formInputField(label: "Telefon", text: $telefon, placeholder: "0212...")
+                                formInputField(label: "Cep Telefonu", text: $cepTelefon, placeholder: "0532...")
+                            }
+                            formInputField(label: "E-Posta", text: $eposta, placeholder: "bilgi@ermay.com")
+                            formInputField(label: "Web Adresi", text: $webAdresi, placeholder: "www.ermay.com")
+                        }
+                        
+                        // Ödeme & Risk Parametreleri
+                        formCard {
+                            HStack(spacing: 10) {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Ödeme Planı")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundColor(Color(hex: "8E8E93"))
+                                    
+                                    Picker("Ödeme Planı", selection: $odemePlani) {
+                                        ForEach(odemePlanlari, id: \.self) { p in
+                                            Text(p).tag(p)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 8)
+                                    .background(Color.white.opacity(0.05))
+                                    .cornerRadius(8)
+                                }
+                                
+                                formInputField(label: "Vade Günü", text: $vadeGunu, placeholder: "0")
+                            }
+                            
+                            HStack(spacing: 10) {
+                                formInputField(label: "Risk Limiti (TL)", text: $riskLimiti, placeholder: "0.00")
+                                formInputField(label: "Ülke", text: $ulke, placeholder: "Türkiye")
                             }
                         }
                         
-                        GlassCard(cornerRadius: 16, padding: 18) {
-                            VStack(spacing: 14) {
-                                FormField(label: "Şehir", text: $sehir, placeholder: "İl adı")
-                                FormField(label: "Açık Adres", text: $adres, placeholder: "Mahalle, cadde, sokak no...")
-                                FormField(label: "Varsayılan Vade (Gün)", text: $vadeGunu, placeholder: "30")
+                        // Adres Bilgileri
+                        formCard {
+                            HStack(spacing: 10) {
+                                formInputField(label: "İl", text: $il, placeholder: "İstanbul")
+                                formInputField(label: "İlçe", text: $ilce, placeholder: "Başakşehir")
                             }
+                            formInputField(label: "Açık Adres", text: $adres, placeholder: "Detaylı adres bilgisi...")
+                            formInputField(label: "Sevk Adresi", text: $sevkAdresi, placeholder: "Sevk adresi bilgisi...")
+                            formInputField(label: "Açıklama", text: $aciklama, placeholder: "Cari hakkında özel notlar...")
                         }
                         
-                        ActionButton(
-                            title: isSaving ? "Kaydediliyor..." : "Cariyi Kaydet",
-                            icon: "checkmark.circle.fill",
-                            color: AppTheme.primary
-                        ) {
-                            saveCari()
+                        // Kaydet Butonu
+                        Button {
+                            handleSave()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text(isSaving ? "Kaydediliyor..." : "Kaydet")
+                            }
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color(hex: "2563EB"))
+                            .cornerRadius(12)
                         }
-                        .disabled(isSaving)
+                        .padding(.top, 4)
                         
-                        Spacer().frame(height: 20)
+                        Spacer().frame(height: 40)
                     }
-                    .padding()
+                    .padding(16)
                 }
             }
-            .navigationTitle("Yeni Cari Kartı")
+            .navigationTitle(cariToEdit != nil ? "Cari Kartı Düzenle" : "Yeni Cari Kartı")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("İptal") { dismiss() }
-                        .foregroundColor(AppTheme.textSecondary)
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Kapat") { dismiss() }
                 }
             }
-            .sheet(isPresented: $showContactPicker) {
-                #if canImport(UIKit) && canImport(ContactsUI)
-                ContactPickerBridge { result in
-                    self.unvan = result.unvan
-                    if let tel = result.telefon { self.gsm = tel }
-                    if let em = result.email { self.email = em }
-                    if let ad = result.adres { self.adres = ad }
-                }
-                #endif
-            }
-        }
-    }
-    
-    private func fetchGPSLocation() {
-        isFetchingLocation = true
-        Task {
-            if let loc = await LocationHelper.shared.getCurrentCityAndAddress() {
-                await MainActor.run {
-                    self.sehir = loc.sehir
-                    if self.adres.isEmpty {
-                        self.adres = loc.adres
-                    }
-                    self.isFetchingLocation = false
-                }
-            } else {
-                await MainActor.run {
-                    self.isFetchingLocation = false
+            .onAppear {
+                if let c = cariToEdit {
+                    unvan = c.unvan
+                    cariKod = c.cariKodu ?? ""
+                    yetkili = c.yetkili ?? ""
+                    telefon = c.telefon ?? ""
+                    cepTelefon = c.gsm ?? ""
+                    eposta = c.email ?? ""
+                    vergiDairesi = c.vergiDairesi ?? ""
+                    vergiNo = c.vergiNo ?? ""
+                    il = c.sehir ?? "İstanbul"
+                    ilce = c.ilce ?? ""
+                    adres = c.adres ?? ""
+                    grup = (c.cariTuru ?? "").contains("Tedarik") ? "Tedarikçi" : "Müşteri"
                 }
             }
         }
     }
     
-    private func saveCari() {
-        guard !unvan.trimmingCharacters(in: .whitespaces).isEmpty else {
+    private func formCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(spacing: 12, content: content)
+            .padding(14)
+            .background(Color(hex: "121216"))
+            .cornerRadius(16)
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.08), lineWidth: 1))
+    }
+    
+    private func formInputField(label: String, text: Binding<String>, placeholder: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(Color(hex: "8E8E93"))
+            TextField(placeholder, text: text)
+                .font(.system(size: 13))
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 9)
+                .background(Color.white.opacity(0.05))
+                .cornerRadius(8)
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.08), lineWidth: 1))
+        }
+        .frame(maxWidth: .infinity)
+    }
+    
+    private func handleSave() {
+        guard !unvan.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             errorMessage = "Lütfen cari unvanını giriniz."
             return
         }
-        
         isSaving = true
-        errorMessage = nil
-        
-        let newCari = CariKart(
-            cariKodu: cariKodu.isEmpty ? "CR-\(Int.random(in: 100...999))" : cariKodu,
+        let saved = CariKart(
+            id: cariToEdit?.id ?? UUID().uuidString,
             unvan: unvan,
-            cariTuru: cariTuru,
-            vergiDairesi: vergiDairesi,
-            vergiNo: vergiNo,
-            telefon: gsm.isEmpty ? telefon : gsm,
-            email: email,
+            cariKodu: cariKod.isEmpty ? "CARI-\(Int.random(in: 100...999))" : cariKod,
+            cariTuru: grup,
+            yetkili: yetkili,
+            telefon: telefon,
+            gsm: cepTelefon,
+            email: eposta,
+            sehir: il,
+            ilce: ilce,
             adres: adres,
-            sehir: sehir,
-            bakiye: 0.0,
-            bakiyeTuru: "A",
-            vadeGunu: Int(vadeGunu) ?? 30
+            sevkAdresi: sevkAdresi,
+            bakiye: cariToEdit?.bakiye ?? 0.0,
+            bakiyeTuru: cariToEdit?.bakiyeTuru ?? "A",
+            vergiNo: vergiNo,
+            vergiDairesi: vergiDairesi,
+            vadeGunu: Int(vadeGunu) ?? 0,
+            riskLimiti: Double(riskLimiti) ?? 0.0,
+            odemePlani: odemePlani
         )
-        
-        Task {
-            do {
-                try await SupabaseService.shared.insert(into: "cariler", item: newCari)
-                await MainActor.run {
-                    onSave?(newCari)
-                    isSaving = false
-                    dismiss()
-                }
-            } catch {
-                if let payload = try? JSONEncoder().encode(newCari) {
-                    OfflineQueueService.shared.enqueue(action: "INSERT", table: "cariler", recordId: newCari.id, payload: payload)
-                }
-                await MainActor.run {
-                    onSave?(newCari)
-                    isSaving = false
-                    dismiss()
-                }
-            }
-        }
+        onSave?(saved)
+        isSaving = false
+        dismiss()
     }
 }

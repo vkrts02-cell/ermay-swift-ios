@@ -1,306 +1,670 @@
 import SwiftUI
-
-public enum CRMDetailTab: String, CaseIterable {
-    case gorusmeler = "Görüşmeler"
-    case fiyatlar = "Özel Fiyatlar"
-    case gorseller = "Görseller & Fotoğraf"
-    case notlar = "Özel Notlar"
-}
-
-public struct GorusmeKaydi: Identifiable {
-    public var id = UUID()
-    public var baslik: String
-    public var icerik: String
-    public var tarih: String
-}
-
-public struct OzelFiyatKaydi: Identifiable {
-    public var id = UUID()
-    public var baslik: String
-    public var tutar: Double
-    public var paraBirimi: String
-    public var aciklama: String
-    public var tarih: String
-}
-
-public struct GorselKaydi: Identifiable {
-    public var id = UUID()
-    public var baslik: String
-    public var systemImageName: String
-    public var tarih: String
-}
+#if canImport(UIKit)
+import UIKit
+import WebKit
+#endif
 
 public struct MusteriTakipDetayView: View {
-    public let kayit: MusteriTakipKayit
-    @State private var activeTab: CRMDetailTab = .gorusmeler
+    @Environment(\.presentationMode) var presentationMode
+    public let klasor: MusteriTakipKlasor
     
-    // Veriler
-    @State private var gorusmeler: [GorusmeKaydi] = [
-        GorusmeKaydi(baslik: "Yıllık Bakım & Rulman Sözleşmesi", icerik: "Yıllık 500 adet rulman ve 200 adet keçe alımı için özel iskonto talep edildi.", tarih: "03.11.2026"),
-        GorusmeKaydi(baslik: "İlk Tanışma & Fabrika Ziyareti", icerik: "Tuzla fabrikasındaki yetkili mühendis ile numune testleri incelendi.", tarih: "20.10.2026")
-    ]
-    @State private var fiyatlar: [OzelFiyatKaydi] = [
-        OzelFiyatKaydi(baslik: "Bilyalı Rulman 6204", tutar: 195.0, paraBirimi: "₺", aciklama: "Net peşin özel fiyat", tarih: "03.11.2026"),
-        OzelFiyatKaydi(baslik: "Hidrolik Keçe 35x50", tutar: 72.0, paraBirimi: "₺", aciklama: "100 adet üzeri siparişte geçerli", tarih: "20.10.2026")
-    ]
-    @State private var gorseller: [GorselKaydi] = [
-        GorselKaydi(baslik: "Müşteri Kartviziti", systemImageName: "person.crop.rectangle.fill", tarih: "03.11.2026"),
-        GorselKaydi(baslik: "Fabrika Girişi & Numune", systemImageName: "building.2.crop.circle.fill", tarih: "20.10.2026")
-    ]
-    @State private var ozelNotlar: String = "Yetkili kişi Ahmet Bey her Çarşamba toplantıda oluyor. Teklifler doğrudan satın alma müdürü Mehmet Bey'e cc yapılmalı."
+    @State private var activeTab: String = "Gorusmeler" // "Gorusmeler" | "Fiyatlar" | "Gorseller" | "Notlar"
+    @State private var klasorEtiket: String
+    @State private var klasorRenk: String
+    @State private var isEtiketModalOpen: Bool = false
+    @State private var isPdfGenerating: Bool = false
     
-    // Modals
-    @State private var showAddModal: Bool = false
-    @State private var newItemTitle: String = ""
-    @State private var newItemContent: String = ""
-    @State private var newItemAmount: String = ""
-    @State private var showShareSheet: Bool = false
+    // Detay Listeleri
+    @State private var gorusmeler: [MusteriTakipDetay] = [
+        MusteriTakipDetay(id: 1, klasorId: 1, cariId: 1, baslik: "Yıllık Bakım & Rulman Sözleşmesi", icerik: "Yıllık 500 adet rulman ve 200 adet keçe alımı için özel iskonto talep edildi. Satın alma müdürü ile mutabakata varıldı.", tip: "Gorusme", tarih: "03.11.2026 14:30"),
+        MusteriTakipDetay(id: 2, klasorId: 1, cariId: 1, baslik: "Fabrika Ziyareti ve Numune İnceleme", icerik: "Tuzla tesislerinde teknik ekip ile testler incelendi.", tip: "Gorusme", tarih: "20.10.2026 11:00")
+    ]
     
-    public init(kayit: MusteriTakipKayit) {
-        self.kayit = kayit
+    @State private var fiyatlar: [MusteriTakipDetay] = [
+        MusteriTakipDetay(id: 3, klasorId: 1, cariId: 1, baslik: "Bilyalı Rulman 6204-2RS", icerik: "100 adet üzeri siparişte net peşin özel fiyat", tip: "Fiyat", fiyatBilgisi: 195.0, paraBirimi: "₺", tarih: "03.11.2026"),
+        MusteriTakipDetay(id: 4, klasorId: 1, cariId: 1, baslik: "Hidrolik Keçe 35x50", icerik: "Yıllık paket alım birim fiyatı", tip: "Fiyat", fiyatBilgisi: 72.0, paraBirimi: "₺", tarih: "20.10.2026")
+    ]
+    
+    @State private var gorseller: [MusteriTakipDetay] = [
+        MusteriTakipDetay(id: 5, klasorId: 1, cariId: 1, baslik: "Müşteri Kartviziti & Teknik Çizim", icerik: "Ön yüz çekildi", tip: "Gorsel", tarih: "03.11.2026")
+    ]
+    
+    @State private var notlar: [MusteriTakipDetay] = [
+        MusteriTakipDetay(id: 6, klasorId: 1, cariId: 1, baslik: "Özel Müşteri Notu", icerik: "Yetkili kişi Ahmet Bey her Çarşamba toplantıda oluyor. Teklifler doğrudan satın alma müdürü Mehmet Bey'e cc yapılmalı.", tip: "Not", tarih: "03.11.2026")
+    ]
+    
+    // Görüşme Formu State
+    @State private var gorusmeBaslik: String = ""
+    @State private var gorusmeIcerik: String = ""
+    
+    // Fiyat Formu State
+    @State private var fiyatBaslik: String = ""
+    @State private var fiyatTutar: String = ""
+    @State private var fiyatParaBirimi: String = "₺"
+    @State private var fiyatAciklama: String = ""
+    
+    // Görsel Formu State
+    @State private var gorselBaslik: String = ""
+    
+    // Not Formu State
+    @State private var notBaslik: String = ""
+    @State private var notIcerik: String = ""
+    
+    private let etiketSecenekleri = ["Sıcak Müşteri", "Teklif Aşamasında", "Önemli", "Yeni İletişim", "Takipte"]
+    private let renkSecenekleri = ["#0A84FF", "#30D158", "#BF5AF2", "#FF9F0A", "#FF453A", "#64D2FF", "#FF375F"]
+    private let paraBirimleri = ["₺", "$", "€"]
+    
+    public init(klasor: MusteriTakipKlasor) {
+        self.klasor = klasor
+        _klasorEtiket = State(initialValue: klasor.etiket ?? "Yeni İletişim")
+        _klasorRenk = State(initialValue: klasor.renk ?? "#0A84FF")
     }
     
     public var body: some View {
         ZStack {
-            AppTheme.background.ignoresSafeArea()
+            Color.black.ignoresSafeArea()
             
-            VStack(spacing: 12) {
-                // Müşteri Başlık Kartı
-                GlassCard(cornerRadius: 18, padding: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text(kayit.cariUnvan)
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(AppTheme.textPrimary)
-                            Spacer()
-                            StatusBadge(title: kayit.durum, color: AppTheme.success)
-                        }
-                        
-                        Text("Konu: \(kayit.konu)")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(AppTheme.primary)
-                        
-                        if let eylem = kayit.sonrakiEylem {
-                            HStack(spacing: 4) {
-                                Image(systemName: "arrow.turn.down.right")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(AppTheme.info)
-                                Text("Sonraki Eylem: \(eylem) (\(kayit.sonrakiEylemTarihi ?? "-"))")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(AppTheme.info)
-                            }
-                        }
+            VStack(spacing: 0) {
+                // 1. Header Bar (Exact to MusteriTakipDetayScreen.tsx)
+                HStack(spacing: 10) {
+                    Button {
+                        presentationMode.wrappedValue.dismiss()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(6)
                     }
-                }
-                .padding(.horizontal)
-                .padding(.top, 4)
-                
-                // 4'lü Sekme Çubuğu
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(CRMDetailTab.allCases, id: \.self) { tab in
-                            let isSelected = activeTab == tab
-                            Button {
-                                withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                                    activeTab = tab
-                                }
-                            } label: {
-                                Text(tab.rawValue)
-                                    .font(.system(size: 13, weight: isSelected ? .bold : .medium))
-                                    .foregroundColor(isSelected ? .white : AppTheme.textSecondary)
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 8)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .fill(isSelected ? AppTheme.primary : AppTheme.cardBackground)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 10)
-                                                    .stroke(isSelected ? AppTheme.primary : AppTheme.border, lineWidth: 1)
-                                            )
-                                    )
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                }
-                
-                // Sekme İçerikleri
-                ScrollView {
-                    VStack(spacing: 12) {
-                        switch activeTab {
-                        case .gorusmeler:
-                            renderGorusmelerTab()
-                        case .fiyatlar:
-                            renderFiyatlarTab()
-                        case .gorseller:
-                            renderGorsellerTab()
-                        case .notlar:
-                            renderNotlarTab()
-                        }
-                        
-                        // PDF Rapor Oluştur Butonu
-                        ActionButton(
-                            title: "Müşteri CRM Raporu Oluştur & Paylaş",
-                            icon: "doc.text.fill",
-                            color: AppTheme.primary
-                        ) {
-                            showShareSheet = true
-                        }
-                        .padding(.top, 10)
-                        
-                        Spacer().frame(height: 30)
-                    }
-                    .padding(.horizontal)
-                }
-            }
-            
-            // Yeni Öğe Ekleme Modalı
-            SwipeableModal(isPresented: $showAddModal, title: "Yeni \(activeTab.rawValue) Kaydı") {
-                VStack(spacing: 14) {
-                    FormField(label: "Başlık *", text: $newItemTitle, placeholder: "Örn: Görüşme veya Ürün adı")
-                    if activeTab == .fiyatlar {
-                        FormField(label: "Özel Fiyat (₺) *", text: $newItemAmount, placeholder: "0.00")
-                    }
-                    FormField(label: "Açıklama / Detay", text: $newItemContent, placeholder: "Detaylı not...")
                     
-                    ActionButton(title: "Kaydet", icon: "checkmark.circle.fill", color: AppTheme.primary) {
-                        saveNewItem()
+                    // Folder Icon
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color(hex: klasorRenk).opacity(0.18))
+                            .frame(width: 36, height: 36)
+                        Image(systemName: "folder.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(Color(hex: klasorRenk))
                     }
-                }
-            }
-        }
-        .navigationTitle("Müşteri Takip Kartı")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    newItemTitle = ""
-                    newItemContent = ""
-                    newItemAmount = ""
-                    showAddModal = true
-                } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(AppTheme.primary)
-                }
-            }
-        }
-    }
-    
-    // MARK: - 1. Görüşmeler
-    @ViewBuilder
-    private func renderGorusmelerTab() -> some View {
-        VStack(spacing: 10) {
-            ForEach(gorusmeler) { g in
-                GlassCard(cornerRadius: 14, padding: 14) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text(g.baslik)
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(AppTheme.textPrimary)
-                            Spacer()
-                            Text(g.tarih)
-                                .font(.system(size: 11))
-                                .foregroundColor(AppTheme.textMuted)
-                        }
-                        Text(g.icerik)
-                            .font(.system(size: 12))
-                            .foregroundColor(AppTheme.textSecondary)
-                    }
-                }
-            }
-        }
-    }
-    
-    // MARK: - 2. Özel Fiyatlar
-    @ViewBuilder
-    private func renderFiyatlarTab() -> some View {
-        VStack(spacing: 10) {
-            ForEach(fiyatlar) { f in
-                GlassCard(cornerRadius: 14, padding: 14) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(f.baslik)
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(AppTheme.textPrimary)
-                            Text("\(f.aciklama) • \(f.tarih)")
-                                .font(.system(size: 11))
-                                .foregroundColor(AppTheme.textMuted)
-                        }
-                        Spacer()
-                        Text("\(AppFormatters.money(f.tutar))")
-                            .font(.system(size: 15, weight: .heavy))
-                            .foregroundColor(AppTheme.success)
-                    }
-                }
-            }
-        }
-    }
-    
-    // MARK: - 3. Görseller & Fotoğraf
-    @ViewBuilder
-    private func renderGorsellerTab() -> some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-            ForEach(gorseller) { img in
-                GlassCard(cornerRadius: 14, padding: 14) {
-                    VStack(spacing: 10) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(AppTheme.cardSecondary)
-                                .frame(height: 90)
-                            Image(systemName: img.systemImageName)
-                                .font(.system(size: 36))
-                                .foregroundColor(AppTheme.primary)
-                        }
-                        Text(img.baslik)
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(AppTheme.textPrimary)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(klasor.cariUnvan)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.white)
                             .lineLimit(1)
-                        Text(img.tarih)
+                        Text("\(klasor.yetkili ?? "-") | \(klasor.telefon ?? "-")")
                             .font(.system(size: 10))
-                            .foregroundColor(AppTheme.textMuted)
+                            .foregroundColor(Color(hex: "8E8E93"))
+                            .lineLimit(1)
                     }
+                    
+                    Spacer()
+                    
+                    // PDF / Rapor Butonu (Sağ Üst)
+                    Button {
+                        generateAndShareCRMReport()
+                    } label: {
+                        HStack(spacing: 4) {
+                            if isPdfGenerating {
+                                ProgressView().scaleEffect(0.7).tint(Color(hex: "FF453A"))
+                            } else {
+                                Image(systemName: "arrow.down.doc.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(Color(hex: "FF453A"))
+                                Text("PDF")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(Color(hex: "FF453A"))
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(Color(hex: "FF453A").opacity(0.12))
+                        .cornerRadius(8)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "FF453A").opacity(0.3), lineWidth: 1))
+                    }
+                    
+                    // Etiket / Renk Düzenle Butonu
+                    Button {
+                        isEtiketModalOpen = true
+                    } label: {
+                        HStack(spacing: 5) {
+                            Circle().fill(Color(hex: klasorRenk)).frame(width: 7, height: 7)
+                            Text(klasorEtiket)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(Color.white.opacity(0.06))
+                        .cornerRadius(8)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: klasorRenk).opacity(0.4), lineWidth: 1))
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                
+                // 2. 4 Modern Sekme Çubuğu (Görüşmeler | Fiyatlar | Evrak | Notlar)
+                HStack(spacing: 8) {
+                    tabItem(title: "Görüşmeler", icon: "message.fill", count: gorusmeler.count, key: "Gorusmeler", color: Color(hex: "0A84FF"))
+                    tabItem(title: "Fiyatlar", icon: "tag.fill", count: fiyatlar.count, key: "Fiyatlar", color: Color(hex: "30D158"))
+                    tabItem(title: "Evrak", icon: "photo.fill", count: gorseller.count, key: "Gorseller", color: Color(hex: "BF5AF2"))
+                    tabItem(title: "Notlar", icon: "doc.text.fill", count: notlar.count, key: "Notlar", color: Color(hex: "FF9F0A"))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                
+                // 3. Sekme İçerikleri
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 16) {
+                        switch activeTab {
+                        case "Gorusmeler":
+                            renderGorusmelerTab()
+                        case "Fiyatlar":
+                            renderFiyatlarTab()
+                        case "Gorseller":
+                            renderGorsellerTab()
+                        case "Notlar":
+                            renderNotlarTab()
+                        default:
+                            EmptyView()
+                        }
+                        
+                        // 4. BİREBİR İSTENEN BUTON: MÜŞTERİ CRM RAPORU OLUŞTUR VE PAYLAŞ
+                        Button {
+                            generateAndShareCRMReport()
+                        } label: {
+                            HStack(spacing: 8) {
+                                if isPdfGenerating {
+                                    ProgressView().tint(.white)
+                                    Text("Rapor Hazırlanıyor...")
+                                        .font(.system(size: 14, weight: .bold))
+                                } else {
+                                    Image(systemName: "doc.text.fill")
+                                        .font(.system(size: 16, weight: .bold))
+                                    Text("Müşteri CRM Raporu Oluştur ve Paylaş")
+                                        .font(.system(size: 14, weight: .bold))
+                                }
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(
+                                LinearGradient(
+                                    colors: [Color(hex: "2563EB"), Color(hex: "1D4ED8")],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(14)
+                            .shadow(color: Color(hex: "2563EB").opacity(0.35), radius: 8, y: 4)
+                        }
+                        .padding(.top, 8)
+                        
+                        Spacer().frame(height: 50)
+                    }
+                    .padding(16)
+                }
+            }
+        }
+        .navigationBarHidden(true)
+        .sheet(isPresented: $isEtiketModalOpen) {
+            etiketSheet()
+        }
+    }
+    
+    private func tabItem(title: String, icon: String, count: Int, key: String, color: Color) -> some View {
+        let isSel = activeTab == key
+        return Button {
+            withAnimation(.easeInOut(duration: 0.15)) { activeTab = key }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: icon).font(.system(size: 11))
+                Text(title).font(.system(size: 11, weight: isSel ? .bold : .medium))
+                Text("\(count)")
+                    .font(.system(size: 9, weight: .bold))
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(isSel ? color : Color.white.opacity(0.1))
+                    .cornerRadius(4)
+            }
+            .foregroundColor(isSel ? color : Color(hex: "8E8E93"))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(isSel ? color.opacity(0.15) : Color.white.opacity(0.04))
+            .cornerRadius(10)
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(isSel ? color.opacity(0.4) : Color.clear, lineWidth: 1))
+        }
+    }
+    
+    // MARK: - Görüşmeler Sekmesi
+    private func renderGorusmelerTab() -> some View {
+        VStack(spacing: 12) {
+            // Ekleme Kartı
+            formCard {
+                Text("Yeni Görüşme / Toplantı Ekle").font(.system(size: 12, weight: .bold)).foregroundColor(.white)
+                inputField(label: "Görüşme Başlığı", text: $gorusmeBaslik, placeholder: "Örn: Sözleşme Şartları...")
+                inputField(label: "Görüşme Detayı & Alınan Kararlar", text: $gorusmeIcerik, placeholder: "Konuşulan konular ve anlaşılan şartlar...")
+                
+                Button {
+                    guard !gorusmeBaslik.isEmpty || !gorusmeIcerik.isEmpty else { return }
+                    let newD = MusteriTakipDetay(
+                        id: Int.random(in: 1000...9999),
+                        klasorId: klasor.id,
+                        cariId: klasor.cariId,
+                        baslik: gorusmeBaslik.isEmpty ? "Müşteri Görüşmesi" : gorusmeBaslik,
+                        icerik: gorusmeIcerik,
+                        tip: "Gorusme",
+                        tarih: "03.11.2026 15:00"
+                    )
+                    gorusmeler.insert(newD, at: 0)
+                    gorusmeBaslik = ""
+                    gorusmeIcerik = ""
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus")
+                        Text("Görüşmeyi Ekle")
+                    }
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color(hex: "0A84FF"))
+                    .cornerRadius(10)
+                }
+            }
+            
+            // Liste
+            ForEach(gorusmeler) { g in
+                itemCard(title: g.baslik, subtitle: g.icerik ?? "", date: g.tarih, color: Color(hex: "0A84FF")) {
+                    gorusmeler.removeAll { $0.id == g.id }
                 }
             }
         }
     }
     
-    // MARK: - 4. Özel Notlar
-    @ViewBuilder
-    private func renderNotlarTab() -> some View {
-        GlassCard(cornerRadius: 16, padding: 16) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Müşteri Özel Not Defteri")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(AppTheme.textSecondary)
+    // MARK: - Fiyatlar Sekmesi
+    private func renderFiyatlarTab() -> some View {
+        VStack(spacing: 12) {
+            formCard {
+                Text("Özel Fiyat Teklifi Ekle").font(.system(size: 12, weight: .bold)).foregroundColor(.white)
+                inputField(label: "Ürün / Hizmet Başlığı", text: $fiyatBaslik, placeholder: "Örn: Rulman 6204")
+                HStack(spacing: 8) {
+                    inputField(label: "Fiyat Tutarı", text: $fiyatTutar, placeholder: "0.00")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Birim").font(.system(size: 11, weight: .semibold)).foregroundColor(Color(hex: "8E8E93"))
+                        Picker("Birim", selection: $fiyatParaBirimi) {
+                            ForEach(paraBirimleri, id: \.self) { p in Text(p).tag(p) }
+                        }
+                        .pickerStyle(.menu)
+                        .padding(7)
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(8)
+                    }
+                }
+                inputField(label: "Teklif Açıklaması", text: $fiyatAciklama, placeholder: "Örn: 50 adet ve üzeri")
                 
-                Text(ozelNotlar)
-                    .font(.system(size: 13))
-                    .foregroundColor(AppTheme.textPrimary)
-                    .lineSpacing(4)
+                Button {
+                    guard !fiyatBaslik.isEmpty else { return }
+                    let newF = MusteriTakipDetay(
+                        id: Int.random(in: 1000...9999),
+                        klasorId: klasor.id,
+                        cariId: klasor.cariId,
+                        baslik: fiyatBaslik,
+                        icerik: fiyatAciklama,
+                        tip: "Fiyat",
+                        fiyatBilgisi: Double(fiyatTutar) ?? 0,
+                        paraBirimi: fiyatParaBirimi,
+                        tarih: "03.11.2026"
+                    )
+                    fiyatlar.insert(newF, at: 0)
+                    fiyatBaslik = ""
+                    fiyatTutar = ""
+                    fiyatAciklama = ""
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus")
+                        Text("Fiyatı Ekle")
+                    }
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color(hex: "30D158"))
+                    .cornerRadius(10)
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            
+            ForEach(fiyatlar) { f in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(f.baslik).font(.system(size: 13, weight: .bold)).foregroundColor(.white)
+                        Spacer()
+                        Text("\(String(format: "%.2f", f.fiyatBilgisi ?? 0)) \(f.paraBirimi ?? "₺")")
+                            .font(.system(size: 14, weight: .heavy))
+                            .foregroundColor(Color(hex: "30D158"))
+                    }
+                    if let icerik = f.icerik, !icerik.isEmpty {
+                        Text(icerik).font(.system(size: 12)).foregroundColor(Color(hex: "E2E8F0"))
+                    }
+                    HStack {
+                        Text(f.tarih).font(.system(size: 10)).foregroundColor(Color(hex: "8E8E93"))
+                        Spacer()
+                        Button {
+                            fiyatlar.removeAll { $0.id == f.id }
+                        } label: {
+                            Image(systemName: "trash").font(.system(size: 11)).foregroundColor(Color(hex: "EF4444"))
+                        }
+                    }
+                }
+                .padding(14)
+                .background(Color(hex: "121216"))
+                .cornerRadius(14)
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.08), lineWidth: 1))
+            }
         }
     }
     
-    private func saveNewItem() {
-        guard !newItemTitle.isEmpty else { return }
-        let now = AppFormatters.isoDate.string(from: Date())
-        
-        switch activeTab {
-        case .gorusmeler:
-            gorusmeler.insert(GorusmeKaydi(baslik: newItemTitle, icerik: newItemContent, tarih: now), at: 0)
-        case .fiyatlar:
-            let tutar = Double(newItemAmount) ?? 0.0
-            fiyatlar.insert(OzelFiyatKaydi(baslik: newItemTitle, tutar: tutar, paraBirimi: "₺", aciklama: newItemContent, tarih: now), at: 0)
-        case .gorseller:
-            gorseller.insert(GorselKaydi(baslik: newItemTitle, systemImageName: "photo.fill", tarih: now), at: 0)
-        case .notlar:
-            ozelNotlar = "\(ozelNotlar)\n\n[\(now)] \(newItemTitle): \(newItemContent)"
+    // MARK: - Evrak Sekmesi
+    private func renderGorsellerTab() -> some View {
+        VStack(spacing: 12) {
+            formCard {
+                Text("Evrak / Fotoğraf Ekle").font(.system(size: 12, weight: .bold)).foregroundColor(.white)
+                inputField(label: "Evrak Başlığı", text: $gorselBaslik, placeholder: "Örn: Kartvizit, Numune, İrsaliye")
+                
+                Button {
+                    guard !gorselBaslik.isEmpty else { return }
+                    let newG = MusteriTakipDetay(
+                        id: Int.random(in: 1000...9999),
+                        klasorId: klasor.id,
+                        cariId: klasor.cariId,
+                        baslik: gorselBaslik,
+                        icerik: "Fotoğraf / Belge Eklendi",
+                        tip: "Gorsel",
+                        tarih: "03.11.2026"
+                    )
+                    gorseller.insert(newG, at: 0)
+                    gorselBaslik = ""
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "camera.fill")
+                        Text("Belgeyi Kaydet")
+                    }
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color(hex: "BF5AF2"))
+                    .cornerRadius(10)
+                }
+            }
+            
+            ForEach(gorseller) { g in
+                itemCard(title: g.baslik, subtitle: g.icerik ?? "", date: g.tarih, color: Color(hex: "BF5AF2")) {
+                    gorseller.removeAll { $0.id == g.id }
+                }
+            }
         }
+    }
+    
+    // MARK: - Notlar Sekmesi
+    private func renderNotlarTab() -> some View {
+        VStack(spacing: 12) {
+            formCard {
+                Text("Özel Not Ekle").font(.system(size: 12, weight: .bold)).foregroundColor(.white)
+                inputField(label: "Not Başlığı", text: $notBaslik, placeholder: "Örn: Tahsilat Tercihi")
+                inputField(label: "Not İçeriği", text: $notIcerik, placeholder: "Müşteriye dair kritik hatırlatmalar...")
+                
+                Button {
+                    guard !notBaslik.isEmpty || !notIcerik.isEmpty else { return }
+                    let newN = MusteriTakipDetay(
+                        id: Int.random(in: 1000...9999),
+                        klasorId: klasor.id,
+                        cariId: klasor.cariId,
+                        baslik: notBaslik.isEmpty ? "Genel Not" : notBaslik,
+                        icerik: notIcerik,
+                        tip: "Not",
+                        tarih: "03.11.2026"
+                    )
+                    notlar.insert(newN, at: 0)
+                    notBaslik = ""
+                    notIcerik = ""
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus")
+                        Text("Notu Ekle")
+                    }
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color(hex: "FF9F0A"))
+                    .cornerRadius(10)
+                }
+            }
+            
+            ForEach(notlar) { n in
+                itemCard(title: n.baslik, subtitle: n.icerik ?? "", date: n.tarih, color: Color(hex: "FF9F0A")) {
+                    notlar.removeAll { $0.id == n.id }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Helper UI Builders
+    private func formCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10, content: content)
+            .padding(14)
+            .background(Color(hex: "121216"))
+            .cornerRadius(16)
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.08), lineWidth: 1))
+    }
+    
+    private func inputField(label: String, text: Binding<String>, placeholder: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label).font(.system(size: 11, weight: .semibold)).foregroundColor(Color(hex: "8E8E93"))
+            TextField(placeholder, text: text)
+                .font(.system(size: 13))
+                .foregroundColor(.white)
+                .padding(10)
+                .background(Color.white.opacity(0.05))
+                .cornerRadius(8)
+        }
+    }
+    
+    private func itemCard(title: String, subtitle: String, date: String, color: Color, onDelete: @escaping () -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title).font(.system(size: 13, weight: .bold)).foregroundColor(.white)
+                Spacer()
+                Button(action: onDelete) {
+                    Image(systemName: "trash").font(.system(size: 11)).foregroundColor(Color(hex: "EF4444"))
+                }
+            }
+            if !subtitle.isEmpty {
+                Text(subtitle).font(.system(size: 12)).foregroundColor(Color(hex: "E2E8F0"))
+            }
+            Text(date).font(.system(size: 10)).foregroundColor(Color(hex: "8E8E93"))
+        }
+        .padding(14)
+        .background(Color(hex: "121216"))
+        .cornerRadius(14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.08), lineWidth: 1))
+    }
+    
+    private func etiketSheet() -> some View {
+        VStack(spacing: 16) {
+            Text("Klasör Etiketi ve Rengi").font(.system(size: 16, weight: .bold)).foregroundColor(.white).padding(.top, 20)
+            
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Etiket Seçiniz").font(.system(size: 12, weight: .semibold)).foregroundColor(Color(hex: "8E8E93"))
+                Picker("Etiket", selection: $klasorEtiket) {
+                    ForEach(etiketSecenekleri, id: \.self) { e in Text(e).tag(e) }
+                }
+                .pickerStyle(.segmented)
+            }
+            .padding(.horizontal, 20)
+            
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Renk Seçiniz").font(.system(size: 12, weight: .semibold)).foregroundColor(Color(hex: "8E8E93"))
+                HStack(spacing: 12) {
+                    ForEach(renkSecenekleri, id: \.self) { hex in
+                        Button {
+                            klasorRenk = hex
+                        } label: {
+                            Circle()
+                                .fill(Color(hex: hex))
+                                .frame(width: 32, height: 32)
+                                .overlay(Circle().stroke(Color.white, lineWidth: klasorRenk == hex ? 2 : 0))
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            
+            Button("Tamam") {
+                isEtiketModalOpen = false
+            }
+            .font(.system(size: 14, weight: .bold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 40)
+            .padding(.vertical, 12)
+            .background(Color(hex: "2563EB"))
+            .cornerRadius(10)
+            .padding(.top, 10)
+            
+            Spacer()
+        }
+        .presentationDetents([.medium])
+    }
+    
+    // MARK: - Müşteri CRM Raporu Oluştur ve Paylaş (Exact to MusteriTakipDetayScreen.tsx)
+    private func generateAndShareCRMReport() {
+        isPdfGenerating = true
         
-        showAddModal = false
-        HardwareService.shared.hapticSuccess()
+        let reportHTML = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Müşteri Takip Raporu - \(klasor.cariUnvan)</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 30px; color: #1E293B; }
+            .header { border-bottom: 2px solid #2563EB; padding-bottom: 12px; margin-bottom: 20px; }
+            .title { font-size: 22px; font-weight: bold; color: #1E3A8A; margin: 0; }
+            .unvan { font-size: 16px; font-weight: bold; color: #0F172A; margin-top: 6px; }
+            .meta { font-size: 12px; color: #475569; margin-top: 4px; }
+            .right-meta { float: right; text-align: right; font-size: 12px; color: #64748B; }
+            .badge { display: inline-block; background: #DBEAFE; color: #1E40AF; padding: 3px 8px; border-radius: 6px; font-weight: bold; font-size: 12px; }
+            .section-title { font-size: 14px; font-weight: bold; color: #1E40AF; margin-top: 25px; margin-bottom: 8px; border-bottom: 1px solid #E2E8F0; padding-bottom: 4px; text-transform: uppercase; }
+            table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 12px; }
+            th { background: #F1F5F9; border-bottom: 1px solid #CBD5E1; padding: 8px; text-align: left; font-weight: 600; color: #334155; }
+            td { padding: 8px; border-bottom: 1px solid #F1F5F9; vertical-align: top; }
+            .empty { color: #94A3B8; font-style: italic; padding: 8px 0; font-size: 12px; }
+            .price-tag { color: #059669; font-weight: bold; }
+            .footer { margin-top: 40px; border-top: 1px solid #E2E8F0; padding-top: 10px; text-align: center; font-size: 10px; color: #94A3B8; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="right-meta">
+              <div>Rapor Tarihi: 03.11.2026</div>
+              <div style="margin-top: 4px;">Durum: <span class="badge">\(klasorEtiket)</span></div>
+            </div>
+            <div class="title">MÜŞTERİ TAKİP &amp; CRM RAPORU</div>
+            <div class="unvan">Müşteri / Ünvan: \(klasor.cariUnvan)</div>
+            <div class="meta">
+              Yetkili: \(klasor.yetkili ?? "-") &nbsp;|&nbsp;
+              Telefon: \(klasor.telefon ?? "-") &nbsp;|&nbsp;
+              Cari Kod: \(klasor.cariKod ?? "-")
+            </div>
+          </div>
+
+          <!-- 1. GÖRÜŞME NOTLARI -->
+          <div class="section-title">1. Görüşme ve Toplantı Notları</div>
+          \(gorusmeler.isEmpty ? "<div class='empty'>Kayıtlı görüşme bulunmamaktadır.</div>" : """
+          <table>
+            <thead>
+              <tr><th style='width: 140px;'>Tarih</th><th style='width: 200px;'>Görüşme Konusu</th><th>Detay ve Anlaşmalar</th></tr>
+            </thead>
+            <tbody>
+              \(gorusmeler.map { "<tr><td>\($0.tarih)</td><td><strong>\($0.baslik)</strong></td><td>\($0.icerik ?? "-")</td></tr>" }.joined())
+            </tbody>
+          </table>
+          """)
+
+          <!-- 2. VERİLEN FİYAT TEKLİFLERİ -->
+          <div class="section-title">2. Verilen Fiyat Teklifleri</div>
+          \(fiyatlar.isEmpty ? "<div class='empty'>Kayıtlı fiyat teklifi bulunmamaktadır.</div>" : """
+          <table>
+            <thead>
+              <tr><th style='width: 140px;'>Tarih</th><th style='width: 200px;'>Teklif / Ürün</th><th style='width: 120px;'>Verilen Fiyat</th><th>Açıklama</th></tr>
+            </thead>
+            <tbody>
+              \(fiyatlar.map { "<tr><td>\($0.tarih)</td><td><strong>\($0.baslik)</strong></td><td class='price-tag'>\(String(format: "%.2f", $0.fiyatBilgisi ?? 0)) \($0.paraBirimi ?? "₺")</td><td>\($0.icerik ?? "-")</td></tr>" }.joined())
+            </tbody>
+          </table>
+          """)
+
+          <!-- 3. YÜKLENEN GÖRSELLER & EVRAKLAR -->
+          <div class="section-title">3. Yüklenen Görseller ve Evraklar</div>
+          \(gorseller.isEmpty ? "<div class='empty'>Kayıtlı evrak bulunmamaktadır.</div>" : """
+          <ul>
+            \(gorseller.map { "<li><strong>\($0.baslik)</strong> - \($0.tarih) (\($0.icerik ?? ""))</li>" }.joined())
+          </ul>
+          """)
+
+          <!-- 4. ÖZEL NOTLAR -->
+          <div class="section-title">4. Özel Notlar</div>
+          \(notlar.isEmpty ? "<div class='empty'>Kayıtlı not bulunmamaktadır.</div>" : """
+          <table>
+            <thead>
+              <tr><th style='width: 140px;'>Tarih</th><th style='width: 200px;'>Not Başlığı</th><th>Not İçeriği</th></tr>
+            </thead>
+            <tbody>
+              \(notlar.map { "<tr><td>\($0.tarih)</td><td><strong>\($0.baslik)</strong></td><td>\($0.icerik ?? "-")</td></tr>" }.joined())
+            </tbody>
+          </table>
+          """)
+
+          <div class="footer">
+            Ermay Muhasebe &copy; 2026 - Müşteri Takip Sistemi tarafından otomatik oluşturulmuştur.
+          </div>
+        </body>
+        </html>
+        """
+        
+        #if canImport(UIKit)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            let printFormatter = UIMarkupTextPrintFormatter(markupText: reportHTML)
+            let renderer = UIPrintPageRenderer()
+            renderer.addPrintFormatter(printFormatter, startingAtPageAt: 0)
+            
+            // Standard A4 Size
+            let a4Rect = CGRect(x: 0, y: 0, width: 595.2, height: 841.8)
+            renderer.setValue(NSValue(cgRect: a4Rect), forKey: "paperRect")
+            renderer.setValue(NSValue(cgRect: a4Rect.insetBy(dx: 20, dy: 20)), forKey: "printableRect")
+            
+            let pdfData = NSMutableData()
+            UIGraphicsBeginPDFContextToData(pdfData, a4Rect, nil)
+            for i in 0..<renderer.numberOfPages {
+                UIGraphicsBeginPDFPage()
+                renderer.drawPage(at: i, in: UIGraphicsGetPDFContextBounds())
+            }
+            UIGraphicsEndPDFContext()
+            
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("Musteri_CRM_Raporu_\(klasor.cariUnvan.replacingOccurrences(of: " ", with: "_")).pdf")
+            try? pdfData.write(to: tempURL, options: .atomic)
+            
+            isPdfGenerating = false
+            
+            let av = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let rootVC = windowScene.windows.first?.rootViewController {
+                rootVC.present(av, animated: true)
+            }
+        }
+        #else
+        isPdfGenerating = false
+        #endif
     }
 }
-

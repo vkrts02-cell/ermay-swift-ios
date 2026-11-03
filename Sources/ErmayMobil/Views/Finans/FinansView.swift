@@ -1,550 +1,513 @@
 import SwiftUI
 
-public enum FinansTab: String, CaseIterable {
-    case dashboard = "Özet Panel"
-    case nakit = "Kasa & Nakit"
-    case cek = "Çek & Senet"
-    case kk = "POS & Kart"
-    case eft = "Banka & EFT"
-}
-
 public struct FinansView: View {
-    @State private var activeTab: FinansTab = .dashboard
+    @State private var activeTab: String = "dashboard" // "dashboard" | "nakit" | "cek" | "kk" | "eft"
     
-    // Veri State'leri
-    @State private var kasalar: [KasaBanka] = [
-        KasaBanka(id: "1", hesapAdi: "Merkez TL Kasası", hesapTuru: "KASA", bakiye: 54200.0),
-        KasaBanka(id: "2", hesapAdi: "Şube Dolar Kasası", hesapTuru: "KASA", dovizCinsi: "USD", bakiye: 2450.0)
-    ]
-    @State private var bankalar: [KasaBanka] = [
-        KasaBanka(id: "3", hesapAdi: "Garanti BBVA Ticari TL", hesapTuru: "BANKA", bankaAdi: "Garanti BBVA", iban: "TR12 0006 2000 1234 5678 9012 34", bakiye: 184500.0),
-        KasaBanka(id: "4", hesapAdi: "İş Bankası Şirket Hesabı", hesapTuru: "BANKA", bankaAdi: "İş Bankası", iban: "TR64 0006 4000 0012 3456 7890 12", bakiye: 92400.0)
-    ]
-    @State private var cekler: [Cek] = [
-        Cek(id: "1", cekNo: "CK-8841", cariUnvan: "Ermay Ltd. Şti.", portfoyNo: "P-101", seriNo: "SR-00412", vadeTarihi: "15.11.2026", tutar: 45000, borclu: "Ermay Bilişim", banka: "Garanti", sube: "Güneşli", cekTuru: "MUSTERI", durum: "PORTFOYDE"),
-        Cek(id: "2", cekNo: "CK-8842", cariUnvan: "Akıncılar Çelik Döküm", portfoyNo: "P-102", seriNo: "SR-00413", vadeTarihi: "05.11.2026", tutar: 32000, borclu: "Akıncılar A.Ş.", banka: "İş Bankası", sube: "Tuzla", cekTuru: "MUSTERI", durum: "BANKADA")
-    ]
-    @State private var hareketler: [KasaHareket] = [
-        KasaHareket(id: "1", tarih: "03.11.2026", islemTuru: "TAHSILAT", cariUnvan: "Ermay Ltd.", belgeNo: "TS-2026001", tutar: 15000, aciklama: "Nakit Tahsilat"),
-        KasaHareket(id: "2", tarih: "02.11.2026", islemTuru: "TEDIYE", cariUnvan: "Akıncılar Çelik", belgeNo: "TS-2026002", tutar: 8500, aciklama: "Hammadde Nakliyesi")
-    ]
+    // KPI Data
+    @State private var kasaBakiye: Double = 54200.0
+    @State private var bankaBakiye: Double = 276900.0
+    @State private var posBakiye: Double = 18450.0
+    @State private var portfoyCekBakiye: Double = 125000.0
     
     // Modals
-    @State private var isTransactionModalOpen: Bool = false
-    @State private var isCekStatusModalOpen: Bool = false
-    @State private var isHesapModalOpen: Bool = false
-    @State private var selectedCek: Cek? = nil
+    @State private var showYeniIslem: Bool = false
+    @State private var showKasaSayimi: Bool = false
+    @State private var showYeniHesap: Bool = false
     
     // Yeni İşlem Form State
-    @State private var transType: IslemTuru = "Tahsilat"
-    @State private var transMethod: OdemeYontemi = "Nakit"
-    @State private var transAmount: String = ""
-    @State private var transDesc: String = ""
-    @State private var transCariUnvan: String = ""
-    @State private var transEvrakNo: String = ""
-    @State private var isSaving: Bool = false
+    @State private var islemTuru: String = "Tahsilat" // "Tahsilat" | "Ödeme" | "Virman" | "Gider"
+    @State private var odemeYontemi: String = "Nakit" // "Nakit" | "Kredi Kartı" | "Havale/EFT"
+    @State private var cariUnvan: String = "Ermay Tekstil Ltd. Şti."
+    @State private var seciliHesap: String = "Merkez Kasa (TL)"
+    @State private var islemTutar: String = ""
+    @State private var islemAciklama: String = ""
+    @State private var islemEvrakNo: String = "EVR-2026-089"
+    
+    // Çek Modülü Toggle
+    @State private var cekTuru: String = "ALINAN" // "ALINAN" | "VERILEN"
+    
+    // Finansal İşlemler Listesi
+    struct FinansListItem: Identifiable {
+        let id = UUID()
+        let title: String
+        let description: String
+        let amount: Double
+        let date: String
+        let type: String // "In" | "Out"
+        let method: String
+    }
+    
+    @State private var hareketler: [FinansListItem] = [
+        FinansListItem(title: "Ermay Makine ve Tekstil", description: "Satış Tahsilatı", amount: 35000, date: "03.11.2026", type: "In", method: "Banka Havale"),
+        FinansListItem(title: "Akıncılar Lojistik Depolama", description: "Sevkiyat Navlun Ödemesi", amount: 6200, date: "02.11.2026", type: "Out", method: "Nakit Kasa"),
+        FinansListItem(title: "Kaya Metal Sanayi", description: "Cari Tahsilat", amount: 28500, date: "01.11.2026", type: "In", method: "Kredi Kartı / POS"),
+        FinansListItem(title: "Yönetim Ofis Kirası", description: "Kasım Ayı Kira Gideri", amount: 18000, date: "01.11.2026", type: "Out", method: "Banka Havale"),
+        FinansListItem(title: "Tekno Hammadde A.Ş.", description: "Hammadde Avans Ödemesi", amount: 22800, date: "31.10.2026", type: "Out", method: "Nakit Kasa")
+    ]
+    
+    // Çek Kayıtları
+    struct CekItem: Identifiable {
+        let id = UUID()
+        let portfoyNo: String
+        let kesideci: String
+        let banka: String
+        let vade: String
+        let tutar: Double
+        let durum: String
+        let tip: String
+    }
+    
+    @State private var cekler: [CekItem] = [
+        CekItem(portfoyNo: "ÇEK-2026-01", kesideci: "Ermay Makine Ltd.", banka: "Garanti BBVA", vade: "15.11.2026", tutar: 45000, durum: "Portföyde", tip: "ALINAN"),
+        CekItem(portfoyNo: "ÇEK-2026-02", kesideci: "Mega Plastik A.Ş.", banka: "İş Bankası", vade: "28.11.2026", tutar: 80000, durum: "Portföyde", tip: "ALINAN"),
+        CekItem(portfoyNo: "ÇEK-2026-03", kesideci: "Akıncılar Çelik", banka: "Akbank", vade: "10.12.2026", tutar: 32000, durum: "Ciro Edildi", tip: "ALINAN"),
+        CekItem(portfoyNo: "ÇEK-2026-04", kesideci: "Ermay Muhasebe (Biz)", banka: "Yapı Kredi", vade: "20.11.2026", tutar: 65000, durum: "Verildi", tip: "VERILEN")
+    ]
+    
+    private var toplamLikidite: Double {
+        kasaBakiye + bankaBakiye + posBakiye
+    }
     
     public init() {}
-    
-    private var toplamKasaBakiye: Double {
-        kasalar.reduce(0.0) { $0 + $1.bakiye }
-    }
-    
-    private var toplamBankaBakiye: Double {
-        bankalar.reduce(0.0) { $0 + $1.bakiye }
-    }
-    
-    private var toplamCekBakiye: Double {
-        cekler.filter { $0.durum == "PORTFOYDE" || $0.durum == "BANKADA" }.reduce(0.0) { $0 + $1.tutar }
-    }
-    
-    private var toplamHazirDegerler: Double {
-        toplamKasaBakiye + toplamBankaBakiye + toplamCekBakiye
-    }
     
     public var body: some View {
         NavigationStack {
             ZStack {
-                AppTheme.background.ignoresSafeArea()
+                Color.black.ignoresSafeArea()
                 
-                VStack(spacing: 12) {
-                    // Header Bar
+                VStack(spacing: 0) {
+                    // 1. Header Bar (Exact to FinansScreen.tsx)
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Finans & Likidite")
-                                .font(.system(size: 22, weight: .bold))
-                                .foregroundColor(AppTheme.textPrimary)
-                            Text("Toplam Değer: \(AppFormatters.money(toplamHazirDegerler))")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(AppTheme.success)
+                            Text("Finans Yönetimi")
+                                .font(.system(size: 24, weight: .heavy))
+                                .foregroundColor(.white)
+                                .tracking(-0.5)
+                            Text("Kasa, banka, çek/senet ve POS takibi")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(Color(hex: "94A3B8"))
                         }
                         
                         Spacer()
                         
-                        Button {
-                            isTransactionModalOpen = true
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "plus.circle.fill")
-                                Text("Yeni İşlem")
-                            }
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .background(AppTheme.primary)
-                            .cornerRadius(8)
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 6)
-                    
-                    // 5 Sekmeli Kaydırmalı Tab Bar
-                    ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            ForEach(FinansTab.allCases, id: \.self) { tab in
-                                let isSelected = activeTab == tab
+                            if activeTab == "nakit" {
                                 Button {
-                                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                                        activeTab = tab
-                                    }
+                                    showKasaSayimi = true
                                 } label: {
-                                    Text(tab.rawValue)
-                                        .font(.system(size: 13, weight: isSelected ? .bold : .medium))
-                                        .foregroundColor(isSelected ? .white : AppTheme.textSecondary)
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 8)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 10)
-                                                .fill(isSelected ? AppTheme.primary : AppTheme.cardBackground)
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: 10)
-                                                        .stroke(isSelected ? AppTheme.primary : AppTheme.border, lineWidth: 1)
-                                                )
-                                        )
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "banknote.fill")
+                                        Text("Sayım")
+                                    }
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 7)
+                                    .background(Color(hex: "0D9488"))
+                                    .cornerRadius(8)
                                 }
                             }
-                        }
-                        .padding(.horizontal)
-                    }
-                    
-                    // Sekme İçeriği
-                    ScrollView {
-                        VStack(spacing: 16) {
-                            switch activeTab {
-                            case .dashboard:
-                                renderDashboardTab()
-                            case .nakit:
-                                renderNakitTab()
-                            case .cek:
-                                renderCekTab()
-                            case .kk:
-                                renderKrediKartiTab()
-                            case .eft:
-                                renderBankaTab()
-                            }
-                            
-                            Spacer().frame(height: 70)
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 4)
-                    }
-                }
-                
-                // Modals
-                renderTransactionModal()
-                renderCekStatusModal()
-            }
-            .navigationBarHidden(true)
-        }
-    }
-    
-    // MARK: - 1. Dashboard / Karne Sekmesi
-    @ViewBuilder
-    private func renderDashboardTab() -> some View {
-        let karne = FinansAnalizUtils.hesapKarneler(
-            kasaBakiye: toplamKasaBakiye,
-            bankaBakiye: toplamBankaBakiye,
-            cekPortfoyBakiye: toplamCekBakiye,
-            toplamAlacak: 125000.0,
-            toplamBorc: 68000.0
-        )
-        
-        VStack(spacing: 14) {
-            // Likidite Karne Kartı
-            GlassCard(cornerRadius: 18, padding: 18) {
-                VStack(spacing: 12) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("FİNANSAL SAĞLIK VE LİKİDİTE PUANI")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(AppTheme.textSecondary)
-                            Text(karne.durumSeviyesi.uppercased())
-                                .font(.system(size: 18, weight: .heavy))
-                                .foregroundColor(karne.likiditePuani >= 70 ? AppTheme.success : AppTheme.warning)
-                        }
-                        Spacer()
-                        ZStack {
-                            Circle()
-                                .stroke(AppTheme.border, lineWidth: 6)
-                                .frame(width: 58, height: 58)
-                            Circle()
-                                .trim(from: 0, to: CGFloat(karne.likiditePuani) / 100.0)
-                                .stroke(karne.likiditePuani >= 70 ? AppTheme.success : AppTheme.warning, style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                                .rotationEffect(.degrees(-90))
-                                .frame(width: 58, height: 58)
-                            Text("\(karne.likiditePuani)")
-                                .font(.system(size: 16, weight: .heavy))
-                                .foregroundColor(AppTheme.textPrimary)
-                        }
-                    }
-                    
-                    Text(karne.genelDurumMetni)
-                        .font(.system(size: 12))
-                        .foregroundColor(AppTheme.textSecondary)
-                        .lineSpacing(3)
-                    
-                    Divider().background(AppTheme.border)
-                    
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Toplam Varlık")
-                                .font(.system(size: 10))
-                                .foregroundColor(AppTheme.textMuted)
-                            Text(AppFormatters.money(karne.toplamVarlik))
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(AppTheme.textPrimary)
-                        }
-                        Spacer()
-                        VStack(alignment: .center, spacing: 2) {
-                            Text("Yükümlülük")
-                                .font(.system(size: 10))
-                                .foregroundColor(AppTheme.textMuted)
-                            Text(AppFormatters.money(karne.toplamYukumluluk))
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(AppTheme.danger)
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("Net Pozisyon")
-                                .font(.system(size: 10))
-                                .foregroundColor(AppTheme.textMuted)
-                            Text(AppFormatters.money(karne.netPozisyon))
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(AppTheme.success)
-                        }
-                    }
-                }
-            }
-            
-            // 4'lü Özet Metrik Grid
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                StatCard(title: "Kasa Mevcudu", value: AppFormatters.money(toplamKasaBakiye), subtitle: "\(kasalar.count) Kasa", icon: "banknote.fill", accentColor: AppTheme.primary)
-                StatCard(title: "Banka Mevcudu", value: AppFormatters.money(toplamBankaBakiye), subtitle: "\(bankalar.count) Hesap", icon: "building.columns.fill", accentColor: AppTheme.purple)
-                StatCard(title: "Portföydeki Çekler", value: AppFormatters.money(toplamCekBakiye), subtitle: "\(cekler.count) Adet Çek", icon: "doc.text.fill", accentColor: AppTheme.warning)
-                StatCard(title: "Ort. Tahsilat Vadesi", value: "34 Gün", subtitle: "Ağırlıklı Vade", icon: "clock.fill", accentColor: AppTheme.info)
-            }
-            
-            // Finansal Trend Grafiği (Son 6 Ay)
-            GlassCard(cornerRadius: 16, padding: 16) {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Finansal Nakit Akış Trendi (Gelir vs Gider)")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(AppTheme.textPrimary)
-                    
-                    let trends = FinansAnalizUtils.hesapFinansTrend(aylikFaturalar: [], kasaHareketler: hareketler)
-                    HStack(alignment: .bottom, spacing: 12) {
-                        ForEach(trends) { item in
-                            VStack(spacing: 6) {
-                                HStack(spacing: 3) {
-                                    RoundedRectangle(cornerRadius: 3)
-                                        .fill(AppTheme.success)
-                                        .frame(width: 8, height: CGFloat(item.gelir / 2000))
-                                    RoundedRectangle(cornerRadius: 3)
-                                        .fill(AppTheme.danger)
-                                        .frame(width: 8, height: CGFloat(item.gider / 2000))
-                                }
-                                Text(item.donem)
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundColor(AppTheme.textSecondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .frame(height: 110)
-                }
-            }
-        }
-    }
-    
-    // MARK: - 2. Nakit Kasa Sekmesi
-    @ViewBuilder
-    private func renderNakitTab() -> some View {
-        VStack(spacing: 12) {
-            ForEach(kasalar) { kasa in
-                GlassCard(cornerRadius: 14, padding: 14) {
-                    HStack(spacing: 12) {
-                        ZStack {
-                            Circle().fill(AppTheme.primary.opacity(0.15)).frame(width: 42, height: 42)
-                            Image(systemName: "banknote.fill").foregroundColor(AppTheme.primary)
-                        }
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(kasa.hesapAdi)
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(AppTheme.textPrimary)
-                            Text(kasa.dovizCinsi ?? "TRY")
-                                .font(.system(size: 11))
-                                .foregroundColor(AppTheme.textMuted)
-                        }
-                        Spacer()
-                        Text(AppFormatters.money(kasa.bakiye))
-                            .font(.system(size: 16, weight: .heavy))
-                            .foregroundColor(AppTheme.textPrimary)
-                    }
-                }
-            }
-            
-            // Kasa Hareketleri
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Kasa Hareket Dökümü")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(AppTheme.textPrimary)
-                
-                ForEach(hareketler) { h in
-                    GlassCard(cornerRadius: 12, padding: 12) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(h.cariUnvan ?? h.aciklama ?? "Nakit İşlem")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundColor(AppTheme.textPrimary)
-                                Text("\(h.tarih) • \(h.belgeNo ?? "")")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(AppTheme.textMuted)
-                            }
-                            Spacer()
-                            Text(AppFormatters.money(h.tutar))
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(h.islemTuru == "TAHSILAT" ? AppTheme.success : AppTheme.danger)
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    // MARK: - 3. Çek / Senet Portföyü Sekmesi
-    @ViewBuilder
-    private func renderCekTab() -> some View {
-        VStack(spacing: 12) {
-            ForEach(cekler) { cek in
-                GlassCard(cornerRadius: 14, padding: 14) {
-                    VStack(spacing: 8) {
-                        HStack {
-                            StatusBadge(title: cek.durum, color: cek.durum == "PORTFOYDE" ? AppTheme.warning : AppTheme.success)
-                            Text(cek.seriNo ?? cek.cekNo ?? "")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(AppTheme.textMuted)
-                            Spacer()
-                            Text(AppFormatters.money(cek.tutar))
-                                .font(.system(size: 15, weight: .heavy))
-                                .foregroundColor(AppTheme.textPrimary)
-                        }
-                        
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(cek.borclu ?? cek.cariUnvan ?? "-")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(AppTheme.textPrimary)
-                                Text("Banka: \(cek.banka ?? "") - \(cek.sube ?? "") • Vade: \(cek.vadeTarihi)")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(AppTheme.textSecondary)
-                            }
-                            Spacer()
                             
                             Button {
-                                selectedCek = cek
-                                isCekStatusModalOpen = true
+                                showYeniIslem = true
                             } label: {
-                                Image(systemName: "ellipsis.circle.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(AppTheme.primary)
+                                HStack(spacing: 4) {
+                                    Image(systemName: "plus")
+                                    Text("Yeni İşlem")
+                                }
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(Color(hex: "2563EB"))
+                                .cornerRadius(8)
                             }
                         }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 6)
+                    .padding(.bottom, 10)
+                    
+                    // 2. 5 Sekmeli Menü (Dashboard | Nakit | Çekler | Kredi Kartı | Havale/EFT)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            tabButton(title: "Dashboard", key: "dashboard")
+                            tabButton(title: "Nakit", key: "nakit")
+                            tabButton(title: "Çekler", key: "cek")
+                            tabButton(title: "Kredi Kartı", key: "kk")
+                            tabButton(title: "Havale/EFT", key: "eft")
+                        }
+                        .padding(.horizontal, 16)
+                    }
+                    .padding(.bottom, 12)
+                    
+                    // 3. Sekme İçerikleri
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 16) {
+                            switch activeTab {
+                            case "dashboard":
+                                renderDashboardTab()
+                            case "nakit":
+                                renderNakitTab()
+                            case "cek":
+                                renderCeklerTab()
+                            case "kk":
+                                renderKrediKartiTab()
+                            case "eft":
+                                renderHavaleEftTab()
+                            default:
+                                EmptyView()
+                            }
+                            
+                            Spacer().frame(height: 110)
+                        }
+                        .padding(.horizontal, 16)
+                    }
                 }
+            }
+            .navigationBarHidden(true)
+            .sheet(isPresented: $showYeniIslem) {
+                yeniIslemSheet()
+            }
+            .sheet(isPresented: $showKasaSayimi) {
+                kasaSayimiSheet()
             }
         }
     }
     
-    // MARK: - 4. Kredi Kartı / POS Sekmesi
-    @ViewBuilder
+    private func tabButton(title: String, key: String) -> some View {
+        let isSel = activeTab == key
+        return Button {
+            withAnimation(.easeInOut(duration: 0.15)) { activeTab = key }
+        } label: {
+            Text(title)
+                .font(.system(size: 13, weight: isSel ? .bold : .medium))
+                .foregroundColor(isSel ? .white : Color(hex: "8E8E93"))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(isSel ? Color(hex: "2563EB") : Color(hex: "121216"))
+                .cornerRadius(10)
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(isSel ? Color(hex: "2563EB") : Color.white.opacity(0.06), lineWidth: 1))
+        }
+    }
+    
+    // MARK: - 1. Dashboard Tab
+    private func renderDashboardTab() -> some View {
+        VStack(spacing: 14) {
+            // 3 KPI Likidite Kartları
+            HStack(spacing: 10) {
+                kpiCard(title: "NAKİT KASA", value: AppFormatters.money(kasaBakiye), icon: "wallet.pass.fill", color: Color(hex: "30D158"))
+                kpiCard(title: "BANKA MEVDUAT", value: AppFormatters.money(bankaBakiye), icon: "building.columns.fill", color: Color(hex: "0A84FF"))
+            }
+            
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("TOPLAM LİKİDİTE (KASA + BANKA + POS)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(Color(hex: "8E8E93"))
+                    Spacer()
+                    Image(systemName: "creditcard.fill").foregroundColor(Color(hex: "FF9F0A"))
+                }
+                Text(AppFormatters.money(toplamLikidite))
+                    .font(.system(size: 26, weight: .heavy))
+                    .foregroundColor(.white)
+            }
+            .padding(16)
+            .background(Color(hex: "121216"))
+            .cornerRadius(18)
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.08), lineWidth: 1))
+            
+            // Son Finansal İşlemler
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Son Finansal İşlemler")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+                
+                VStack(spacing: 0) {
+                    ForEach(Array(hareketler.enumerated()), id: \.element.id) { idx, item in
+                        HStack(spacing: 12) {
+                            ZStack {
+                                Circle()
+                                    .fill((item.type == "In" ? Color(hex: "00FF87") : Color(hex: "FF416C")).opacity(0.15))
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: item.type == "In" ? "arrow.down.left" : "arrow.up.right")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(item.type == "In" ? Color(hex: "00FF87") : Color(hex: "FF416C"))
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.title)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                Text("\(item.description) • \(item.method) • \(item.date)")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(Color(hex: "8E8E93"))
+                            }
+                            
+                            Spacer()
+                            
+                            Text("\(item.type == "In" ? "+" : "-")\(AppFormatters.money(item.amount))")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(item.type == "In" ? Color(hex: "00FF87") : Color(hex: "FF416C"))
+                        }
+                        .padding(.vertical, 10)
+                        
+                        if idx < hareketler.count - 1 {
+                            Divider().background(Color.white.opacity(0.06))
+                        }
+                    }
+                }
+            }
+            .padding(16)
+            .background(Color(hex: "121216"))
+            .cornerRadius(20)
+            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.08), lineWidth: 1))
+        }
+    }
+    
+    // MARK: - 2. Nakit Tab
+    private func renderNakitTab() -> some View {
+        VStack(spacing: 14) {
+            // Kasa Kartları
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Kasa Hesapları").font(.system(size: 13, weight: .bold)).foregroundColor(.white)
+                HStack(spacing: 10) {
+                    kasaBox(title: "Merkez Kasa (TL)", bakiye: 38400, color: Color(hex: "30D158"))
+                    kasaBox(title: "Şantiye / Saha Kasası", bakiye: 15800, color: Color(hex: "0A84FF"))
+                }
+            }
+            .padding(16)
+            .background(Color(hex: "121216"))
+            .cornerRadius(20)
+            
+            // Kasa Hareketleri
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Kasa Hareket Listesi").font(.system(size: 13, weight: .bold)).foregroundColor(.white)
+                ForEach(hareketler.filter { $0.method.contains("Kasa") }) { h in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(h.title).font(.system(size: 13, weight: .bold)).foregroundColor(.white)
+                            Text("\(h.description) • \(h.date)").font(.system(size: 11)).foregroundColor(Color(hex: "8E8E93"))
+                        }
+                        Spacer()
+                        Text("\(h.type == "In" ? "+" : "-")\(AppFormatters.money(h.amount))")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(h.type == "In" ? Color(hex: "00FF87") : Color(hex: "FF416C"))
+                    }
+                    .padding(.vertical, 8)
+                }
+            }
+            .padding(16)
+            .background(Color(hex: "121216"))
+            .cornerRadius(20)
+        }
+    }
+    
+    // MARK: - 3. Çekler Tab
+    private func renderCeklerTab() -> some View {
+        VStack(spacing: 12) {
+            Picker("Çek Türü", selection: $cekTuru) {
+                Text("Alınan Müşteri Çekleri").tag("ALINAN")
+                Text("Verilen Firma Çekleri").tag("VERILEN")
+            }
+            .pickerStyle(.segmented)
+            .padding(.bottom, 4)
+            
+            ForEach(cekler.filter { $0.tip == cekTuru }) { c in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(c.portfoyNo).font(.system(size: 11, weight: .bold)).foregroundColor(Color(hex: "3B82F6"))
+                        Spacer()
+                        Text(c.durum)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(Color(hex: "10B981"))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color(hex: "10B981").opacity(0.12))
+                            .cornerRadius(4)
+                    }
+                    
+                    Text(c.kesideci).font(.system(size: 14, weight: .bold)).foregroundColor(.white)
+                    
+                    HStack {
+                        Text("\(c.banka) • Vade: \(c.vade)").font(.system(size: 11)).foregroundColor(Color(hex: "8E8E93"))
+                        Spacer()
+                        Text(AppFormatters.money(c.tutar)).font(.system(size: 14, weight: .heavy)).foregroundColor(.white)
+                    }
+                }
+                .padding(14)
+                .background(Color(hex: "121216"))
+                .cornerRadius(16)
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.08), lineWidth: 1))
+            }
+        }
+    }
+    
+    // MARK: - 4. Kredi Kartı Tab
     private func renderKrediKartiTab() -> some View {
         VStack(spacing: 12) {
-            GlassCard(cornerRadius: 16, padding: 16) {
-                VStack(alignment: .leading, spacing: 10) {
+            kpiCard(title: "POS HESAP BAKİYESİ", value: AppFormatters.money(posBakiye), icon: "creditcard.and.123", color: Color(hex: "BF5AF2"))
+            
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Kredi Kartı / POS Tahsilatları").font(.system(size: 13, weight: .bold)).foregroundColor(.white)
+                ForEach(hareketler.filter { $0.method.contains("Kredi") }) { h in
                     HStack {
-                        Image(systemName: "creditcard.fill").foregroundColor(AppTheme.purple)
-                        Text("Ana Şirket POS Cihazı (Garanti BBVA)")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(AppTheme.textPrimary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(h.title).font(.system(size: 13, weight: .bold)).foregroundColor(.white)
+                            Text("\(h.description) • \(h.date)").font(.system(size: 11)).foregroundColor(Color(hex: "8E8E93"))
+                        }
                         Spacer()
-                        StatusBadge(title: "AKTİF", color: AppTheme.success)
+                        Text(AppFormatters.money(h.amount)).font(.system(size: 13, weight: .bold)).foregroundColor(Color(hex: "30D158"))
                     }
-                    Divider().background(AppTheme.border)
-                    DetailSummaryRow(label: "Komisyon Oranı:", value: "% 2.45")
-                    DetailSummaryRow(label: "Bloke Çözülme Süresi:", value: "28 Gün")
-                    DetailSummaryRow(label: "Bugün Çekilen:", value: "₺24.500,00")
+                    .padding(.vertical, 8)
                 }
             }
+            .padding(16)
+            .background(Color(hex: "121216"))
+            .cornerRadius(20)
         }
     }
     
-    // MARK: - 5. Banka & EFT Sekmesi
-    @ViewBuilder
-    private func renderBankaTab() -> some View {
+    // MARK: - 5. Havale / EFT Tab
+    private func renderHavaleEftTab() -> some View {
         VStack(spacing: 12) {
-            ForEach(bankalar) { banka in
-                GlassCard(cornerRadius: 14, padding: 14) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text(banka.hesapAdi)
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(AppTheme.textPrimary)
-                            Spacer()
-                            Text(AppFormatters.money(banka.bakiye))
-                                .font(.system(size: 16, weight: .heavy))
-                                .foregroundColor(AppTheme.textPrimary)
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Banka Hesapları").font(.system(size: 13, weight: .bold)).foregroundColor(.white)
+                bankaBox(ad: "Garanti BBVA Ticari", iban: "TR44 0006 2000 1234 5678 9012 34", bakiye: 184500)
+                bankaBox(ad: "Yapı Kredi Şirket Hesabı", iban: "TR12 0006 7000 9876 5432 1098 76", bakiye: 92400)
+            }
+            .padding(16)
+            .background(Color(hex: "121216"))
+            .cornerRadius(20)
+            
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Son Havale & EFT İşlemleri").font(.system(size: 13, weight: .bold)).foregroundColor(.white)
+                ForEach(hareketler.filter { $0.method.contains("Banka") }) { h in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(h.title).font(.system(size: 13, weight: .bold)).foregroundColor(.white)
+                            Text("\(h.description) • \(h.date)").font(.system(size: 11)).foregroundColor(Color(hex: "8E8E93"))
                         }
-                        
-                        if let iban = banka.iban {
-                            HStack {
-                                Text(iban)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(AppTheme.textMuted)
-                                Spacer()
-                                Button {
-                                    #if canImport(UIKit)
-                                    UIPasteboard.general.string = iban
-                                    #endif
-                                    HardwareService.shared.hapticSuccess()
-                                } label: {
-                                    Image(systemName: "doc.on.doc")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(AppTheme.primary)
-                                }
-                            }
-                        }
+                        Spacer()
+                        Text("\(h.type == "In" ? "+" : "-")\(AppFormatters.money(h.amount))")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(h.type == "In" ? Color(hex: "00FF87") : Color(hex: "FF416C"))
                     }
+                    .padding(.vertical, 8)
                 }
             }
+            .padding(16)
+            .background(Color(hex: "121216"))
+            .cornerRadius(20)
         }
     }
     
-    // MARK: - Yeni İşlem Modalı
-    @ViewBuilder
-    private func renderTransactionModal() -> some View {
-        SwipeableModal(isPresented: $isTransactionModalOpen, title: "Yeni Finansal İşlem") {
-            VStack(spacing: 14) {
-                Picker("İşlem Türü", selection: $transType) {
-                    Text("Tahsilat (Giriş)").tag("Tahsilat")
-                    Text("Ödeme (Çıkış)").tag("Ödeme")
+    private func kpiCard(title: String, value: String, icon: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(title).font(.system(size: 10, weight: .bold)).foregroundColor(Color(hex: "8E8E93"))
+                Spacer()
+                Image(systemName: icon).foregroundColor(color)
+            }
+            Text(value).font(.system(size: 17, weight: .heavy)).foregroundColor(.white)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(hex: "121216"))
+        .cornerRadius(16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.08), lineWidth: 1))
+    }
+    
+    private func kasaBox(title: String, bakiye: Double, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.system(size: 12, weight: .bold)).foregroundColor(.white)
+            Text(AppFormatters.money(bakiye)).font(.system(size: 16, weight: .heavy)).foregroundColor(color)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.03))
+        .cornerRadius(12)
+    }
+    
+    private func bankaBox(ad: String, iban: String, bakiye: Double) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(ad).font(.system(size: 13, weight: .bold)).foregroundColor(.white)
+                Spacer()
+                Text(AppFormatters.money(bakiye)).font(.system(size: 14, weight: .heavy)).foregroundColor(Color(hex: "0A84FF"))
+            }
+            Text(iban).font(.system(size: 10)).foregroundColor(Color(hex: "8E8E93"))
+        }
+        .padding(12)
+        .background(Color.white.opacity(0.03))
+        .cornerRadius(12)
+    }
+    
+    // MARK: - Modals
+    private func yeniIslemSheet() -> some View {
+        VStack(spacing: 16) {
+            Text("Yeni Finansal İşlem").font(.system(size: 18, weight: .bold)).foregroundColor(.white).padding(.top, 20)
+            
+            VStack(spacing: 12) {
+                Picker("İşlem Türü", selection: $islemTuru) {
+                    Text("Tahsilat").tag("Tahsilat")
+                    Text("Ödeme").tag("Ödeme")
+                    Text("Virman").tag("Virman")
+                    Text("Gider").tag("Gider")
                 }
                 .pickerStyle(.segmented)
                 
-                Picker("Ödeme Yöntemi", selection: $transMethod) {
+                Picker("Ödeme Yöntemi", selection: $odemeYontemi) {
                     Text("Nakit").tag("Nakit")
                     Text("Kredi Kartı").tag("Kredi Kartı")
-                    Text("Banka / EFT").tag("Havale/EFT")
-                    Text("Çek").tag("Çek")
+                    Text("Havale/EFT").tag("Havale/EFT")
                 }
                 .pickerStyle(.segmented)
                 
-                FormField(label: "Cari / Müşteri Unvanı *", text: $transCariUnvan, placeholder: "Örn: Akıncılar Çelik")
-                FormField(label: "Tutar (₺) *", text: $transAmount, placeholder: "0.00")
-                FormField(label: "Açıklama", text: $transDesc, placeholder: "İşlem notu...")
+                TextField("Cari Unvanı", text: $cariUnvan)
+                    .font(.system(size: 13)).foregroundColor(.white).padding(10).background(Color.white.opacity(0.05)).cornerRadius(8)
                 
-                ActionButton(title: isSaving ? "Kaydediliyor..." : "İşlemi Tamamla", icon: "checkmark.circle.fill", color: transType == "Tahsilat" ? AppTheme.success : AppTheme.danger) {
-                    saveTransaction()
+                TextField("Tutar (₺)", text: $islemTutar)
+                    .font(.system(size: 13)).foregroundColor(.white).padding(10).background(Color.white.opacity(0.05)).cornerRadius(8)
+                
+                TextField("Açıklama", text: $islemAciklama)
+                    .font(.system(size: 13)).foregroundColor(.white).padding(10).background(Color.white.opacity(0.05)).cornerRadius(8)
+            }
+            .padding(.horizontal, 20)
+            
+            Button {
+                let tutar = Double(islemTutar) ?? 0
+                guard tutar > 0 else { return }
+                let newItem = FinansListItem(
+                    title: cariUnvan,
+                    description: islemAciklama.isEmpty ? islemTuru : islemAciklama,
+                    amount: tutar,
+                    date: "03.11.2026",
+                    type: (islemTuru == "Tahsilat" ? "In" : "Out"),
+                    method: odemeYontemi
+                )
+                hareketler.insert(newItem, at: 0)
+                if islemTuru == "Tahsilat" {
+                    kasaBakiye += tutar
+                } else {
+                    kasaBakiye -= tutar
                 }
-                .disabled(isSaving)
+                showYeniIslem = false
+            } label: {
+                Text("İşlemi Kaydet")
+                    .font(.system(size: 15, weight: .bold)).foregroundColor(.white)
+                    .frame(maxWidth: .infinity).padding(.vertical, 14)
+                    .background(Color(hex: "2563EB")).cornerRadius(12)
             }
+            .padding(.horizontal, 20)
+            
+            Spacer()
         }
+        .presentationDetents([.medium])
     }
     
-    // MARK: - Çek Durum Modalı
-    @ViewBuilder
-    private func renderCekStatusModal() -> some View {
-        SwipeableModal(isPresented: $isCekStatusModalOpen, title: "Çek Portföy Durumu") {
-            if let c = selectedCek {
-                VStack(spacing: 12) {
-                    Text("\(c.borclu ?? c.cariUnvan ?? "") - \(AppFormatters.money(c.tutar))")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(AppTheme.textPrimary)
-                    
-                    let options = [
-                        ("Tahsile Ver (Bankada)", "BANKADA", AppTheme.info),
-                        ("Tahsil Edildi (Hesaba Geçti)", "TAHSIL_EDILDI", AppTheme.success),
-                        ("Karşılıksız Çıktı (Protesto)", "KARSILIKSIZ", AppTheme.danger),
-                        ("Müşteriye İade Et", "IADE", AppTheme.textMuted)
-                    ]
-                    
-                    ForEach(options, id: \.1) { opt in
-                        Button {
-                            updateCekStatus(c, newStatus: opt.1)
-                        } label: {
-                            Text(opt.0)
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(opt.2)
-                                .cornerRadius(10)
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    private func saveTransaction() {
-        guard let tutarNum = Double(transAmount), tutarNum > 0, !transCariUnvan.isEmpty else { return }
-        isSaving = true
-        
-        let cari = CariKart(unvan: transCariUnvan)
-        let req = FinancialTransactionRequest(
-            cari: cari,
-            amount: tutarNum,
-            date: AppFormatters.isoDate.string(from: Date()),
-            transactionType: transType,
-            method: transMethod,
-            description: transDesc,
-            selectedHesap: kasalar.first
-        )
-        
-        Task {
-            _ = try? await TransactionService.shared.saveFinancialTransaction(req: req)
-            await MainActor.run {
-                hareketler.insert(KasaHareket(
-                    id: UUID().uuidString,
-                    tarih: req.date,
-                    islemTuru: transType == "Tahsilat" ? "TAHSILAT" : "TEDIYE",
-                    cariUnvan: transCariUnvan,
-                    belgeNo: "TS-\(Int.random(in: 100...999))",
-                    tutar: tutarNum,
-                    aciklama: transDesc
-                ), at: 0)
-                isSaving = false
-                isTransactionModalOpen = false
-                HardwareService.shared.hapticSuccess()
-            }
-        }
-    }
-    
-    private func updateCekStatus(_ cek: Cek, newStatus: String) {
-        if let idx = cekler.firstIndex(where: { $0.id == cek.id }) {
-            cekler[idx].durum = newStatus
-            isCekStatusModalOpen = false
-            HardwareService.shared.hapticSuccess()
-        }
+    private func kasaSayimiSheet() -> some View {
+        KasaSayimView(sistemBakiye: kasaBakiye)
     }
 }
