@@ -74,6 +74,9 @@ public struct Cek: Identifiable, Codable, Sendable {
     }
 }
 
+public typealias CekSenet = Cek
+
+
 public struct Senet: Identifiable, Codable, Sendable {
     public var id: String
     public var senetNo: String?
@@ -123,4 +126,7 @@ public struct Senet: Identifiable, Codable, Sendable {
         case aciklama
     }
 }
+
+public typealias CekSenet = Cek
+
 

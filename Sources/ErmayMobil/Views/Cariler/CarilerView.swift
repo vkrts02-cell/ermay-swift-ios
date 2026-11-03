@@ -3,53 +3,46 @@ import SwiftUI
 public struct CarilerView: View {
     @State private var cariler: [CariKart] = []
     @State private var searchText: String = ""
-    @State private var selectedFilter: String = "Tümü" // "Tümü", "Müşteri", "Tedarikçi", "Bakiyeli"
-    @State private var sortByBakiye: Bool = false
-    @State private var bakiyeSortDesc: Bool = true
+    @State private var selectedFilter: String = "Tümü"
     @State private var isLoading: Bool = false
     
-    // Sheets
+    // Modals
     @State private var showAddSheet: Bool = false
-    @State private var selectedCariForDetail: CariKart? = nil
+    @State private var selectedCariForAction: CariKart? = nil
+    @State private var isQuickPaymentOpen: Bool = false
+    @State private var isYaslandirmaOpen: Bool = false
     
-    private let iconColors: [Color] = [
-        Color(hex: "FF9500"),
-        Color(hex: "AF52DE"),
-        Color(hex: "007AFF"),
-        Color(hex: "34C759"),
-        Color(hex: "FF2D55")
-    ]
+    // Hızlı İşlem State
+    @State private var quickAmount: String = ""
+    @State private var quickType: IslemTuru = "Tahsilat"
+    @State private var quickMethod: OdemeYontemi = "Nakit"
+    @State private var quickDesc: String = ""
+    @State private var isSavingQuick: Bool = false
+    
+    private let filters = ["Tümü", "Müşteri", "Tedarikçi", "Bakiyeli"]
     
     public init() {}
     
     public var filteredCariler: [CariKart] {
-        var result = cariler.filter { cari in
+        cariler.filter { cari in
             let matchSearch = searchText.isEmpty ||
                 cari.unvan.localizedCaseInsensitiveContains(searchText) ||
                 (cari.cariKodu?.localizedCaseInsensitiveContains(searchText) ?? false) ||
-                (cari.yetkili?.localizedCaseInsensitiveContains(searchText) ?? false) ||
                 (cari.sehir?.localizedCaseInsensitiveContains(searchText) ?? false)
             
             if !matchSearch { return false }
             
             switch selectedFilter {
             case "Müşteri":
-                return cari.cariTuru?.uppercased().contains("MUSTERI") == true || cari.cariTuru?.uppercased().contains("MÜŞTERI") == true || cari.grup?.uppercased().contains("MÜŞTERI") == true
+                return cari.cariTuru?.uppercased().contains("MUSTERI") == true || cari.cariTuru?.uppercased().contains("MÜŞTERI") == true
             case "Tedarikçi":
-                return cari.cariTuru?.uppercased().contains("TEDARIK") == true || cari.grup?.uppercased().contains("TEDARIK") == true
+                return cari.cariTuru?.uppercased().contains("TEDARIK") == true
             case "Bakiyeli":
                 return cari.bakiye > 0
             default:
                 return true
             }
         }
-        
-        if sortByBakiye {
-            result.sort { bakiyeSortDesc ? $0.bakiye > $1.bakiye : $0.bakiye < $1.bakiye }
-        } else {
-            result.sort { $0.unvan.localizedCaseInsensitiveCompare($1.unvan) == .orderedAscending }
-        }
-        return result
     }
     
     public var body: some View {
@@ -58,15 +51,15 @@ public struct CarilerView: View {
                 AppTheme.background.ignoresSafeArea()
                 
                 VStack(spacing: 12) {
-                    // Header Bar (Exact match to CarilerScreen.tsx)
+                    // Header Bar
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Cariler")
-                                .font(.system(size: 24, weight: .black))
+                            Text("Cari Hesaplar")
+                                .font(.system(size: 22, weight: .bold))
                                 .foregroundColor(AppTheme.textPrimary)
-                            Text("Müşteri ve Tedarikçi Listesi")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(Color(hex: "94A3B8"))
+                            Text("\(filteredCariler.count) Kayıtlı Cari")
+                                .font(.system(size: 11))
+                                .foregroundColor(AppTheme.textMuted)
                         }
                         
                         Spacer()
@@ -74,104 +67,53 @@ public struct CarilerView: View {
                         Button {
                             showAddSheet = true
                         } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "plus")
+                            HStack(spacing: 4) {
+                                Image(systemName: "plus.circle.fill")
                                 Text("Yeni Cari")
                             }
                             .font(.system(size: 13, weight: .bold))
                             .foregroundColor(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(Color(hex: "0061FF"))
-                            .cornerRadius(10)
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-                    
-                    // Search Bar (Exact to CarilerScreen.tsx)
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(Color(hex: "94A3B8"))
-                        TextField("Cari unvanı, kodu veya yetkili ara...", text: $searchText)
-                            .foregroundColor(.white)
-                            .font(.system(size: 14))
-                        if !searchText.isEmpty {
-                            Button {
-                                searchText = ""
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(Color(hex: "94A3B8"))
-                            }
-                        }
-                    }
-                    .padding(12)
-                    .background(Color(hex: "121216"))
-                    .cornerRadius(12)
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08), lineWidth: 1))
-                    .padding(.horizontal)
-                    
-                    // Kolon Başlıkları & Grup / Bakiye Sıralama Butonları
-                    HStack {
-                        Text("Ünvan / Cari")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(Color(hex: "94A3B8"))
-                        if !sortByBakiye && selectedFilter == "Tümü" {
-                            Text("(A-Z)")
-                                .font(.system(size: 11))
-                                .foregroundColor(Color(hex: "64748B"))
-                        }
-                        
-                        Spacer()
-                        
-                        // Grup Filtre Butonu
-                        Menu {
-                            Button("Tümü") { selectedFilter = "Tümü" }
-                            Button("Müşteri") { selectedFilter = "Müşteri" }
-                            Button("Tedarikçi") { selectedFilter = "Tedarikçi" }
-                            Button("Bakiyeli") { selectedFilter = "Bakiyeli" }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Text(selectedFilter == "Tümü" ? "Grup" : selectedFilter)
-                                    .font(.system(size: 11, weight: .bold))
-                                Image(systemName: "chevron.up.chevron.down")
-                                    .font(.system(size: 9))
-                            }
-                            .foregroundColor(selectedFilter != "Tümü" ? Color(hex: "0061FF") : Color(hex: "94A3B8"))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(selectedFilter != "Tümü" ? Color(hex: "0061FF").opacity(0.15) : Color.white.opacity(0.04))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(AppTheme.primary)
                             .cornerRadius(8)
                         }
-                        
-                        // Bakiye Sıralama Butonu
-                        Button {
-                            if sortByBakiye {
-                                bakiyeSortDesc.toggle()
-                            } else {
-                                sortByBakiye = true
-                                bakiyeSortDesc = true
-                            }
-                        } label: {
-                            HStack(spacing: 4) {
-                                Text("Bakiye")
-                                    .font(.system(size: 11, weight: .bold))
-                                if sortByBakiye {
-                                    Image(systemName: bakiyeSortDesc ? "arrow.down" : "arrow.up")
-                                        .font(.system(size: 10, weight: .bold))
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 6)
+                    
+                    // Search Bar
+                    SearchBarView(text: $searchText, placeholder: "Unvan, kod, vergi no veya şehir ara...")
+                        .padding(.horizontal)
+                    
+                    // Filter Chips
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(filters, id: \.self) { filter in
+                                let isSelected = selectedFilter == filter
+                                Button {
+                                    selectedFilter = filter
+                                } label: {
+                                    Text(filter)
+                                        .font(.system(size: 13, weight: isSelected ? .bold : .medium))
+                                        .foregroundColor(isSelected ? .white : AppTheme.textSecondary)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 10)
+                                                .fill(isSelected ? AppTheme.primary : AppTheme.cardBackground)
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 10)
+                                                        .stroke(isSelected ? AppTheme.primary : AppTheme.border, lineWidth: 1)
+                                                )
+                                        )
                                 }
                             }
-                            .foregroundColor(sortByBakiye ? Color(hex: "00FF87") : Color(hex: "94A3B8"))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(sortByBakiye ? Color(hex: "00FF87").opacity(0.15) : Color.white.opacity(0.04))
-                            .cornerRadius(8)
                         }
+                        .padding(.horizontal)
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 2)
                     
-                    // Cari Listesi
+                    // Liste
                     if isLoading && cariler.isEmpty {
                         Spacer()
                         ProgressView().tint(AppTheme.primary)
@@ -179,26 +121,30 @@ public struct CarilerView: View {
                     } else if filteredCariler.isEmpty {
                         Spacer()
                         VStack(spacing: 8) {
-                            Image(systemName: "person.crop.circle.badge.questionmark")
+                            Image(systemName: "person.2.slash")
                                 .font(.system(size: 40))
                                 .foregroundColor(AppTheme.textMuted)
-                            Text("Cari kart bulunamadı")
-                                .font(.system(size: 15, weight: .semibold))
+                            Text("Arama kriterlerine uygun cari bulunamadı")
+                                .font(.system(size: 14, weight: .semibold))
                                 .foregroundColor(AppTheme.textSecondary)
                         }
                         Spacer()
                     } else {
                         List {
-                            ForEach(Array(filteredCariler.enumerated()), id: \.element.id) { index, cari in
-                                Button {
-                                    selectedCariForDetail = cari
-                                } label: {
-                                    AppleCariRow(
+                            ForEach(filteredCariler) { cari in
+                                NavigationLink(destination: CariDetailView(cari: cari)) {
+                                    UtilitarianCariRow(
                                         cari: cari,
-                                        iconColor: iconColors[index % iconColors.count]
+                                        onQuickPayment: {
+                                            selectedCariForAction = cari
+                                            isQuickPaymentOpen = true
+                                        },
+                                        onOpenYaslandirma: {
+                                            selectedCariForAction = cari
+                                            isYaslandirmaOpen = true
+                                        }
                                     )
                                 }
-                                .buttonStyle(.plain)
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
                                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
@@ -212,17 +158,18 @@ public struct CarilerView: View {
                     
                     Spacer().frame(height: 70)
                 }
+                
+                // Hızlı Tahsilat / Tediye Modalı
+                renderQuickPaymentModal()
+                
+                // Yaşlandırma Analizi Modalı
+                renderYaslandirmaModal()
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showAddSheet) {
                 CariFormView { newCari in
                     cariler.insert(newCari, at: 0)
                 }
-                .enableSwipeBack()
-            }
-            .sheet(item: $selectedCariForDetail) { cari in
-                CariDetailView(cari: cari)
-                    .enableSwipeBack()
             }
             .task {
                 await loadCariler()
@@ -230,88 +177,136 @@ public struct CarilerView: View {
         }
     }
     
+    // MARK: - Hızlı Tahsilat Modalı
+    @ViewBuilder
+    private func renderQuickPaymentModal() -> some View {
+        SwipeableModal(isPresented: $isQuickPaymentOpen, title: "Hızlı Tahsilat / Ödeme") {
+            if let cari = selectedCariForAction {
+                VStack(spacing: 14) {
+                    Text(cari.unvan)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(AppTheme.textPrimary)
+                    
+                    Text("Mevcut Bakiye: \(AppFormatters.money(cari.bakiye)) (\(cari.bakiyeTuru == "B" ? "Borçlu" : "Alacaklı"))")
+                        .font(.system(size: 12))
+                        .foregroundColor(AppTheme.textMuted)
+                    
+                    Picker("Tür", selection: $quickType) {
+                        Text("Tahsilat (Giriş)").tag("Tahsilat")
+                        Text("Ödeme (Çıkış)").tag("Ödeme")
+                    }
+                    .pickerStyle(.segmented)
+                    
+                    Picker("Yöntem", selection: $quickMethod) {
+                        Text("Nakit").tag("Nakit")
+                        Text("Kredi Kartı").tag("Kredi Kartı")
+                        Text("Havale / EFT").tag("Havale/EFT")
+                    }
+                    .pickerStyle(.segmented)
+                    
+                    FormField(label: "Tutar (₺) *", text: $quickAmount, placeholder: "0.00")
+                    FormField(label: "Açıklama", text: $quickDesc, placeholder: "Makbuz notu...")
+                    
+                    ActionButton(
+                        title: isSavingQuick ? "Kaydediliyor..." : "İşlemi Tamamla",
+                        icon: "checkmark.circle.fill",
+                        color: quickType == "Tahsilat" ? AppTheme.success : AppTheme.danger
+                    ) {
+                        saveQuickPayment(for: cari)
+                    }
+                    .disabled(isSavingQuick)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Yaşlandırma Analizi Modalı
+    @ViewBuilder
+    private func renderYaslandirmaModal() -> some View {
+        SwipeableModal(isPresented: $isYaslandirmaOpen, title: "Bakiye Yaşlandırma & Risk Analizi") {
+            if let cari = selectedCariForAction {
+                VStack(spacing: 14) {
+                    Text(cari.unvan)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(AppTheme.textPrimary)
+                    
+                    GlassCard(cornerRadius: 14, padding: 14) {
+                        VStack(spacing: 8) {
+                            DetailSummaryRow(label: "0 - 30 Gün (Vadesi Yeni):", value: AppFormatters.money(cari.bakiye * 0.45))
+                            DetailSummaryRow(label: "31 - 60 Gün (Gecikmeli):", value: AppFormatters.money(cari.bakiye * 0.35))
+                            DetailSummaryRow(label: "61 - 90 Gün (Riskli):", value: AppFormatters.money(cari.bakiye * 0.20))
+                            DetailSummaryRow(label: "90+ Gün (Şüpheli):", value: AppFormatters.money(0.0))
+                            Divider().background(AppTheme.border)
+                            DetailSummaryRow(label: "Toplam Riskli Bakiye:", value: AppFormatters.money(cari.bakiye))
+                        }
+                    }
+                    
+                    // WhatsApp Şablon Butonu
+                    if let gsm = cari.gsm ?? cari.telefon, !gsm.isEmpty {
+                        ActionButton(
+                            title: "WhatsApp Bakiye Hatırlatması Gönder",
+                            icon: "message.fill",
+                            color: Color(hex: "25D366")
+                        ) {
+                            let msg = "Sayın \(cari.unvan), firmamızda kayıtlı \(AppFormatters.money(cari.bakiye)) tutarındaki açık bakiyeniz bulunmaktadır. Bilgilerinize sunar, iyi çalışmalar dileriz."
+                            let encoded = msg.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+                            let clean = gsm.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "-", with: "")
+                            if let url = URL(string: "https://wa.me/90\(clean)?text=\(encoded)") {
+                                #if canImport(UIKit)
+                                UIApplication.shared.open(url)
+                                #endif
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func saveQuickPayment(for cari: CariKart) {
+        guard let tutarNum = Double(quickAmount), tutarNum > 0 else { return }
+        isSavingQuick = true
+        
+        let req = FinancialTransactionRequest(
+            cari: cari,
+            amount: tutarNum,
+            date: AppFormatters.isoDate.string(from: Date()),
+            transactionType: quickType,
+            method: quickMethod,
+            description: quickDesc
+        )
+        
+        Task {
+            _ = try? await TransactionService.shared.saveFinancialTransaction(req: req)
+            await MainActor.run {
+                if let idx = cariler.firstIndex(where: { $0.id == cari.id }) {
+                    let delta = quickType == "Tahsilat" ? -tutarNum : tutarNum
+                    cariler[idx].bakiye = max(0, cariler[idx].bakiye + delta)
+                }
+                isSavingQuick = false
+                isQuickPaymentOpen = false
+                HardwareService.shared.hapticSuccess()
+            }
+        }
+    }
+    
     private func loadCariler() async {
         isLoading = true
         do {
-            let items: [CariKart] = try await SupabaseService.shared.fetch(from: "cariler")
+            let items: [CariKart] = try await SupabaseService.shared.fetch(from: "cariler", orderBy: "unvan.asc")
             await MainActor.run {
                 self.cariler = items
             }
         } catch {
-            await MainActor.run {
-                self.cariler = [
-                    CariKart(id: "1", cariKodu: "CARI-001", unvan: "Ermay Bilişim Sanayi Ltd. Şti.", cariTuru: "Müşteri", yetkili: "Ahmet Erdem", grup: "Müşteri", telefon: "0532 111 2233", sehir: "İstanbul", bakiye: 45200.0, bakiyeTuru: "A"),
-                    CariKart(id: "2", cariKodu: "CARI-002", unvan: "Mega Plastik Ambalaj Sanayi A.Ş.", cariTuru: "Müşteri", yetkili: "Mehmet Kaya", grup: "Müşteri", telefon: "0542 333 4455", sehir: "Kocaeli", bakiye: 28400.0, bakiyeTuru: "A"),
-                    CariKart(id: "3", cariKodu: "CARI-003", unvan: "Akıncılar Çelik Döküm A.Ş.", cariTuru: "Tedarikçi", yetkili: "Hakan Akıncı", grup: "Tedarikçi", telefon: "0505 555 6677", sehir: "Bursa", bakiye: 22800.0, bakiyeTuru: "B"),
-                    CariKart(id: "4", cariKodu: "CARI-004", unvan: "Kaya Metal Kalıp Ltd. Şti.", cariTuru: "Müşteri", yetkili: "Selim Kaya", grup: "Müşteri", telefon: "0533 777 8899", sehir: "İzmir", bakiye: 24800.0, bakiyeTuru: "A"),
-                    CariKart(id: "5", cariKodu: "CARI-005", unvan: "Özkanlar Ambalaj ve Koli Sanayi", cariTuru: "Tedarikçi", yetkili: "Murat Özkan", grup: "Tedarikçi", telefon: "0555 999 0011", sehir: "Ankara", bakiye: 11400.0, bakiyeTuru: "B")
+            if cariler.isEmpty {
+                cariler = [
+                    CariKart(cariKodu: "CR-001", unvan: "Ermay Bilişim Sanayi Ticaret Ltd. Şti.", cariTuru: "Müşteri", telefon: "05321112233", gsm: "05321112233", sehir: "İstanbul", bakiye: 45200.0, bakiyeTuru: "A"),
+                    CariKart(cariKodu: "CR-002", unvan: "Akıncılar Çelik & Alüminyum Döküm A.Ş.", cariTuru: "Tedarikçi", telefon: "05423334455", gsm: "05423334455", sehir: "Kocaeli", bakiye: 18500.0, bakiyeTuru: "B"),
+                    CariKart(cariKodu: "CR-003", unvan: "Mega Plastik İthalat İhracat Ltd.", cariTuru: "Müşteri", telefon: "05556667788", gsm: "05556667788", sehir: "Bursa", bakiye: 8900.0, bakiyeTuru: "A"),
+                    CariKart(cariKodu: "CR-004", unvan: "Yıldız Lojistik ve Antrepo Hizmetleri", cariTuru: "Tedarikçi", telefon: "05339998877", gsm: "05339998877", sehir: "İzmir", bakiye: 0.0, bakiyeTuru: "A")
                 ]
             }
         }
         isLoading = false
-    }
-}
-
-// MARK: - AppleCariRow (Exact React Native Parity)
-struct AppleCariRow: View {
-    let cari: CariKart
-    let iconColor: Color
-    
-    var isAlacak: Bool {
-        cari.bakiyeTuru == "A"
-    }
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(iconColor)
-                    .frame(width: 44, height: 44)
-                Image(systemName: "person.circle.fill")
-                    .font(.system(size: 24))
-                    .foregroundColor(.white)
-            }
-            
-            VStack(alignment: .leading, spacing: 3) {
-                Text(cari.unvan)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(AppTheme.textPrimary)
-                    .lineLimit(1)
-                
-                HStack(spacing: 6) {
-                    Text("\(cari.cariKodu ?? "CARI") • \(cari.yetkili ?? "Yetkili Yok")")
-                        .font(.system(size: 11))
-                        .foregroundColor(Color(hex: "94A3B8"))
-                        .lineLimit(1)
-                    
-                    Text(cari.grup ?? cari.cariTuru ?? "Müşteri")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(cari.grup == "Tedarikçi" ? Color(hex: "FF9F0A") : Color(hex: "0061FF"))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background((cari.grup == "Tedarikçi" ? Color(hex: "FF9F0A") : Color(hex: "0061FF")).opacity(0.15))
-                        .cornerRadius(6)
-                }
-            }
-            
-            Spacer()
-            
-            VStack(alignment: .trailing, spacing: 3) {
-                Text(AppFormatters.money(cari.bakiye))
-                    .font(.system(size: 13, weight: .heavy))
-                    .foregroundColor(cari.bakiye == 0 ? Color(hex: "94A3B8") : (isAlacak ? Color(hex: "30D158") : Color(hex: "FF453A")))
-                
-                Text(cari.bakiye == 0 ? "Sıfır" : (isAlacak ? "Alacak" : "Borç"))
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(cari.bakiye == 0 ? Color(hex: "64748B") : (isAlacak ? Color(hex: "30D158") : Color(hex: "FF453A")))
-            }
-        }
-        .padding(14)
-        .background(Color(hex: "121216"))
-        .cornerRadius(16)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
     }
 }

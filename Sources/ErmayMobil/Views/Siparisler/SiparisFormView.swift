@@ -334,12 +334,83 @@ public struct SiparisFormView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
             } else {
-                ForEach($kalemler) { $item in
-                    SiparisKalemRow(item: $item, birimler: birimler) {
-                        if let idx = kalemler.firstIndex(where: { $0.id == item.id }) {
-                            kalemler.remove(at: idx)
+                ForEach(Array(kalemler.enumerated()), id: \.offset) { index, item in
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(item.stokAdi)
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(.white)
+                            Spacer()
+                            Button {
+                                kalemler.remove(at: index)
+                            } label: {
+                                Image(systemName: "trash.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(Color(hex: "EF4444"))
+                            }
                         }
+                        
+                        HStack(spacing: 8) {
+                            TextField("0", value: Binding(
+                                get: { kalemler[index].miktar },
+                                set: { kalemler[index].miktar = $0 }
+                            ), formatter: NumberFormatter())
+                            .keyboardType(.decimalPad)
+                            .padding(8)
+                            .background(Color(hex: "2A2A2A"))
+                            .cornerRadius(6)
+                            .foregroundColor(.white)
+                            .frame(width: 55)
+                            
+                            Menu {
+                                ForEach(birimler, id: \.self) { b in
+                                    Button(b) {
+                                        kalemler[index].birim = b
+                                    }
+                                }
+                            } label: {
+                                Text(kalemler[index].birim ?? "Adet")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 8)
+                                    .background(Color(hex: "2A2A2A"))
+                                    .cornerRadius(6)
+                            }
+                            
+                            TextField("0.00", value: Binding(
+                                get: { kalemler[index].birimFiyat },
+                                set: { kalemler[index].birimFiyat = $0 }
+                            ), formatter: NumberFormatter())
+                            .keyboardType(.decimalPad)
+                            .padding(8)
+                            .background(Color(hex: "2A2A2A"))
+                            .cornerRadius(6)
+                            .foregroundColor(.white)
+                            
+                            Text("%\(Int(kalemler[index].kdvOrani))")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(Color(hex: "10B981"))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 8)
+                                .background(Color.white.opacity(0.06))
+                                .cornerRadius(6)
+                        }
+                        
+                        TextField("Kalem notu...", text: Binding(
+                            get: { kalemler[index].aciklama ?? "" },
+                            set: { kalemler[index].aciklama = $0 }
+                        ))
+                        .font(.system(size: 12))
+                        .padding(8)
+                        .background(Color(hex: "2A2A2A"))
+                        .cornerRadius(6)
+                        .foregroundColor(.white)
                     }
+                    .padding(12)
+                    .background(Color(hex: "121216"))
+                    .cornerRadius(12)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08), lineWidth: 1))
                 }
             }
         }
@@ -459,86 +530,5 @@ public struct SiparisFormView: View {
                 dismiss()
             }
         }
-    }
-}
-
-struct SiparisKalemRow: View {
-    @Binding var item: SiparisKalem
-    var birimler: [String]
-    var onDelete: () -> Void
-    
-    private var aciklamaBinding: Binding<String> {
-        Binding<String>(
-            get: { item.aciklama ?? "" },
-            set: { item.aciklama = $0 }
-        )
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(item.stokAdi)
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(.white)
-                Spacer()
-                Button(action: onDelete) {
-                    Image(systemName: "trash.fill")
-                        .font(.system(size: 14))
-                        .foregroundColor(Color(hex: "EF4444"))
-                }
-            }
-            
-            HStack(spacing: 8) {
-                TextField("0", value: $item.miktar, formatter: NumberFormatter())
-                    .keyboardType(.decimalPad)
-                    .padding(8)
-                    .background(Color(hex: "2A2A2A"))
-                    .cornerRadius(6)
-                    .foregroundColor(.white)
-                    .frame(width: 55)
-                
-                Menu {
-                    ForEach(birimler, id: \.self) { b in
-                        Button(b) {
-                            item.birim = b
-                        }
-                    }
-                } label: {
-                    Text(item.birim ?? "Adet")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 8)
-                        .background(Color(hex: "2A2A2A"))
-                        .cornerRadius(6)
-                }
-                
-                TextField("0.00", value: $item.birimFiyat, formatter: NumberFormatter())
-                    .keyboardType(.decimalPad)
-                    .padding(8)
-                    .background(Color(hex: "2A2A2A"))
-                    .cornerRadius(6)
-                    .foregroundColor(.white)
-                
-                Text("%\(Int(item.kdvOrani))")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(Color(hex: "10B981"))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 8)
-                    .background(Color.white.opacity(0.06))
-                    .cornerRadius(6)
-            }
-            
-            TextField("Kalem notu...", text: aciklamaBinding)
-                .font(.system(size: 12))
-                .padding(8)
-                .background(Color(hex: "2A2A2A"))
-                .cornerRadius(6)
-                .foregroundColor(.white)
-        }
-        .padding(12)
-        .background(Color(hex: "121216"))
-        .cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08), lineWidth: 1))
     }
 }

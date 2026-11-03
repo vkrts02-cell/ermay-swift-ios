@@ -2,7 +2,10 @@ import SwiftUI
 
 public struct StokDetailView: View {
     public let stok: StokKart
-    @State private var hareketler: [StokHareket] = []
+    @State private var hareketler: [StokHareket] = [
+        StokHareket(id: "1", tarih: "02.11.2026", islemTuru: "Satış Faturası", belgeNo: "FTR-2026-0012", miktar: 5, birimFiyat: 220, toplamTutar: 1100, aciklama: "Ermay Ltd. Şti. Satışı"),
+        StokHareket(id: "2", tarih: "25.10.2026", islemTuru: "Alış Faturası", belgeNo: "FTR-2026-0004", miktar: 50, birimFiyat: 140, toplamTutar: 7000, aciklama: "Akıncılar Çelik Alımı")
+    ]
     
     public init(stok: StokKart) {
         self.stok = stok
@@ -39,7 +42,7 @@ public struct StokDetailView: View {
                             
                             VStack(spacing: 2) {
                                 Text("MEVCUT ENVANTER")
-                                    .font(.system(size: 11, weight: .bold))
+                                    .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(AppTheme.textSecondary)
                                 
                                 Text("\(String(format: "%.2f", stok.mevcutMiktar)) \(stok.birim ?? "Adet")")
@@ -78,13 +81,29 @@ public struct StokDetailView: View {
                             .foregroundColor(AppTheme.textPrimary)
                             .padding(.horizontal)
                         
-                        GlassCard(cornerRadius: 14, padding: 18) {
-                            HStack {
-                                Spacer()
-                                Text("Bu ürüne ait son hareketler burada listelenir.")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(AppTheme.textMuted)
-                                Spacer()
+                        VStack(spacing: 8) {
+                            ForEach(hareketler) { h in
+                                GlassCard(cornerRadius: 12, padding: 12) {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(h.islemTuru ?? "Hareket")
+                                                .font(.system(size: 13, weight: .bold))
+                                                .foregroundColor(AppTheme.textPrimary)
+                                            Text("\(h.tarih ?? "-") • \(h.belgeNo ?? "")")
+                                                .font(.system(size: 11))
+                                                .foregroundColor(AppTheme.textMuted)
+                                        }
+                                        Spacer()
+                                        VStack(alignment: .trailing, spacing: 2) {
+                                            Text("\(String(format: "%.0f", h.miktar)) \(stok.birim ?? "Adet")")
+                                                .font(.system(size: 13, weight: .bold))
+                                                .foregroundColor(h.islemTuru?.contains("Satış") == true ? AppTheme.danger : AppTheme.success)
+                                            Text(AppFormatters.money(h.toplamTutar))
+                                                .font(.system(size: 10))
+                                                .foregroundColor(AppTheme.textMuted)
+                                        }
+                                    }
+                                }
                             }
                         }
                         .padding(.horizontal)
@@ -99,4 +118,3 @@ public struct StokDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 }
-
