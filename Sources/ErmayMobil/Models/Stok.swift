@@ -81,6 +81,45 @@ public struct StokKart: Identifiable, Codable, Hashable {
         self.syncGuid = syncGuid
         self.tenantId = tenantId
     }
+    
+    // Convenience init accepting grupAdi and mevcutMiktar before barkod / kdvOrani
+    public init(
+        id: String = UUID().uuidString,
+        stokKodu: String? = nil,
+        stokAdi: String,
+        grupAdi: String? = "Genel",
+        birim: String? = "Adet",
+        alisFiyati: Double = 0.0,
+        satisFiyati: Double = 0.0,
+        mevcutMiktar: Double = 0.0,
+        kdvOrani: Double = 20.0,
+        barkod: String? = nil,
+        kritikMiktar: Double? = 5.0,
+        aciklama: String? = nil,
+        aktif: Bool? = true,
+        syncGuid: String? = UUID().uuidString,
+        tenantId: String? = nil
+    ) {
+        self.init(
+            id: id,
+            stokKodu: stokKodu,
+            stokAdi: stokAdi,
+            barkod: barkod,
+            grupAdi: grupAdi,
+            birim: birim,
+            alisFiyati: alisFiyati,
+            satisFiyati: satisFiyati,
+            kdvOrani: kdvOrani,
+            bakiye: mevcutMiktar,
+            kategori: grupAdi,
+            mevcutMiktar: mevcutMiktar,
+            kritikMiktar: kritikMiktar,
+            aciklama: aciklama,
+            aktif: aktif,
+            syncGuid: syncGuid,
+            tenantId: tenantId
+        )
+    }
 }
 
 public struct StokMiktarUpdate: Codable {

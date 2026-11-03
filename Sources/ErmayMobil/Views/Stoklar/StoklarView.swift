@@ -25,11 +25,11 @@ public struct StoklarView: View {
     
     // Stok Listesi State
     @State private var stoklar: [StokKart] = [
-        StokKart(id: "1", stokKodu: "STK-001", stokAdi: "Bilyalı Rulman 6204-2RS", grupAdi: "Rulman", birim: "Adet", alisFiyati: 145.0, satisFiyati: 210.0, mevcutMiktar: 84.0, kdvOrani: 20.0, barkod: "8690001001"),
-        StokKart(id: "2", stokKodu: "STK-002", stokAdi: "Hidrolik Keçe 35x50x10", grupAdi: "Sızdırmazlık", birim: "Adet", alisFiyati: 48.0, satisFiyati: 75.0, mevcutMiktar: 160.0, kdvOrani: 20.0, barkod: "8690001002"),
-        StokKart(id: "3", stokKodu: "STK-003", stokAdi: "Endüstriyel Dişli Yağı ISO VG 220", grupAdi: "Madeni Yağ", birim: "Kg", alisFiyati: 820.0, satisFiyati: 1150.0, mevcutMiktar: 22.0, kdvOrani: 20.0, barkod: "8690001003"),
-        StokKart(id: "4", stokKodu: "STK-004", stokAdi: "Çelik İmbus Cıvata M8x30", grupAdi: "Bağlantı", birim: "Adet", alisFiyati: 4.5, satisFiyati: 8.0, mevcutMiktar: 0.0, kdvOrani: 20.0, barkod: "8690001004"),
-        StokKart(id: "5", stokKodu: "STK-005", stokAdi: "Konik Makaralı Rulman 30205", grupAdi: "Rulman", birim: "Adet", alisFiyati: 280.0, satisFiyati: 395.0, mevcutMiktar: 45.0, kdvOrani: 20.0, barkod: "8690001005")
+        StokKart(id: "1", stokKodu: "STK-001", stokAdi: "Bilyalı Rulman 6204-2RS", barkod: "8690001001", grupAdi: "Rulman", birim: "Adet", alisFiyati: 145.0, satisFiyati: 210.0, kdvOrani: 20.0, mevcutMiktar: 84.0),
+        StokKart(id: "2", stokKodu: "STK-002", stokAdi: "Hidrolik Keçe 35x50x10", barkod: "8690001002", grupAdi: "Sızdırmazlık", birim: "Adet", alisFiyati: 48.0, satisFiyati: 75.0, kdvOrani: 20.0, mevcutMiktar: 160.0),
+        StokKart(id: "3", stokKodu: "STK-003", stokAdi: "Endüstriyel Dişli Yağı ISO VG 220", barkod: "8690001003", grupAdi: "Madeni Yağ", birim: "Kg", alisFiyati: 820.0, satisFiyati: 1150.0, kdvOrani: 20.0, mevcutMiktar: 22.0),
+        StokKart(id: "4", stokKodu: "STK-004", stokAdi: "Çelik İmbus Cıvata M8x30", barkod: "8690001004", grupAdi: "Bağlantı", birim: "Adet", alisFiyati: 4.5, satisFiyati: 8.0, kdvOrani: 20.0, mevcutMiktar: 0.0),
+        StokKart(id: "5", stokKodu: "STK-005", stokAdi: "Konik Makaralı Rulman 30205", barkod: "8690001005", grupAdi: "Rulman", birim: "Adet", alisFiyati: 280.0, satisFiyati: 395.0, kdvOrani: 20.0, mevcutMiktar: 45.0)
     ]
     
     // Filters & Paging State
@@ -623,8 +623,8 @@ public struct StoklarView: View {
                 birim: editBirim,
                 alisFiyati: Double(editAlisFiyati) ?? 0,
                 satisFiyati: Double(editSatisFiyati) ?? 0,
-                mevcutMiktar: Double(editAcilisBakiye) ?? 0,
-                kdvOrani: Double(editKdv) ?? 20
+                kdvOrani: Double(editKdv) ?? 20,
+                mevcutMiktar: Double(editAcilisBakiye) ?? 0
             )
             stoklar.insert(newItem, at: 0)
         }

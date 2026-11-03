@@ -1,18 +1,4 @@
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-
-public struct ShareSheet: UIViewControllerRepresentable {
-    public let items: [Any]
-    public init(items: [Any]) {
-        self.items = items
-    }
-    public func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-    public func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
-#endif
 
 public struct SettingCategory: Identifiable {
     public var id: String
@@ -130,11 +116,7 @@ public struct AyarlarView: View {
                 Text(alertMessage)
             }
             .sheet(isPresented: $showShareSheet) {
-                #if canImport(UIKit)
-                ShareSheet(items: [backupShareContent])
-                #else
-                EmptyView()
-                #endif
+                ShareSheet(activityItems: [backupShareContent])
             }
         }
     }
@@ -894,7 +876,7 @@ public struct AyarlarView: View {
                                 alertMessage = "Aktif çalışma yılı \(yr) olarak değiştirildi. Tüm veriler yeni mali yıla göre yüklenecektir."
                                 showAlert = true
                             } label: {
-                                Text("\(yr) \(activeYear == yr ? "✓ (Aktif)" : "")")
+                                Text(activeYear == yr ? "\(yr) ✓ (Aktif)" : yr)
                                     .font(.system(size: 13, weight: activeYear == yr ? .bold : .medium))
                                     .foregroundColor(activeYear == yr ? .white : Color(red: 0.89, green: 0.91, blue: 0.94))
                                     .padding(.horizontal, 14)

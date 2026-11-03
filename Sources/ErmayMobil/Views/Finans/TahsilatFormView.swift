@@ -14,9 +14,17 @@ public struct TahsilatFormView: View {
     @State private var showCariPicker: Bool = false
     @State private var isSaving: Bool = false
     
-    public init(isTahsilat: Bool = true, onSave: ((KasaHareket) -> Void)? = nil) {
+    public init(isTahsilat: Bool = true, initialCari: CariKart? = nil, onSave: ((KasaHareket) -> Void)? = nil) {
         self.isTahsilat = isTahsilat
         self.onSave = onSave
+        if let cari = initialCari {
+            _cariId = State(initialValue: cari.id)
+            _cariUnvan = State(initialValue: cari.unvan)
+        }
+    }
+    
+    public init(initialCari: CariKart?, isTahsilat: Bool = true, onSave: ((KasaHareket) -> Void)? = nil) {
+        self.init(isTahsilat: isTahsilat, initialCari: initialCari, onSave: onSave)
     }
     
     public var body: some View {

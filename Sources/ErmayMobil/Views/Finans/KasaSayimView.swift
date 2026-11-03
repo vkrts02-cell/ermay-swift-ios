@@ -25,7 +25,9 @@ public struct KasaSayimView: View {
     @State private var showSavedAlert: Bool = false
     @Environment(\.dismiss) private var dismiss
     
-    public init() {}
+    public init(sistemBakiye: Double = 45850.50) {
+        _sistemKasaBakiyesi = State(initialValue: sistemBakiye)
+    }
     
     public var fizikiToplam: Double {
         let banknotToplam = banknotlar.reduce(0.0) { $0 + $1.toplam }
