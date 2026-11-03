@@ -36,7 +36,8 @@ public struct FaturaFormView: View {
     @State private var isSaving: Bool = false
     @State private var errorMessage: String? = nil
     
-    public init(onSave: ((Fatura) -> Void)? = nil) {
+    public init(initialTur: String = "SATIS", onSave: ((Fatura) -> Void)? = nil) {
+        self._tur = State(initialValue: initialTur.uppercased().contains("ALIS") ? "Alış" : "Satış")
         self.onSave = onSave
     }
     
@@ -418,6 +419,82 @@ public struct FaturaFormView: View {
                 await MainActor.run {
                     errorMessage = "Fatura kaydedilirken hata: \(error.localizedDescription)"
                     isSaving = false
+                }
+            }
+        }
+    }
+}
+
+public struct AddKalemView: View {
+    @Environment(\.dismiss) private var dismiss
+    public var onAdd: (FaturaKalem) -> Void
+    
+    @State private var stokAdi: String = ""
+    @State private var miktar: String = "1"
+    @State private var birimFiyat: String = "0"
+    @State private var kdvOrani: Double = 20.0
+    @State private var iskontoOrani: String = "0"
+    
+    public init(onAdd: @escaping (FaturaKalem) -> Void) {
+        self.onAdd = onAdd
+    }
+    
+    public var body: some View {
+        NavigationStack {
+            ZStack {
+                AppTheme.background.ignoresSafeArea()
+                
+                VStack(spacing: 16) {
+                    GlassCard(cornerRadius: 16, padding: 18) {
+                        VStack(spacing: 14) {
+                            FormField(label: "Ürün / Hizmet Adı *", text: $stokAdi, placeholder: "Örn: Endüstriyel Rulman")
+                            FormField(label: "Miktar", text: $miktar, placeholder: "1")
+                            FormField(label: "Birim Fiyat (₺)", text: $birimFiyat, placeholder: "0.00")
+                            
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("KDV Oranı: %\(Int(kdvOrani))")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(AppTheme.textSecondary)
+                                
+                                Picker("KDV", selection: $kdvOrani) {
+                                    Text("%0").tag(0.0)
+                                    Text("%1").tag(1.0)
+                                    Text("%10").tag(10.0)
+                                    Text("%20").tag(20.0)
+                                }
+                                .pickerStyle(.segmented)
+                            }
+                            
+                            FormField(label: "İskonto Oranı (%)", text: $iskontoOrani, placeholder: "0")
+                        }
+                    }
+                    
+                    ActionButton(title: "Kalemi Ekle", icon: "plus.circle.fill", color: AppTheme.primary) {
+                        let m = Double(miktar) ?? 1.0
+                        let bf = Double(birimFiyat) ?? 0.0
+                        let isk = Double(iskontoOrani) ?? 0.0
+                        
+                        let kalem = FaturaKalem(
+                            stokAdi: stokAdi.isEmpty ? "Ürün" : stokAdi,
+                            miktar: m,
+                            birimFiyat: bf,
+                            kdvOrani: kdvOrani,
+                            iskontoOrani: isk
+                        )
+                        onAdd(kalem)
+                        dismiss()
+                    }
+                    
+                    Spacer()
+                }
+                .padding()
+            }
+            .navigationTitle("Kalem Ekle")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Kapat") { dismiss() }
+                        .foregroundColor(AppTheme.textSecondary)
                 }
             }
         }

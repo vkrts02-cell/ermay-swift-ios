@@ -60,10 +60,6 @@ public final class HardwareService: NSObject, ObservableObject {
         }
         #endif
     }
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
-        #endif
-    }
     
     // MARK: - Add Contact to iOS Address Book
     public func addCariToContacts(cari: CariKart) async -> Bool {

@@ -89,60 +89,6 @@ public struct MusteriTakipView: View {
     }
 }
 
-public struct MusteriTakipDetayView: View {
-    public let kayit: MusteriTakipKayit
-    
-    public var body: some View {
-        ZStack {
-            AppTheme.background.ignoresSafeArea()
-            
-            ScrollView {
-                VStack(spacing: 16) {
-                    GlassCard(cornerRadius: 18, padding: 18) {
-                        VStack(spacing: 12) {
-                            Text(kayit.cariUnvan)
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(AppTheme.textPrimary)
-                            
-                            HStack {
-                                StatusBadge(title: kayit.gorusmeTuru, color: AppTheme.primary)
-                                Spacer()
-                                StatusBadge(title: kayit.durum, color: AppTheme.success)
-                            }
-                            
-                            Divider().background(AppTheme.border)
-                            
-                            DetailInfoRow(label: "Konu", value: kayit.konu)
-                            DetailInfoRow(label: "Tarih", value: kayit.gorusmeTarihi)
-                            DetailInfoRow(label: "Sonraki Aksiyon", value: kayit.sonrakiEylem ?? "-")
-                            DetailInfoRow(label: "Aksiyon Tarihi", value: kayit.sonrakiEylemTarihi ?? "-")
-                        }
-                    }
-                    .padding(.horizontal)
-                    
-                    if let notlar = kayit.notlar {
-                        GlassCard(cornerRadius: 16, padding: 16) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Görüşme Notları")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundColor(AppTheme.textSecondary)
-                                Text(notlar)
-                                    .font(.system(size: 14))
-                                    .foregroundColor(AppTheme.textPrimary)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .padding(.horizontal)
-                    }
-                }
-                .padding(.top, 12)
-            }
-        }
-        .navigationTitle("Görüşme Detayı")
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
 struct YeniGorusmeFormView: View {
     @Environment(\.dismiss) private var dismiss
     public var onSave: (MusteriTakipKayit) -> Void
