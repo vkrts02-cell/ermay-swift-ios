@@ -117,6 +117,72 @@ public struct DetailInfoRow: View {
     }
 }
 
+public struct ActionCard: View {
+    public let title: String
+    public let icon: String
+    public let color: Color
+    
+    public init(title: String, icon: String, color: Color) {
+        self.title = title
+        self.icon = icon
+        self.color = color
+    }
+    
+    public var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(color)
+            Text(title)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(AppTheme.textPrimary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(AppTheme.cardSecondary)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(AppTheme.border, lineWidth: 1)
+        )
+    }
+}
+
+public struct QuickActionItem: View {
+    public let title: String
+    public let icon: String
+    public let color: Color
+    public let action: @MainActor () -> Void
+    
+    public init(title: String, icon: String, color: Color, action: @escaping @MainActor () -> Void) {
+        self.title = title
+        self.icon = icon
+        self.color = color
+        self.action = action
+    }
+    
+    public var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(color)
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppTheme.textPrimary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(AppTheme.cardSecondary)
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(AppTheme.border, lineWidth: 1)
+            )
+        }
+    }
+}
+
 public struct ActionButton: View {
     public let title: String
     public let icon: String?

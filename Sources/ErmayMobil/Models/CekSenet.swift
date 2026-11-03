@@ -127,6 +127,4 @@ public struct Senet: Identifiable, Codable, Sendable {
     }
 }
 
-public typealias CekSenet = Cek
-
 
