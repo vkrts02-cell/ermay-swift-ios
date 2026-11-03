@@ -51,13 +51,13 @@ public struct StokKart: Identifiable, Codable, Hashable {
         stokKodu: String? = nil,
         stokAdi: String,
         barkod: String? = nil,
+        grupAdi: String? = "Genel",
         birim: String? = "Adet",
         alisFiyati: Double = 0.0,
         satisFiyati: Double = 0.0,
         kdvOrani: Double = 20.0,
         bakiye: Double = 0.0,
         kategori: String? = "Genel",
-        grupAdi: String? = "Genel",
         mevcutMiktar: Double = 0.0,
         kritikMiktar: Double? = 5.0,
         aciklama: String? = nil,
@@ -80,6 +80,28 @@ public struct StokKart: Identifiable, Codable, Hashable {
         self.aktif = aktif
         self.syncGuid = syncGuid
         self.tenantId = tenantId
+    }
+
+    public init(
+        id: String = UUID().uuidString,
+        stokKodu: String? = nil,
+        stokAdi: String,
+        barkod: String? = nil,
+        birim: String? = "Adet",
+        grupAdi: String? = "Genel",
+        alisFiyati: Double = 0.0,
+        satisFiyati: Double = 0.0,
+        kdvOrani: Double = 20.0,
+        bakiye: Double = 0.0,
+        kategori: String? = "Genel",
+        mevcutMiktar: Double = 0.0,
+        kritikMiktar: Double? = 5.0,
+        aciklama: String? = nil,
+        aktif: Bool? = true,
+        syncGuid: String? = UUID().uuidString,
+        tenantId: String? = nil
+    ) {
+        self.init(id: id, stokKodu: stokKodu, stokAdi: stokAdi, barkod: barkod, grupAdi: grupAdi, birim: birim, alisFiyati: alisFiyati, satisFiyati: satisFiyati, kdvOrani: kdvOrani, bakiye: bakiye, kategori: kategori, mevcutMiktar: mevcutMiktar, kritikMiktar: kritikMiktar, aciklama: aciklama, aktif: aktif, syncGuid: syncGuid, tenantId: tenantId)
     }
 }
 
@@ -137,6 +159,21 @@ public struct StokHareket: Identifiable, Codable, Hashable {
         self.toplamTutar = toplamTutar
         self.aciklama = aciklama
         self.syncGuid = syncGuid
+    }
+
+    public init(
+        id: String = UUID().uuidString,
+        stokId: String? = nil,
+        tarih: String? = nil,
+        islemTuru: String? = nil,
+        belgeNo: String? = nil,
+        miktar: Double = 0.0,
+        birimFiyat: Double = 0.0,
+        toplamTutar: Double = 0.0,
+        aciklama: String? = nil,
+        syncGuid: String? = UUID().uuidString
+    ) {
+        self.init(id: id, stokId: stokId, tarih: tarih, belgeNo: belgeNo, islemTuru: islemTuru, miktar: miktar, birimFiyat: birimFiyat, toplamTutar: toplamTutar, aciklama: aciklama, syncGuid: syncGuid)
     }
 }
 

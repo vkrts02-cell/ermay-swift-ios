@@ -94,6 +94,29 @@ public struct StatusBadge: View {
     }
 }
 
+public struct DetailInfoRow: View {
+    public let label: String
+    public let value: String
+    
+    public init(label: String, value: String) {
+        self.label = label
+        self.value = value
+    }
+    
+    public var body: some View {
+        HStack {
+            Text(label)
+                .font(.system(size: 13))
+                .foregroundColor(AppTheme.textMuted)
+            Spacer()
+            Text(value)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(AppTheme.textPrimary)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
 public struct ActionButton: View {
     public let title: String
     public let icon: String?

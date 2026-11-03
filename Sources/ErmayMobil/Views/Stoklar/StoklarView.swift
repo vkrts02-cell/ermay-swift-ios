@@ -230,3 +230,65 @@ public struct StoklarView: View {
         isLoading = false
     }
 }
+
+public struct StokRowItem: View {
+    public let stok: StokKart
+    
+    public init(stok: StokKart) {
+        self.stok = stok
+    }
+    
+    public var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(hex: "0A84FF").opacity(0.15))
+                    .frame(width: 44, height: 44)
+                Image(systemName: "shippingbox.fill")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(Color(hex: "0A84FF"))
+            }
+            
+            VStack(alignment: .leading, spacing: 3) {
+                Text(stok.stokAdi)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                
+                HStack(spacing: 6) {
+                    Text(stok.stokKodu ?? "STK")
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(hex: "94A3B8"))
+                    
+                    if let grup = stok.grupAdi, !grup.isEmpty {
+                        Text("•")
+                            .font(.system(size: 11))
+                            .foregroundColor(Color(hex: "64748B"))
+                        Text(grup)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(Color(hex: "64748B"))
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 3) {
+                Text("\(String(format: "%.0f", stok.mevcutMiktar)) \(stok.birim ?? "Adet")")
+                    .font(.system(size: 13, weight: .heavy))
+                    .foregroundColor(stok.mevcutMiktar <= (stok.kritikMiktar ?? 5.0) ? Color(hex: "EF4444") : Color(hex: "00FF87"))
+                
+                Text(AppFormatters.money(stok.satisFiyati))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(Color(hex: "94A3B8"))
+            }
+        }
+        .padding(14)
+        .background(Color(hex: "121216"))
+        .cornerRadius(16)
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+}
