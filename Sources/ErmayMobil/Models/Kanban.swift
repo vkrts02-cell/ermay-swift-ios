@@ -1,39 +1,29 @@
 import Foundation
 
-public enum GorevDurumu: String, Codable, CaseIterable {
-    case todo = "YAPILACAK"
-    case inProgress = "DEVAM_EDIYOR"
-    case done = "TAMAMLANDI"
-    
-    public var title: String {
-        switch self {
-        case .todo: return "Yapılacak"
-        case .inProgress: return "Devam Ediyor"
-        case .done: return "Tamamlandı"
-        }
-    }
-}
-
 public struct KanbanGorev: Identifiable, Codable, Hashable {
     public var id: String
     public var baslik: String
     public var aciklama: String?
-    public var durum: GorevDurumu
-    public var oncelik: String // "DUSUK", "ORTA", "YUKSEK", "ACIL"
-    public var atananKisi: String?
+    public var atananPersonelId: Int?
+    public var atananPersonelAd: String?
+    public var durum: String // 'Yapılacak' | 'Yapılıyor' | 'Bitti'
+    public var oncelik: String // 'Düşük' | 'Normal' | 'Acil'
+    public var sonTarih: String
     public var bitisTarihi: String?
-    public var syncGuid: String?
+    public var olusturmaTarihi: String
     public var tenantId: String?
     
     enum CodingKeys: String, CodingKey {
         case id
         case baslik
         case aciklama
+        case atananPersonelId = "atanan_personel_id"
+        case atananPersonelAd = "atanan_personel_ad"
         case durum
         case oncelik
-        case atananKisi = "atanan_kisi"
+        case sonTarih = "son_tarih"
         case bitisTarihi = "bitis_tarihi"
-        case syncGuid = "sync_guid"
+        case olusturmaTarihi = "olusturma_tarihi"
         case tenantId = "tenant_id"
     }
     
@@ -41,22 +31,25 @@ public struct KanbanGorev: Identifiable, Codable, Hashable {
         id: String = UUID().uuidString,
         baslik: String,
         aciklama: String? = nil,
-        durum: GorevDurumu = .todo,
-        oncelik: String = "ORTA",
-        atananKisi: String? = nil,
+        atananPersonelId: Int? = 1,
+        atananPersonelAd: String? = "Yönetici",
+        durum: String = "Yapılacak",
+        oncelik: String = "Normal",
+        sonTarih: String = "2026-11-04",
         bitisTarihi: String? = nil,
-        syncGuid: String? = UUID().uuidString,
+        olusturmaTarihi: String = "2026-11-04",
         tenantId: String? = nil
     ) {
         self.id = id
         self.baslik = baslik
         self.aciklama = aciklama
+        self.atananPersonelId = atananPersonelId
+        self.atananPersonelAd = atananPersonelAd
         self.durum = durum
         self.oncelik = oncelik
-        self.atananKisi = atananKisi
+        self.sonTarih = sonTarih
         self.bitisTarihi = bitisTarihi
-        self.syncGuid = syncGuid
+        self.olusturmaTarihi = olusturmaTarihi
         self.tenantId = tenantId
     }
 }
-
