@@ -873,7 +873,7 @@ public struct AyarlarView: View {
                             Button {
                                 activeYear = yr
                                 HardwareService.shared.hapticSuccess()
-                                alertMessage = "Aktif çalışma yılı \(yr) olarak değiştirildi. Tüm veriler yeni mali yıla göre yüklenecektir."
+                                alertMessage = "Aktif çalışma yılı " + yr + " olarak değiştirildi. Tüm veriler yeni mali yıla göre yüklenecektir."
                                 showAlert = true
                             } label: {
                                 Text(activeYear == yr ? "\(yr) ✓ (Aktif)" : yr)
@@ -913,10 +913,10 @@ public struct AyarlarView: View {
                                         availableYears.sort()
                                         newYearInput = ""
                                         HardwareService.shared.hapticSuccess()
-                                        alertMessage = "\(trimmed} mali yılı başarıyla oluşturuldu."
+                                        alertMessage = trimmed + " mali yılı başarıyla oluşturuldu."
                                         showAlert = true
                                     } else {
-                                        alertMessage = "\(trimmed} yılı zaten mevcut."
+                                        alertMessage = trimmed + " yılı zaten mevcut."
                                         showAlert = true
                                     }
                                 } else {
@@ -975,7 +975,7 @@ public struct AyarlarView: View {
                                 }
                                 Spacer()
                                 Button {
-                                    alertMessage = "DİKKAT: \(yr) mali yılını silmek üzeresiniz! Bu işlem seçilen yıla ait tüm kayıtları kalıcı siler. Devam edilsin mi?"
+                                    alertMessage = "DİKKAT: " + yr + " mali yılını silmek üzeresiniz! Bu işlem seçilen yıla ait tüm kayıtları kalıcı siler. Devam edilsin mi?"
                                     confirmAction = {
                                         availableYears.removeAll { $0 == yr }
                                         HardwareService.shared.hapticSuccess()
@@ -1106,7 +1106,7 @@ public struct AyarlarView: View {
                             await MainActor.run {
                                 devirYukleniyor = false
                                 HardwareService.shared.hapticSuccess()
-                                alertMessage = "\(activeYear) yılı güncel bakiyeleri sonraki yıla başarıyla yansıtıldı."
+                                alertMessage = activeYear + " yılı güncel bakiyeleri sonraki yıla başarıyla yansıtıldı."
                                 showAlert = true
                             }
                         }

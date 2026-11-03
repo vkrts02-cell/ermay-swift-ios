@@ -289,23 +289,23 @@ public struct CariFormView: View {
         isSaving = true
         let saved = CariKart(
             id: cariToEdit?.id ?? UUID().uuidString,
-            unvan: unvan,
             cariKodu: cariKod.isEmpty ? "CARI-\(Int.random(in: 100...999))" : cariKod,
+            unvan: unvan,
             cariTuru: grup,
             yetkili: yetkili,
+            vergiDairesi: vergiDairesi,
+            vergiNo: vergiNo,
             telefon: telefon,
             gsm: cepTelefon,
             email: eposta,
-            sehir: il,
-            ilce: ilce,
             adres: adres,
             sevkAdresi: sevkAdresi,
+            sehir: il,
+            ilce: ilce,
             bakiye: cariToEdit?.bakiye ?? 0.0,
             bakiyeTuru: cariToEdit?.bakiyeTuru ?? "A",
-            vergiNo: vergiNo,
-            vergiDairesi: vergiDairesi,
-            vadeGunu: Int(vadeGunu) ?? 0,
             riskLimiti: Double(riskLimiti) ?? 0.0,
+            vadeGunu: Int(vadeGunu) ?? 0,
             odemePlani: odemePlani
         )
         onSave?(saved)

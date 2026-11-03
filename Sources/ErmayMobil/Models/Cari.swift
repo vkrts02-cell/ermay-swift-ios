@@ -28,6 +28,8 @@ public struct CariKart: Identifiable, Codable, Hashable {
     public var tenantId: String?
     public var sevkAdresi: String?
     public var odemePlani: String?
+    public var ticaretSicilNo: String?
+    public var iban: String?
     
     public var grupAdi: String? {
         get { grup }
@@ -85,6 +87,8 @@ public struct CariKart: Identifiable, Codable, Hashable {
         riskLimiti: Double? = nil,
         vadeGunu: Int? = 30,
         odemePlani: String? = nil,
+        ticaretSicilNo: String? = nil,
+        iban: String? = nil,
         islemTarihi: String? = nil,
         olusturmaTarihi: String? = nil,
         aktif: Bool? = true,
@@ -113,72 +117,13 @@ public struct CariKart: Identifiable, Codable, Hashable {
         self.riskLimiti = riskLimiti
         self.vadeGunu = vadeGunu
         self.odemePlani = odemePlani
+        self.ticaretSicilNo = ticaretSicilNo
+        self.iban = iban
         self.islemTarihi = islemTarihi
         self.olusturmaTarihi = olusturmaTarihi
         self.aktif = aktif
         self.syncGuid = syncGuid
         self.tenantId = tenantId
-    }
-    
-    // Convenience init allowing unvan before cariKodu
-    public init(
-        id: String = UUID().uuidString,
-        unvan: String,
-        cariKodu: String? = nil,
-        cariTuru: String? = "Müşteri",
-        yetkili: String? = nil,
-        grup: String? = "Müşteri",
-        vergiDairesi: String? = nil,
-        vergiNo: String? = nil,
-        tcKimlikNo: String? = nil,
-        telefon: String? = nil,
-        gsm: String? = nil,
-        email: String? = nil,
-        webSitesi: String? = nil,
-        adres: String? = nil,
-        sevkAdresi: String? = nil,
-        sehir: String? = nil,
-        ilce: String? = nil,
-        bakiye: Double = 0.0,
-        bakiyeTuru: String? = "A",
-        riskLimiti: Double? = nil,
-        vadeGunu: Int? = 30,
-        odemePlani: String? = nil,
-        islemTarihi: String? = nil,
-        olusturmaTarihi: String? = nil,
-        aktif: Bool? = true,
-        syncGuid: String? = UUID().uuidString,
-        tenantId: String? = nil
-    ) {
-        self.init(
-            id: id,
-            cariKodu: cariKodu,
-            unvan: unvan,
-            cariTuru: cariTuru,
-            yetkili: yetkili,
-            grup: grup,
-            vergiDairesi: vergiDairesi,
-            vergiNo: vergiNo,
-            tcKimlikNo: tcKimlikNo,
-            telefon: telefon,
-            gsm: gsm,
-            email: email,
-            webSitesi: webSitesi,
-            adres: adres,
-            sevkAdresi: sevkAdresi,
-            sehir: sehir,
-            ilce: ilce,
-            bakiye: bakiye,
-            bakiyeTuru: bakiyeTuru,
-            riskLimiti: riskLimiti,
-            vadeGunu: vadeGunu,
-            odemePlani: odemePlani,
-            islemTarihi: islemTarihi,
-            olusturmaTarihi: olusturmaTarihi,
-            aktif: aktif,
-            syncGuid: syncGuid,
-            tenantId: tenantId
-        )
     }
 }
 
