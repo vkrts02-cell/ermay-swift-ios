@@ -331,36 +331,6 @@ public struct CariDetailView: View {
             }
         }
         .padding(.top, 4)
-                    
-                    Spacer().frame(height: 50)
-                }
-                .padding(.horizontal, 16)
-            }
-        }
-        .navigationBarHidden(true)
-        .sheet(isPresented: $showSatisForm) {
-            FaturaFormView(initialTur: "Satış")
-        }
-        .sheet(isPresented: $showAlisForm) {
-            FaturaFormView(initialTur: "Alış")
-        }
-        .sheet(isPresented: $showTahsilatForm) {
-            TahsilatFormView(initialCari: cari, isTahsilat: true)
-        }
-        .sheet(isPresented: $showOdemeForm) {
-            TahsilatFormView(initialCari: cari, isTahsilat: false)
-        }
-        .sheet(isPresented: $showEditForm) {
-            CariFormView(cariToEdit: cari)
-        }
-        .alert("Cari Sil", isPresented: $showDeleteConfirm) {
-            Button("Sil", role: .destructive) {
-                presentationMode.wrappedValue.dismiss()
-            }
-            Button("Vazgeç", role: .cancel) {}
-        } message: {
-            Text("\(cari.unvan) isimli cari kartını silmek istediğinize emin misiniz?")
-        }
     }
     
     private func actionGridBtn(title: String, iconName: String, color: Color, action: @escaping () -> Void) -> some View {
@@ -427,7 +397,7 @@ public struct CariDetailView: View {
     private func exportExcel() {
         #if canImport(UIKit)
         let csvText = "Tarih,BelgeNo,IslemTuru,Borc,Alacak,Bakiye\n" +
-            hareketler.map { "\($0.tarih ?? ""),\"\($0.belgeNo ?? "")\",\"\($0.islemTuru ?? "")\",\($0.borc ?? 0),\($0.alacak ?? 0)" }.joined(separator: "\n")
+            hareketler.map { "\($0.tarih ?? ""),\"\($0.belgeNo ?? "")\",\"\($0.islemTuru ?? "")\",\($0.borc),\($0.alacak)" }.joined(separator: "\n")
         let av = UIActivityViewController(activityItems: [csvText], applicationActivities: nil)
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let rootVC = windowScene.windows.first?.rootViewController {
