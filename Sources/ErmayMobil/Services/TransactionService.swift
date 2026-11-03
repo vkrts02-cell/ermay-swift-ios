@@ -107,15 +107,83 @@ public struct InvoiceTransactionRequest {
     }
 }
 
+// MARK: - Models for save_invoice_atomic RPC
+public struct AtomicFaturaData: Codable {
+    public var uuid: String
+    public var fatura_no: String
+    public var fatura_turu: String
+    public var cari_id: Int
+    public var cari_unvan: String
+    public var tarih: String
+    public var vade_tarihi: String
+    public var ara_toplam: Double
+    public var iskonto_toplami: Double
+    public var kdv_toplami: Double
+    public var genel_toplam: Double
+    public var odeme_durumu: String
+    public var aciklama: String?
+}
+
+public struct AtomicFaturaDetayData: Codable {
+    public var stok_id: Int
+    public var miktar: Double
+    public var birim_fiyat: Double
+    public var kdv_orani: Double
+    public var kdv_tutari: Double
+    public var iskonto_orani: Double
+    public var iskonto_tutari: Double
+    public var net_tutar: Double
+}
+
+public struct AtomicStokHareketData: Codable {
+    public var stok_id: Int
+    public var tarih: String
+    public var islem_turu: String
+    public var belge_no: String
+    public var miktar: Double
+    public var birim_fiyat: Double
+    public var toplam_tutar: Double
+    public var aciklama: String?
+}
+
+public struct AtomicCariHareketData: Codable {
+    public var cari_id: Int
+    public var tarih: String
+    public var belge_no: String
+    public var islem_turu: String
+    public var borc: Double
+    public var alacak: Double
+    public var aciklama: String?
+}
+
+public struct AtomicInvoicePayload: Codable {
+    public var tenant_id: String
+    public var idempotency_key: String
+    public var fatura: AtomicFaturaData
+    public var detaylar: [AtomicFaturaDetayData]
+    public var stok_hareketler: [AtomicStokHareketData]
+    public var cari_hareketler: [AtomicCariHareketData]
+}
+
+public struct AtomicRpcWrapper: Encodable {
+    public var p_payload: AtomicInvoicePayload
+}
+
+public struct AtomicRpcResponse: Decodable {
+    public var success: Bool
+    public var fatura_id: String?
+    public var message: String?
+}
+
 public final class TransactionService: @unchecked Sendable {
     public static let shared = TransactionService()
     private init() {}
     
     private func getEvrakNoPrefix(method: String) -> String {
-        if method.contains("Kredi") { return "KK-" }
-        if method.contains("EFT") || method.contains("Havale") { return "EFT-" }
-        if method.contains("Çek") { return "CK-" }
-        return "TS-"
+        if method.contains("Kredi") { return "MB-KK-" }
+        if method.contains("EFT") || method.contains("Havale") { return "MB-EFT-" }
+        if method.contains("Çek") { return "MB-CK-" }
+        return "MB-TS-"
     }
     
     // MARK: - Save Financial Transaction (Tahsilat / Ödeme / Virman / Çek)
@@ -199,7 +267,7 @@ public final class TransactionService: @unchecked Sendable {
         
         let fatura = Fatura(
             id: String(currentId),
-            faturaNo: req.faturaNo,
+            faturaNo: req.faturaNo.hasPrefix("MB-") ? req.faturaNo : "MB-\(req.faturaNo)",
             faturaTuru: isSatis ? "SATIS" : "ALIS",
             cariId: req.cari.id,
             cariUnvan: req.cari.unvan,
@@ -214,7 +282,77 @@ public final class TransactionService: @unchecked Sendable {
             kalemler: req.items
         )
         
-        // 1. Faturayı Kaydet
+        // 0. PostgreSQL Atomik ACID RPC Denemesi (Tüm işlem tek bir ACID transaction'da commit edilir)
+        do {
+            let rpcPayload = AtomicInvoicePayload(
+                tenant_id: SupabaseService.shared.tenantId,
+                idempotency_key: "swift-\(UUID().uuidString)",
+                fatura: AtomicFaturaData(
+                    uuid: UUID().uuidString,
+                    fatura_no: fatura.faturaNo,
+                    fatura_turu: fatura.faturaTuru,
+                    cari_id: Int(req.cari.id) ?? 0,
+                    cari_unvan: req.cari.unvan,
+                    tarih: req.tarih,
+                    vade_tarihi: req.vadeTarihi,
+                    ara_toplam: subtotal,
+                    iskonto_toplami: totalIskonto,
+                    kdv_toplami: totalKdv,
+                    genel_toplam: grandTotal,
+                    odeme_durumu: isPaid ? "ODENDI" : "BEKLIYOR",
+                    aciklama: req.aciklama
+                ),
+                detaylar: req.items.map { it in
+                    AtomicFaturaDetayData(
+                        stok_id: it.stokId != nil ? (Int(it.stokId!) ?? 0) : 0,
+                        miktar: it.miktar,
+                        birim_fiyat: it.birimFiyat,
+                        kdv_orani: it.kdvOrani,
+                        kdv_tutari: it.kdvTutari,
+                        iskonto_orani: it.iskontoOrani,
+                        iskonto_tutari: it.iskontoTutari,
+                        net_tutar: it.netTutar
+                    )
+                },
+                stok_hareketler: req.items.compactMap { it in
+                    guard let sId = it.stokId, let intStokId = Int(sId) else { return nil }
+                    return AtomicStokHareketData(
+                        stok_id: intStokId,
+                        tarih: req.tarih,
+                        islem_turu: isSatis ? "Satış Faturası" : "Alış Faturası",
+                        belge_no: req.faturaNo,
+                        miktar: it.miktar,
+                        birim_fiyat: it.birimFiyat,
+                        toplam_tutar: it.netTutar,
+                        aciklama: "Fatura No: \(req.faturaNo)"
+                    )
+                },
+                cari_hareketler: [
+                    AtomicCariHareketData(
+                        cari_id: Int(req.cari.id) ?? 0,
+                        tarih: req.tarih,
+                        belge_no: req.faturaNo,
+                        islem_turu: isSatis ? "Satış Faturası" : "Alış Faturası",
+                        borc: isSatis ? grandTotal : 0,
+                        alacak: !isSatis ? grandTotal : 0,
+                        aciklama: req.aciklama ?? "Fatura Kesildi"
+                    )
+                ]
+            )
+            
+            let res: AtomicRpcResponse = try await SupabaseService.shared.rpc(
+                function: "save_invoice_atomic",
+                params: AtomicRpcWrapper(p_payload: rpcPayload)
+            )
+            if res.success {
+                print("[TransactionService] Fatura PostgreSQL atomik RPC ile tek ACID transaction'da kaydedildi.")
+                return fatura
+            }
+        } catch {
+            print("[TransactionService] Atomik RPC ulasilamadi veya basarisiz (\(error.localizedDescription)), siralı REST kayit fallback'e geciliyor...")
+        }
+
+        // 1. Faturayı Kaydet (Fallback Sıralı Kayıt)
         let savedFatura: Fatura = try await SupabaseService.shared.insert(into: "faturalar", item: fatura)
         
         // 2. Fatura Detay Kalemlerini Kaydet

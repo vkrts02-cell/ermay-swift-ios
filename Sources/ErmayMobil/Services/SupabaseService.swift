@@ -5,7 +5,7 @@ public final class SupabaseService: @unchecked Sendable {
     
     public var baseUrl: String = "https://fqgbdymffknglqeqoogt.supabase.co"
     public var anonKey: String = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxZ2JkeW1mZmtuZ2xxZXFvb2d0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1ODUzMDEsImV4cCI6MjEwNTE2MTMwMX0.pBeE2ivWpbkAd8KSN1y2pXNZPIr_1mGMLXXHYPzjTDg"
-    public var tenantId: String = "tenant_vkrts1992_gmail_com"
+    public var tenantId: String = "tenant_ermay_master"
     public var authToken: String? = nil
     
     private let session: URLSession

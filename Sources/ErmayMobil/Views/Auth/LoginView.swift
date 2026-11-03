@@ -4,7 +4,7 @@ public struct LoginView: View {
     @ObservedObject var authService = AuthService.shared
     @State private var username: String = "admin"
     @State private var pass: String = "admin"
-    @State private var tenantId: String = "tenant_vkrts1992_gmail_com"
+    @State private var tenantId: String = "tenant_ermay_master"
     @State private var showTenantField: Bool = false
     
     public init() {}

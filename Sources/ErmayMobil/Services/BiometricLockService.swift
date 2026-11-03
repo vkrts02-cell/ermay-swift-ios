@@ -24,7 +24,12 @@ public final class BiometricLockService: ObservableObject {
         self.isBiometricsEnabled = UserDefaults.standard.bool(forKey: biometricsEnabledKey)
         
         #if canImport(KeychainAccess)
-        self.pinCode = try? keychain.get(pinCodeKey) ?? UserDefaults.standard.string(forKey: pinCodeKey)
+        self.pinCode = try? keychain.get(pinCodeKey)
+        if self.pinCode == nil, let legacyPin = UserDefaults.standard.string(forKey: pinCodeKey) {
+            self.pinCode = legacyPin
+            try? keychain.set(legacyPin, key: pinCodeKey)
+            UserDefaults.standard.removeObject(forKey: pinCodeKey)
+        }
         #else
         self.pinCode = UserDefaults.standard.string(forKey: pinCodeKey)
         #endif
@@ -43,7 +48,8 @@ public final class BiometricLockService: ObservableObject {
             try? keychain.remove(pinCodeKey)
         }
         #endif
-        UserDefaults.standard.set(pin, forKey: pinCodeKey)
+        // Do not store PIN in plaintext UserDefaults
+        UserDefaults.standard.removeObject(forKey: pinCodeKey)
     }
     
     public func setBiometricsEnabled(_ enabled: Bool) {
