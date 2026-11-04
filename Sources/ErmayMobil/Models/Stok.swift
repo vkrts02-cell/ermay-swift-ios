@@ -23,6 +23,11 @@ public struct StokKart: Identifiable, Codable, Hashable {
         set { grupAdi = newValue }
     }
     
+        public var minimumSeviye: Double? {
+        get { kritikMiktar }
+        set { kritikMiktar = newValue }
+    }
+
     public var bakiye: Double {
         get { mevcutMiktar }
         set { mevcutMiktar = newValue }

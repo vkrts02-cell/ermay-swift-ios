@@ -258,7 +258,7 @@ public final class ReportCalculationService: @unchecked Sendable {
                 let headers = ["Stok Kodu", "Stok Adı", "Mevcut", "Min. Seviye", "Durum", "Satış Fiyatı"]
                 var rows: [[String]] = []
                 for s in stoklar {
-                    let minSev = s.minimumSeviye ?? 10.0
+                    let minSev = s.kritikMiktar ?? 10.0
                     if s.mevcutMiktar <= minSev {
                         rows.append([
                             s.stokKodu ?? "STK-\(s.id)",
