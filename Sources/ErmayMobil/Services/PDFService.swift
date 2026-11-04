@@ -327,10 +327,10 @@ public final class PDFService {
                     UIBezierPath(rect: rBg).fill()
                 }
                 
-                (h.tarih ?? "-" as NSString).draw(at: CGPoint(x: tableLeft + 6, y: currentY + 3), withAttributes: [.font: small, .foregroundColor: UIColor.darkGray])
-                (h.belgeNo ?? "-" as NSString).draw(at: CGPoint(x: tableLeft + 72, y: currentY + 3), withAttributes: [.font: small, .foregroundColor: UIColor.black])
-                (h.islemTuru ?? "-" as NSString).draw(at: CGPoint(x: tableLeft + 155, y: currentY + 3), withAttributes: [.font: small, .foregroundColor: UIColor.black])
-                (h.aciklama ?? "-" as NSString).draw(in: CGRect(x: tableLeft + 240, y: currentY + 3, width: 115, height: 16), withAttributes: [.font: small, .foregroundColor: UIColor.darkGray])
+                ((h.tarih ?? "-") as NSString).draw(at: CGPoint(x: tableLeft + 6, y: currentY + 3), withAttributes: [.font: small, .foregroundColor: UIColor.darkGray])
+                ((h.belgeNo ?? "-") as NSString).draw(at: CGPoint(x: tableLeft + 72, y: currentY + 3), withAttributes: [.font: small, .foregroundColor: UIColor.black])
+                ((h.islemTuru ?? "-") as NSString).draw(at: CGPoint(x: tableLeft + 155, y: currentY + 3), withAttributes: [.font: small, .foregroundColor: UIColor.black])
+                ((h.aciklama ?? "-") as NSString).draw(in: CGRect(x: tableLeft + 240, y: currentY + 3, width: 115, height: 16), withAttributes: [.font: small, .foregroundColor: UIColor.darkGray])
                 
                 let borcStr = h.borc > 0 ? AppFormatters.money(h.borc) : "-"
                 (borcStr as NSString).draw(at: CGPoint(x: tableLeft + 360, y: currentY + 3), withAttributes: [.font: bodyBold, .foregroundColor: h.borc > 0 ? UIColor(red: 239/255, green: 68/255, blue: 68/255, alpha: 1.0) : UIColor.gray])

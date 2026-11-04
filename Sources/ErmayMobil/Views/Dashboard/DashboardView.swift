@@ -605,9 +605,11 @@ public struct DashboardView: View {
                         topBorc += c.bakiye
                     }
                 }
+                let finalAlacak = topAlacak
+                let finalBorc = topBorc
                 await MainActor.run {
-                    self.toplamAlacak = topAlacak > 0 ? topAlacak : self.toplamAlacak
-                    self.toplamBorc = topBorc > 0 ? topBorc : self.toplamBorc
+                    self.toplamAlacak = finalAlacak > 0 ? finalAlacak : self.toplamAlacak
+                    self.toplamBorc = finalBorc > 0 ? finalBorc : self.toplamBorc
                 }
             }
             
@@ -618,9 +620,10 @@ public struct DashboardView: View {
                 let bugunSatis = faturalar
                     .filter { $0.tarih.hasPrefix(today) && $0.faturaTuru.localizedCaseInsensitiveContains("satış") }
                     .reduce(0.0) { $0 + $1.genelToplam }
-                if bugunSatis > 0 {
+                let finalSatis = bugunSatis
+                if finalSatis > 0 {
                     await MainActor.run {
-                        self.gunlukCiro = bugunSatis
+                        self.gunlukCiro = finalSatis
                     }
                 }
             }
