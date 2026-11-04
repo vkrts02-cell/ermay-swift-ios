@@ -495,10 +495,6 @@ public struct SiparisFormView: View {
         .background(Color(hex: "161616"))
         .cornerRadius(14)
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.08), lineWidth: 1))
-.stroke(Color.white.opacity(0.08), lineWidth: 1))
-                }
-            }
-        }
         .padding(.horizontal)
     }
     

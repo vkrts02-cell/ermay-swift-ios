@@ -453,7 +453,6 @@ public struct DashboardView: View {
     
     // MARK: - 4. Hedef & Gerçekleşme Kartı
     @ViewBuilder
-    private @ViewBuilder
     private func renderGoalChartCard() -> some View {
         let isWeekly = (goalPeriod == "week")
         let hedef = isWeekly ? haftalikHedef : aylikHedef
@@ -489,7 +488,7 @@ public struct DashboardView: View {
                 HStack(spacing: 2) {
                     Button {
                         goalPeriod = "week"
-                        HardwareService.shared.hapticSelect()
+                        HardwareService.shared.hapticImpact()
                     } label: {
                         Text("Hafta")
                             .font(.system(size: 12, weight: .black))
@@ -502,7 +501,7 @@ public struct DashboardView: View {
                     
                     Button {
                         goalPeriod = "month"
-                        HardwareService.shared.hapticSelect()
+                        HardwareService.shared.hapticImpact()
                     } label: {
                         Text("Ay")
                             .font(.system(size: 12, weight: .black))
@@ -749,23 +748,23 @@ public struct DashboardView: View {
                 var recentList: [DashboardListItem] = []
                 
                 for c in cariler {
-                    if c.bakiyeTuru == "A" || c.alacakTutari > 0 {
-                        topAlacak += (c.alacakTutari > 0 ? c.alacakTutari : c.bakiye)
-                    } else if c.bakiyeTuru == "B" || c.borcTutari > 0 {
-                        topBorc += (c.borcTutari > 0 ? c.borcTutari : c.bakiye)
+                    if c.bakiyeTuru == "A" {
+                        topAlacak += c.bakiye
+                    } else {
+                        topBorc += c.bakiye
                     }
                 }
                 
                 // İlk 5 cari kartı hareket listesine ekle
                 for c in cariler.prefix(5) {
-                    let isAlacakli = (c.bakiyeTuru == "A" || c.alacakTutari > 0)
-                    let b = c.bakiye > 0 ? c.bakiye : (c.borcTutari > 0 ? c.borcTutari : 15400.0)
+                    let isAlacakli = (c.bakiyeTuru == "A")
+                    let b = c.bakiye > 0 ? c.bakiye : 15400.0
                     recentList.append(DashboardListItem(
                         title: c.unvan,
                         description: isAlacakli ? "Alacak Bakiyesi" : "Borç Bakiyesi",
                         amount: b,
                         date: "Güncel",
-                        vade: c.vadeGun > 0 ? c.vadeGun : 30,
+                        vade: c.vadeGunu ?? 30,
                         type: isAlacakli ? "In" : "Out"
                     ))
                 }

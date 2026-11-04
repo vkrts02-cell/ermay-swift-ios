@@ -884,10 +884,10 @@ public struct RaporDetayInteractiveView: View {
                 if !cariler.isEmpty {
                     var rows: [[String]] = []
                     for c in cariler {
-                        let b = c.bakiye > 0 ? c.bakiye : (c.borcTutari > 0 ? c.borcTutari : (c.alacakTutari > 0 ? c.alacakTutari : 0.0))
+                        let b = c.bakiye > 0 ? c.bakiye : (c.bakiyeTuru == "B" ? c.borcTutari : (c.bakiyeTuru == "A" ? c.alacakTutari : 0.0))
                         let bakiyeStr = AppFormatters.money(b)
-                        let bakiyeTuru = (c.bakiyeTuru == "A" || c.alacakTutari > 0) ? "Alacaklı (+)" : "Borçlu (-)"
-                        let vadeStr = "\(c.vadeGun > 0 ? c.vadeGun : 30) Gün"
+                        let bakiyeTuru = (c.bakiyeTuru == "A" || c.bakiyeTuru == "A") ? "Alacaklı (+)" : "Borçlu (-)"
+                        let vadeStr = "\(c.vadeGunu ?? 30) Gün"
                         
                         if report.headers.count == 5 {
                             rows.append([
@@ -909,8 +909,8 @@ public struct RaporDetayInteractiveView: View {
                                 "04.11.2026",
                                 c.cariKodu ?? "CR-\(c.id)",
                                 c.unvan,
-                                AppFormatters.money(c.borcTutari),
-                                AppFormatters.money(c.alacakTutari),
+                                AppFormatters.money(c.bakiyeTuru == "B" ? c.bakiye : 0),
+                                AppFormatters.money(c.bakiyeTuru == "A" ? c.bakiye : 0),
                                 bakiyeStr
                             ])
                         } else {
@@ -961,10 +961,10 @@ public struct RaporDetayInteractiveView: View {
                 var topAlacak: Double = 0
                 var topBorc: Double = 0
                 for c in cariler {
-                    if c.bakiyeTuru == "A" || c.alacakTutari > 0 {
-                        topAlacak += (c.alacakTutari > 0 ? c.alacakTutari : c.bakiye)
+                    if c.bakiyeTuru == "A" || c.bakiyeTuru == "A" {
+                        topAlacak += (c.bakiye)
                     } else {
-                        topBorc += (c.borcTutari > 0 ? c.borcTutari : c.bakiye)
+                        topBorc += (c.bakiye)
                     }
                 }
                 if topAlacak == 0 { topAlacak = 222120.0 }
