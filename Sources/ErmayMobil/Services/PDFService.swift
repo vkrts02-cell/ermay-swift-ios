@@ -258,7 +258,7 @@ public final class PDFService {
             "VergiDairesi": cari.vergiDairesi ?? "",
             "VergiNo": cari.vergiNo ?? "",
             "Telefon": cari.telefon ?? "",
-            "Email": cari.eposta ?? "",
+            "Email": cari.email ?? "",
             "Yetkili": cari.yetkili ?? ""
         ]
         
