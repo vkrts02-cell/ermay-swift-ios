@@ -25,6 +25,7 @@ public struct CariDetailView: View {
     @State private var showPDFModal: Bool = false
     @State private var generatedPDFData: Data? = nil
     @State private var pdfTitle: String = ""
+    @State private var isGeneratingPDF: Bool = false
     
     // Sample Cari Hareketler
     @State private var hareketler: [CariHareket] = [
@@ -57,6 +58,24 @@ public struct CariDetailView: View {
                     Spacer().frame(height: 50)
                 }
                 .padding(.horizontal, 16)
+            }
+            
+            // PDF Hazırlanıyor HUD
+            if isGeneratingPDF {
+                Color.black.opacity(0.4).ignoresSafeArea()
+                VStack(spacing: 14) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.2)
+                    Text("QuestPDF Ekstresi Hazırlanıyor...")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
+                .background(Color(hex: "1E293B"))
+                .cornerRadius(16)
+                .shadow(color: .black.opacity(0.5), radius: 15, x: 0, y: 8)
             }
         }
         .navigationBarHidden(true)
@@ -453,17 +472,23 @@ public struct CariDetailView: View {
         }
     }
     
-    // MARK: - PDF Ekstre Üretimi & Önizleme
+    // MARK: - PDF Ekstre Üretimi & Önizleme (QuestPDF Destekli)
     private func exportEkstre(detayli: Bool) {
         #if canImport(UIKit)
-        if let pdfData = PDFService.shared.generateCariEkstrePDF(
-            cari: currentCari,
-            hareketler: hareketler,
-            detayli: detayli
-        ) {
-            self.pdfTitle = "\(currentCari.unvan) (\(detayli ? "Detaylı Ekstre" : "Hesap Ekstresi"))"
-            self.generatedPDFData = pdfData
-            self.showPDFModal = true
+        Task { @MainActor in
+            self.isGeneratingPDF = true
+            let title = "\(currentCari.unvan) (\(detayli ? "Detaylı Ekstre" : "Hesap Ekstresi"))"
+            let pdfData = await PDFService.shared.fetchOrGenerateCariEkstrePDF(
+                cari: currentCari,
+                hareketler: hareketler,
+                detayli: detayli
+            )
+            self.isGeneratingPDF = false
+            if let data = pdfData {
+                self.pdfTitle = title
+                self.generatedPDFData = data
+                self.showPDFModal = true
+            }
         }
         #endif
     }
