@@ -550,29 +550,28 @@ public struct FaturaFormView: View {
         isSaving = true
         errorMessage = nil
         
-        let newFatura = Fatura(
+        let req = InvoiceTransactionRequest(
             faturaNo: faturaNo,
-            faturaTuru: tur,
+            tarih: AppFormatters.isoDate.string(from: tarih),
+            vadeTarihi: AppFormatters.isoDate.string(from: vadeTarihi),
+            cari: cari,
             tur: tur,
-            cariId: cari.id,
-            cariUnvan: cari.unvan,
-            tarih: tarih,
-            vadeTarihi: vadeTarihi,
-            araToplam: araToplam,
-            kdvToplam: kdvToplami,
-            genelToplam: genelToplam,
-            odemeSekli: odemeSekli,
             durum: durum,
+            odemeSekli: odemeSekli,
+            kasaId: kasaId,
+            bankaId: bankaId,
+            dovizTuru: "TL",
+            dovizKuru: 1.0,
             aciklama: aciklama,
-            kalemler: items
+            items: items
         )
         
         Task {
             do {
-                _ = try await TransactionService.shared.saveFaturaAtomic(fatura: newFatura, cari: cari)
+                let savedFatura = try await TransactionService.shared.saveInvoiceTransaction(req: req)
                 await MainActor.run {
                     HardwareService.shared.hapticSuccess()
-                    onSave?(newFatura)
+                    onSave?(savedFatura)
                     dismiss()
                 }
             } catch {

@@ -884,9 +884,9 @@ public struct RaporDetayInteractiveView: View {
                 if !cariler.isEmpty {
                     var rows: [[String]] = []
                     for c in cariler {
-                        let b = c.bakiye > 0 ? c.bakiye : (c.bakiyeTuru == "B" ? c.borcTutari : (c.bakiyeTuru == "A" ? c.alacakTutari : 0.0))
+                        let b = c.bakiye
                         let bakiyeStr = AppFormatters.money(b)
-                        let bakiyeTuru = (c.bakiyeTuru == "A" || c.bakiyeTuru == "A") ? "Alacaklı (+)" : "Borçlu (-)"
+                        let bakiyeTuru = (c.bakiyeTuru == "A") ? "Alacaklı (+)" : "Borçlu (-)"
                         let vadeStr = "\(c.vadeGunu ?? 30) Gün"
                         
                         if report.headers.count == 5 {
@@ -918,7 +918,8 @@ public struct RaporDetayInteractiveView: View {
                         }
                     }
                     if !rows.isEmpty {
-                        await MainActor.run { self.liveRows = rows }
+                        let finalRows = rows
+                        await MainActor.run { self.liveRows = finalRows }
                         return
                     }
                 }
@@ -926,17 +927,17 @@ public struct RaporDetayInteractiveView: View {
             
             // 2. Kasa / Banka / Nakit Raporları
             if title.contains("kasa") || title.contains("nakit") || title.contains("banka") || cat.contains("kasa") {
-                let kasalar: [KasaKart] = try await SupabaseService.shared.fetch(from: "kasalar")
+                let kasalar: [KasaBanka] = try await SupabaseService.shared.fetch(from: "kasalar")
                 let bankalar: [BankaKart] = try await SupabaseService.shared.fetch(from: "bankalar")
                 var rows: [[String]] = []
                 for k in kasalar {
                     rows.append([
                         "04.11.2026",
-                        k.kasaAdi,
+                        k.hesapAdi,
                         "Kasa Bakiye",
-                        k.aciklama ?? "Merkez Kasa",
+                        k.hesapTuru,
                         AppFormatters.money(k.bakiye),
-                        k.paraBirimi
+                        k.dovizCinsi ?? "TL"
                     ])
                 }
                 for b in bankalar {
@@ -944,13 +945,14 @@ public struct RaporDetayInteractiveView: View {
                         "04.11.2026",
                         b.bankaAdi,
                         "Banka Hesabı",
-                        b.hesapNo,
+                        b.hesapNo ?? "-",
                         AppFormatters.money(b.bakiye),
-                        b.paraBirimi
+                        b.dovizTuru ?? "TL"
                     ])
                 }
                 if !rows.isEmpty {
-                    await MainActor.run { self.liveRows = rows }
+                    let finalRows = rows
+                    await MainActor.run { self.liveRows = finalRows }
                     return
                 }
             }
@@ -961,10 +963,10 @@ public struct RaporDetayInteractiveView: View {
                 var topAlacak: Double = 0
                 var topBorc: Double = 0
                 for c in cariler {
-                    if c.bakiyeTuru == "A" || c.bakiyeTuru == "A" {
-                        topAlacak += (c.bakiye)
+                    if c.bakiyeTuru == "A" {
+                        topAlacak += c.bakiye
                     } else {
-                        topBorc += (c.bakiye)
+                        topBorc += c.bakiye
                     }
                 }
                 if topAlacak == 0 { topAlacak = 222120.0 }
@@ -977,7 +979,8 @@ public struct RaporDetayInteractiveView: View {
                     ["Kayıtlı Aktif Cari Sayısı", "\(cariler.count > 0 ? cariler.count : 31) Firma"],
                     ["Mali Durum", topAlacak >= topBorc ? "Pozitif (Güçlü Nakit)" : "Risk Analizinde"]
                 ]
-                await MainActor.run { self.liveRows = rows }
+                let finalRows = rows
+                await MainActor.run { self.liveRows = finalRows }
                 return
             }
             
@@ -992,12 +995,13 @@ public struct RaporDetayInteractiveView: View {
                             f.faturaNo,
                             f.cariUnvan ?? "Cari",
                             AppFormatters.money(f.araToplam),
-                            AppFormatters.money(f.kdvToplam),
+                            AppFormatters.money(f.kdvToplami),
                             AppFormatters.money(f.genelToplam)
                         ])
                     }
                     if !rows.isEmpty {
-                        await MainActor.run { self.liveRows = rows }
+                        let finalRows = rows
+                        await MainActor.run { self.liveRows = finalRows }
                         return
                     }
                 }
@@ -1028,23 +1032,20 @@ public struct RaporDetayInteractiveView: View {
                 ForEach(days) { day in
                     Button {
                         selectedDay = day
-                        HardwareService.shared.hapticSelect()
+                        HardwareService.shared.hapticImpact()
                     } label: {
                         VStack(spacing: 2) {
                             Text(day.day)
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(.white)
-                            Text(day.net >= 0 ? "+\(Int(day.net / 1000))k" : "-\(Int(abs(day.net) / 1000))k")
+                            let kVal = Int(abs(day.net) / 1000)
+                            Text(day.net >= 0 ? "+\(kVal)k" : "-\(kVal)k")
                                 .font(.system(size: 8))
                                 .foregroundColor(day.net >= 0 ? Color(hex: "10B981") : Color(hex: "EF4444"))
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 44)
-                        .background(
-                            day.net >= 0
-                            ? Color(hex: "10B981").opacity(min(0.2 + (day.net / 30000) * 0.6, 0.8))
-                            : Color(hex: "EF4444").opacity(min(0.2 + (abs(day.net) / 30000) * 0.6, 0.8))
-                        )
+                        .background(heatmapCellBg(day: day))
                         .cornerRadius(8)
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
@@ -1088,6 +1089,14 @@ public struct RaporDetayInteractiveView: View {
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.08), lineWidth: 1))
     }
     
+    private func heatmapCellBg(day: DailyFlow) -> Color {
+        let ratio = min(abs(day.net) / 30000.0, 1.0)
+        let opacity = 0.2 + (ratio * 0.6)
+        let baseColor = day.net >= 0 ? Color(hex: "10B981") : Color(hex: "EF4444")
+        return baseColor.opacity(opacity)
+    }
+
+
     // MARK: - Table Section (Headers + Dynamic Live Rows)
     @ViewBuilder
     private func renderTableSection() -> some View {

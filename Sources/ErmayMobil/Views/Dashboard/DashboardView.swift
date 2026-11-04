@@ -784,7 +784,7 @@ public struct DashboardView: View {
             
             // 2. Kasa ve Banka Mevcutlarını Çek
             do {
-                let kasalar: [KasaKart] = try await SupabaseService.shared.fetch(from: "kasalar")
+                let kasalar: [KasaBanka] = try await SupabaseService.shared.fetch(from: "kasalar")
                 let kasaTop = kasalar.reduce(0.0) { $0 + $1.bakiye }
                 let bankalar: [BankaKart] = try await SupabaseService.shared.fetch(from: "bankalar")
                 let bankaTop = bankalar.reduce(0.0) { $0 + $1.bakiye }
