@@ -268,88 +268,173 @@ public struct TeklifFormView: View {
             
             if kalemler.isEmpty {
                 Text("Henüz kalem eklenmedi.")
-                    .font(.system(size: 12))
+                    .font(.system(size: 13))
                     .foregroundColor(Color(hex: "64748B"))
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
+                    .padding(.vertical, 20)
+                    .background(Color(hex: "141414"))
+                    .cornerRadius(12)
             } else {
                 ForEach(Array(kalemler.enumerated()), id: \.offset) { index, item in
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        
+                        // Header: Stok Adı + Çöp Kutusu
                         HStack {
                             Text(item.stokAdi)
                                 .font(.system(size: 13, weight: .bold))
                                 .foregroundColor(.white)
+                                .lineLimit(2)
+                            
                             Spacer()
+                            
                             Button {
                                 kalemler.remove(at: index)
+                                HardwareService.shared.hapticWarning()
                             } label: {
-                                Image(systemName: "trash.fill")
-                                    .font(.system(size: 14))
+                                Image(systemName: "trash")
+                                    .font(.system(size: 15))
                                     .foregroundColor(Color(hex: "EF4444"))
+                                    .padding(4)
                             }
                         }
+                        .padding(.bottom, 4)
+                        .overlay(Divider().background(Color.white.opacity(0.06)), alignment: .bottom)
                         
-                        HStack(spacing: 8) {
-                            TextField("0", value: Binding(
-                                get: { kalemler[index].miktar },
-                                set: { kalemler[index].miktar = $0 }
-                            ), formatter: NumberFormatter())
-                            .keyboardType(.decimalPad)
-                            .padding(8)
-                            .background(Color(hex: "2A2A2A"))
-                            .cornerRadius(6)
-                            .foregroundColor(.white)
-                            .frame(width: 55)
+                        // Body: Miktar + Birim, Birim Fiyatı, KDV
+                        HStack(alignment: .top, spacing: 10) {
                             
-                            Menu {
-                                ForEach(birimler, id: \.self) { b in
-                                    Button(b) {
-                                        kalemler[index].birim = b
+                            // Miktar + Birim Seçici
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("MİKTAR")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(Color(hex: "94A3B8"))
+                                
+                                HStack(spacing: 2) {
+                                    TextField("Miktar", value: Binding(
+                                        get: { kalemler[index].miktar },
+                                        set: { kalemler[index].miktar = $0 }
+                                    ), formatter: NumberFormatter())
+                                    .keyboardType(.decimalPad)
+                                    .font(.system(size: 12, weight: .bold))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 7)
+                                    .foregroundColor(.white)
+                                    
+                                    Menu {
+                                        ForEach(birimler, id: \.self) { b in
+                                            Button(b) {
+                                                kalemler[index].birim = b
+                                            }
+                                        }
+                                    } label: {
+                                        HStack(spacing: 2) {
+                                            Text(kalemler[index].birim ?? "Adet")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundColor(Color(hex: "94A3B8"))
+                                            Image(systemName: "chevron.down")
+                                                .font(.system(size: 8))
+                                                .foregroundColor(Color(hex: "94A3B8"))
+                                        }
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 6)
+                                        .background(Color.white.opacity(0.06))
+                                        .cornerRadius(6)
                                     }
                                 }
-                            } label: {
-                                Text(kalemler[index].birim ?? "Adet")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 8)
-                                    .background(Color(hex: "2A2A2A"))
-                                    .cornerRadius(6)
+                                .background(Color(hex: "2A2A2A"))
+                                .cornerRadius(8)
                             }
+                            .frame(maxWidth: .infinity)
                             
-                            TextField("0.00", value: Binding(
-                                get: { kalemler[index].birimFiyat },
-                                set: { kalemler[index].birimFiyat = $0 }
-                            ), formatter: NumberFormatter())
-                            .keyboardType(.decimalPad)
-                            .padding(8)
-                            .background(Color(hex: "2A2A2A"))
-                            .cornerRadius(6)
-                            .foregroundColor(.white)
-                            
-                            Text("%\(Int(kalemler[index].kdvOrani))")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(Color(hex: "10B981"))
+                            // Birim Fiyatı
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("BİRİM FİYATI")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(Color(hex: "94A3B8"))
+                                
+                                TextField("Fiyat", value: Binding(
+                                    get: { kalemler[index].birimFiyat },
+                                    set: { kalemler[index].birimFiyat = $0 }
+                                ), formatter: NumberFormatter())
+                                .keyboardType(.decimalPad)
+                                .font(.system(size: 12, weight: .bold))
                                 .padding(.horizontal, 8)
-                                .padding(.vertical, 8)
-                                .background(Color.white.opacity(0.06))
-                                .cornerRadius(6)
+                                .padding(.vertical, 7)
+                                .background(Color(hex: "2A2A2A"))
+                                .foregroundColor(.white)
+                                .cornerRadius(8)
+                            }
+                            .frame(maxWidth: .infinity)
+                            
+                            // KDV Seçici
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("KDV")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(Color(hex: "94A3B8"))
+                                
+                                Menu {
+                                    ForEach([0.0, 1.0, 10.0, 20.0], id: \.self) { rate in
+                                        Button("%\(Int(rate))") {
+                                            kalemler[index].kdvOrani = rate
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 2) {
+                                        Text("%\(Int(kalemler[index].kdvOrani))")
+                                            .font(.system(size: 12, weight: .bold))
+                                            .foregroundColor(Color(hex: "10B981"))
+                                        Image(systemName: "chevron.down")
+                                            .font(.system(size: 8))
+                                            .foregroundColor(Color(hex: "10B981"))
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 7)
+                                    .background(Color.white.opacity(0.06))
+                                    .cornerRadius(8)
+                                }
+                            }
+                            .frame(width: 60)
                         }
                         
-                        TextField("Kalem notu...", text: Binding(
-                            get: { kalemler[index].aciklama ?? "" },
-                            set: { kalemler[index].aciklama = $0 }
-                        ))
-                        .font(.system(size: 12))
-                        .padding(8)
-                        .background(Color(hex: "2A2A2A"))
-                        .cornerRadius(6)
-                        .foregroundColor(.white)
+                        // Kalem Açıklaması (Opsiyonel)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("KALEM AÇIKLAMASI (OPSİYONEL)")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(Color(hex: "94A3B8"))
+                            
+                            TextField("Kalem hakkında not...", text: Binding(
+                                get: { kalemler[index].aciklama ?? "" },
+                                set: { kalemler[index].aciklama = $0 }
+                            ))
+                            .font(.system(size: 11))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 6)
+                            .background(Color(hex: "2A2A2A"))
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                        }
+                        
+                        // Canlı Satır Tutarı
+                        HStack {
+                            Spacer()
+                            let rowTotal = kalemler[index].miktar * kalemler[index].birimFiyat
+                            Text("Satır Tutarı: \(AppFormatters.money(rowTotal))")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(Color(hex: "00FF87"))
+                        }
                     }
                     .padding(12)
-                    .background(Color(hex: "121216"))
+                    .background(Color.white.opacity(0.03))
                     .cornerRadius(12)
                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                }
+            }
+        }
+        .padding(14)
+        .background(Color(hex: "161616"))
+        .cornerRadius(14)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.08), lineWidth: 1))
+.stroke(Color.white.opacity(0.08), lineWidth: 1))
                 }
             }
         }

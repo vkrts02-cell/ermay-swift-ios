@@ -98,6 +98,7 @@ public struct FaturaKalem: Identifiable, Codable, Hashable {
     public var iskontoOrani: Double
     public var iskontoTutari: Double
     public var netTutar: Double
+    public var aciklama: String?
     public var syncGuid: String?
     
     enum CodingKeys: String, CodingKey {
@@ -114,6 +115,7 @@ public struct FaturaKalem: Identifiable, Codable, Hashable {
         case iskontoOrani = "iskonto_orani"
         case iskontoTutari = "iskonto_tutari"
         case netTutar = "net_tutar"
+        case aciklama
         case syncGuid = "sync_guid"
     }
     
@@ -127,7 +129,8 @@ public struct FaturaKalem: Identifiable, Codable, Hashable {
         miktar: Double = 1.0,
         birimFiyat: Double = 0.0,
         kdvOrani: Double = 20.0,
-        iskontoOrani: Double = 0.0
+        iskontoOrani: Double = 0.0,
+        aciklama: String? = nil
     ) {
         self.id = id
         self.faturaId = faturaId
@@ -139,6 +142,7 @@ public struct FaturaKalem: Identifiable, Codable, Hashable {
         self.birimFiyat = birimFiyat
         self.kdvOrani = kdvOrani
         self.iskontoOrani = iskontoOrani
+        self.aciklama = aciklama
         
         let brüt = miktar * birimFiyat
         let isk = brüt * (iskontoOrani / 100.0)

@@ -28,3 +28,4 @@ public final class NotificationManager: ObservableObject {
         bildirimler.removeAll { $0.id == id }
     }
 }
+
