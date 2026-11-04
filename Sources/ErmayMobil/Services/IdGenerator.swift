@@ -29,3 +29,4 @@ public final class IdGenerator: @unchecked Sendable {
         return newId
     }
 }
+

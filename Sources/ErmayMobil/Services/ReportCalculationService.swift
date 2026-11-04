@@ -13,7 +13,6 @@ public final class ReportCalculationService: @unchecked Sendable {
         let title = report.title
         
         do {
-            // Ortak verileri paralel veya önbellekle çekelim
             let cariler: [CariKart] = (try? await SupabaseService.shared.fetch(from: "cariler")) ?? []
             let stoklar: [StokKart] = (try? await SupabaseService.shared.fetch(from: "stoklar")) ?? []
             let faturalar: [Fatura] = (try? await SupabaseService.shared.fetch(from: "faturalar")) ?? []
@@ -24,12 +23,28 @@ public final class ReportCalculationService: @unchecked Sendable {
             switch title {
             // 1. Genel Durum
             case "Genel Özet":
-                let topAlacak = cariler.filter { $0.bakiyeTuru == "A" }.reduce(0.0) { $0 + $1.bakiye }
-                let topBorc = cariler.filter { $0.bakiyeTuru == "B" }.reduce(0.0) { $0 + $1.bakiye }
-                let kasaTop = kasalar.reduce(0.0) { $0 + $1.bakiye }
-                let bankaTop = bankalar.reduce(0.0) { $0 + $1.bakiye }
-                let topStokAdet = stoklar.reduce(0.0) { $0 + $1.mevcutMiktar }
-                let topStokDeger = stoklar.reduce(0.0) { $0 + ($1.mevcutMiktar * $1.alisFiyati) }
+                var topAlacak: Double = 0
+                var topBorc: Double = 0
+                for c in cariler {
+                    if c.bakiyeTuru == "A" {
+                        topAlacak += c.bakiye
+                    } else {
+                        topBorc += c.bakiye
+                    }
+                }
+                
+                var kasaTop: Double = 0
+                for k in kasalar { kasaTop += k.bakiye }
+                
+                var bankaTop: Double = 0
+                for b in bankalar { bankaTop += b.bakiye }
+                
+                var topStokAdet: Double = 0
+                var topStokDeger: Double = 0
+                for s in stoklar {
+                    topStokAdet += s.mevcutMiktar
+                    topStokDeger += (s.mevcutMiktar * s.alisFiyati)
+                }
                 
                 let headers = ["Rapor Kalemi", "Tutar / Değer"]
                 let rows: [[String]] = [
@@ -140,9 +155,6 @@ public final class ReportCalculationService: @unchecked Sendable {
                 let headers = ["Tarih", "İşlem Türü", "Evrak No", "Açıklama", "Borç", "Alacak", "Bakiye"]
                 var rows: [[String]] = []
                 for h in cariHareketler {
-                    if let cName = cariName, !cName.isEmpty, cName != "Tüm Cariler" {
-                        // Filtreli
-                    }
                     rows.append([
                         String((h.tarih ?? "2026-11-04").prefix(10)),
                         h.islemTuru ?? "Fatura",
@@ -245,15 +257,18 @@ public final class ReportCalculationService: @unchecked Sendable {
             case "Kritik Stok Seviyesi":
                 let headers = ["Stok Kodu", "Stok Adı", "Mevcut", "Min. Seviye", "Durum", "Satış Fiyatı"]
                 var rows: [[String]] = []
-                for s in stoklar.filter({ $0.mevcutMiktar <= ($0.minimumSeviye ?? 10) }) {
-                    rows.append([
-                        s.stokKodu ?? "STK-\(s.id)",
-                        s.stokAdi,
-                        "\(String(format: "%.1f", s.mevcutMiktar)) \(s.birim ?? "Adet")",
-                        "\(String(format: "%.1f", s.minimumSeviye ?? 10))",
-                        "KRİTİK SEVİYE",
-                        AppFormatters.money(s.satisFiyati)
-                    ])
+                for s in stoklar {
+                    let minSev = s.minimumSeviye ?? 10.0
+                    if s.mevcutMiktar <= minSev {
+                        rows.append([
+                            s.stokKodu ?? "STK-\(s.id)",
+                            s.stokAdi,
+                            "\(String(format: "%.1f", s.mevcutMiktar)) \(s.birim ?? "Adet")",
+                            "\(String(format: "%.1f", minSev))",
+                            "KRİTİK SEVİYE",
+                            AppFormatters.money(s.satisFiyati)
+                        ])
+                    }
                 }
                 if rows.isEmpty {
                     rows = [
@@ -287,15 +302,18 @@ public final class ReportCalculationService: @unchecked Sendable {
             case "Satış Faturası Dökümü":
                 let headers = ["Fatura No", "Tarih", "Müşteri", "Ara Toplam", "KDV", "Genel Toplam"]
                 var rows: [[String]] = []
-                for f in faturalar.filter({ $0.faturaTuru == "SATIS" || $0.faturaTuru.contains("Sat") }) {
-                    rows.append([
-                        f.faturaNo,
-                        String(f.tarih.prefix(10)),
-                        f.cariUnvan ?? "Müşteri",
-                        AppFormatters.money(f.araToplam),
-                        AppFormatters.money(f.kdvToplami),
-                        AppFormatters.money(f.genelToplam)
-                    ])
+                for f in faturalar {
+                    let tur = f.faturaTuru.uppercased()
+                    if tur.contains("SATIS") || tur.contains("SAT") {
+                        rows.append([
+                            f.faturaNo,
+                            String(f.tarih.prefix(10)),
+                            f.cariUnvan ?? "Müşteri",
+                            AppFormatters.money(f.araToplam),
+                            AppFormatters.money(f.kdvToplami),
+                            AppFormatters.money(f.genelToplam)
+                        ])
+                    }
                 }
                 if rows.isEmpty {
                     rows = [
