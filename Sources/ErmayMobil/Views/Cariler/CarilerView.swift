@@ -226,7 +226,17 @@ public struct CarilerView: View {
                                     .padding(.top, 40)
                             } else {
                                 ForEach(Array(filteredCariler.enumerated()), id: \.element.id) { index, item in
-                                    NavigationLink(destination: CariDetailView(cari: item)) {
+                                    NavigationLink(destination: CariDetailView(
+                                        cari: item,
+                                        onUpdate: { updated in
+                                            if let idx = cariler.firstIndex(where: { $0.id == updated.id }) {
+                                                cariler[idx] = updated
+                                            }
+                                        },
+                                        onDelete: { deleted in
+                                            cariler.removeAll { $0.id == deleted.id }
+                                        }
+                                    )) {
                                         renderAppleListRow(item: item, index: index)
                                     }
                                 }

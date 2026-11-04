@@ -731,6 +731,9 @@ public struct RaporDetayInteractiveView: View {
     public let dateFilter: String
     public let cariName: String?
     
+    @State private var showPDFModal: Bool = false
+    @State private var generatedPDFData: Data? = nil
+    
     // Heatmap data structure
     struct DailyFlow: Identifiable {
         let id = UUID()
@@ -790,6 +793,22 @@ public struct RaporDetayInteractiveView: View {
                     
                     Spacer()
                     
+                    // PDF Aç Butonu
+                    Button {
+                        openPDF()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "doc.text.fill")
+                            Text("PDF")
+                        }
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color(hex: "0061FF"))
+                        .cornerRadius(8)
+                    }
+                    
                     // Share / PDF Button
                     Button {
                         shareReport()
@@ -826,6 +845,15 @@ public struct RaporDetayInteractiveView: View {
             }
         }
         .navigationBarHidden(true)
+        .sheet(isPresented: $showPDFModal) {
+            if let data = generatedPDFData {
+                PDFViewerModal(
+                    title: report.title,
+                    pdfData: data,
+                    fileName: "\(report.title.replacingOccurrences(of: " ", with: "_"))_\(dateFilter).pdf"
+                )
+            }
+        }
     }
     
     // MARK: - Heatmap Section
@@ -973,26 +1001,51 @@ public struct RaporDetayInteractiveView: View {
         .overlay(RoundedRectangle(cornerRadius: 8).stroke(color.opacity(0.4), lineWidth: 1))
     }
     
+    private func openPDF() {
+        #if canImport(UIKit)
+        if let pdfData = PDFService.shared.generateReportPDF(
+            title: report.title,
+            category: report.category,
+            headers: report.headers,
+            rows: report.defaultRows,
+            dateFilter: dateFilter,
+            cariName: cariName,
+            isHeatmap: report.isHeatmap
+        ) {
+            self.generatedPDFData = pdfData
+            self.showPDFModal = true
+        }
+        #endif
+    }
+    
     private func shareReport() {
         #if canImport(UIKit)
-        let rowsText = report.defaultRows.map { $0.joined(separator: " | ") }.joined(separator: "\n")
-        let content = """
-        \(report.title.uppercased())
-        ---------------------------
-        Firma: Ermay Muhasebe
-        Tarih: \(ISO8601DateFormatter().string(from: Date()))
-        Kategori: \(report.category)
-        Dönem: \(dateFilter)
-        \(cariName != nil ? "Cari: \(cariName!)\n" : "")
-        TABLO DÖKÜMÜ:
-        \(report.headers.joined(separator: " | "))
-        ------------------------------------------
-        \(rowsText)
-        """
-        let av = UIActivityViewController(activityItems: [content], applicationActivities: nil)
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootVC = windowScene.windows.first?.rootViewController {
-            rootVC.present(av, animated: true)
+        if let pdfData = PDFService.shared.generateReportPDF(
+            title: report.title,
+            category: report.category,
+            headers: report.headers,
+            rows: report.defaultRows,
+            dateFilter: dateFilter,
+            cariName: cariName,
+            isHeatmap: report.isHeatmap
+        ) {
+            let safeName = report.title.replacingOccurrences(of: " ", with: "_")
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(safeName)_\(dateFilter).pdf")
+            do {
+                try pdfData.write(to: tempURL)
+                let av = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                   let rootVC = windowScene.windows.first?.rootViewController {
+                    if let popover = av.popoverPresentationController {
+                        popover.sourceView = rootVC.view
+                        popover.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
+                        popover.permittedArrowDirections = []
+                    }
+                    rootVC.present(av, animated: true)
+                }
+            } catch {
+                print("PDF paylaşım hatası: \(error)")
+            }
         }
         #endif
     }

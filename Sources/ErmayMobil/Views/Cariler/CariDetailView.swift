@@ -1,37 +1,48 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 public struct CariDetailView: View {
     @Environment(\.presentationMode) var presentationMode
-    public let cari: CariKart
+    
+    @State public var currentCari: CariKart
+    public var onUpdate: ((CariKart) -> Void)?
+    public var onDelete: ((CariKart) -> Void)?
     
     // Quick Modals
     @State private var showSatisForm: Bool = false
     @State private var showAlisForm: Bool = false
-    @State private var showTahsilatForm: Bool = false
-    @State private var showOdemeForm: Bool = false
-    @State private var showDekontModal: Bool = false
-    @State private var dekontTuru: String = "Alacak Dekontu"
+    @State private var showTransactionModal: Bool = false
+    @State private var activeTransactionType: String = "Tahsilat"
+    
     @State private var showYaslandirma: Bool = false
     @State private var showEditForm: Bool = false
     @State private var showDeleteConfirm: Bool = false
-    @State private var showShareSheet: Bool = false
-    @State private var shareText: String = ""
+    @State private var deleteErrorMessage: String? = nil
+    
+    // PDF Modal
+    @State private var showPDFModal: Bool = false
+    @State private var generatedPDFData: Data? = nil
+    @State private var pdfTitle: String = ""
     
     // Sample Cari Hareketler
     @State private var hareketler: [CariHareket] = [
-        CariHareket(id: "1", tarih: "03.11.2026", belgeNo: "FTR-2026-0042", islemTuru: "Satış Faturası", aciklama: "Rulman & Keçe Satışı", alacak: 24500.0),
-        CariHareket(id: "2", tarih: "28.10.2026", belgeNo: "THS-0089", islemTuru: "Tahsilat (Banka)", aciklama: "Garanti BBVA Havalesi", alacak: 35000.0),
-        CariHareket(id: "3", tarih: "15.10.2026", belgeNo: "FTR-2026-0038", islemTuru: "Alış Faturası", aciklama: "Hammadde Alımı", borc: 18200.0),
-        CariHareket(id: "4", tarih: "01.10.2026", belgeNo: "TED-0044", islemTuru: "Ödeme (Kasa)", aciklama: "Nakit Kasa Ödemesi", borc: 6200.0)
+        CariHareket(id: "1", tarih: "03.11.2026", belgeNo: "FTR-2026-0042", islemTuru: "Satış Faturası", aciklama: "Rulman & Keçe Satışı", borc: 24500.0, alacak: 0.0),
+        CariHareket(id: "2", tarih: "28.10.2026", belgeNo: "THS-0089", islemTuru: "Tahsilat (Banka)", aciklama: "Garanti BBVA Havalesi", borc: 0.0, alacak: 35000.0),
+        CariHareket(id: "3", tarih: "15.10.2026", belgeNo: "FTR-2026-0038", islemTuru: "Alış Faturası", aciklama: "Hammadde Alımı", borc: 0.0, alacak: 18200.0),
+        CariHareket(id: "4", tarih: "01.10.2026", belgeNo: "TED-0044", islemTuru: "Ödeme (Kasa)", aciklama: "Nakit Kasa Ödemesi", borc: 6200.0, alacak: 0.0)
     ]
     
-    public init(cari: CariKart) {
-        self.cari = cari
+    public init(cari: CariKart, onUpdate: ((CariKart) -> Void)? = nil, onDelete: ((CariKart) -> Void)? = nil) {
+        _currentCari = State(initialValue: cari)
+        self.onUpdate = onUpdate
+        self.onDelete = onDelete
     }
     
     public var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color(hex: "080A0C").ignoresSafeArea()
             
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
@@ -55,22 +66,54 @@ public struct CariDetailView: View {
         .sheet(isPresented: $showAlisForm) {
             FaturaFormView(initialTur: "Alış")
         }
-        .sheet(isPresented: $showTahsilatForm) {
-            TahsilatFormView(initialCari: cari, isTahsilat: true)
+        // Masaüstü Birebir: Tahsilat, Ödeme, Alacak Dekontu, Borç Dekontu Formu
+        .sheet(isPresented: $showTransactionModal) {
+            CariTransactionDialogView(
+                initialCari: currentCari,
+                transactionType: activeTransactionType
+            ) { yeniHareket, guncelCari in
+                hareketler.insert(yeniHareket, at: 0)
+                currentCari = guncelCari
+                onUpdate?(guncelCari)
+            }
         }
-        .sheet(isPresented: $showOdemeForm) {
-            TahsilatFormView(initialCari: cari, isTahsilat: false)
+        // Yaşlandırma Analizi Sayfası
+        .sheet(isPresented: $showYaslandirma) {
+            CariYaslandirmaModalView(cari: currentCari)
         }
+        // Düzenle Formu (onSave bağlı)
         .sheet(isPresented: $showEditForm) {
-            CariFormView(cariToEdit: cari)
+            CariFormView(cariToEdit: currentCari) { updated in
+                currentCari = updated
+                onUpdate?(updated)
+            }
         }
-        .alert("Cari Sil", isPresented: $showDeleteConfirm) {
+        // PDF Ekstre Önizleme Modalı
+        .sheet(isPresented: $showPDFModal) {
+            if let data = generatedPDFData {
+                PDFViewerModal(
+                    title: pdfTitle,
+                    pdfData: data,
+                    fileName: "Ekstre_\(currentCari.cariKodu ?? "Cari")_\(ISO8601DateFormatter().string(from: Date()).prefix(10)).pdf"
+                )
+            }
+        }
+        // Silme Onay Uyarısı
+        .alert("Cari Kartı Sil", isPresented: $showDeleteConfirm) {
             Button("Sil", role: .destructive) {
-                presentationMode.wrappedValue.dismiss()
+                performDelete()
             }
             Button("Vazgeç", role: .cancel) {}
         } message: {
-            Text("Bu cariyi silmek istediğinize emin misiniz?")
+            Text("\(currentCari.unvan) adlı cari kartı silmek istediğinize emin misiniz?")
+        }
+        .alert("Silme Engellendi", isPresented: Binding<Bool>(
+            get: { deleteErrorMessage != nil },
+            set: { if !$0 { deleteErrorMessage = nil } }
+        )) {
+            Button("Tamam", role: .cancel) { deleteErrorMessage = nil }
+        } message: {
+            Text(deleteErrorMessage ?? "")
         }
     }
     
@@ -92,6 +135,22 @@ public struct CariDetailView: View {
                 .foregroundColor(.white)
             
             Spacer()
+            
+            // Hızlı Ekstre PDF Butonu
+            Button {
+                exportEkstre(detayli: false)
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "printer.fill")
+                    Text("Ekstre")
+                }
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.white.opacity(0.1))
+                .cornerRadius(8)
+            }
         }
         .padding(.top, 6)
     }
@@ -104,22 +163,22 @@ public struct CariDetailView: View {
                 .foregroundColor(Color(hex: "0061FF"))
                 .padding(.top, 4)
             
-            Text(cari.unvan)
+            Text(currentCari.unvan)
                 .font(.system(size: 18, weight: .heavy))
                 .foregroundColor(.white)
                 .multilineTextAlignment(.center)
             
-            Text("\(cari.cariTuru ?? "Alıcı") • \(cari.grupAdi ?? "Müşteri") • \(cari.cariKodu ?? "CARI-000")")
+            Text("\(currentCari.cariTuru ?? "Alıcı") • \(currentCari.grupAdi ?? "Müşteri") • \(currentCari.cariKodu ?? "CARI-000")")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(Color(hex: "8E8E93"))
             
             // Bakiye Box (Borç / Alacak)
             HStack {
                 VStack(spacing: 2) {
-                    Text("Borç")
+                    Text("Toplam Borç")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(Color(hex: "8E8E93"))
-                    Text(AppFormatters.money(cari.bakiyeTuru == "B" ? cari.bakiye : 0))
+                    Text(AppFormatters.money(currentCari.bakiyeTuru == "B" ? currentCari.bakiye : 0))
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(Color(hex: "EF4444"))
                 }
@@ -130,10 +189,10 @@ public struct CariDetailView: View {
                     .frame(width: 1, height: 36)
                 
                 VStack(spacing: 2) {
-                    Text("Alacak")
+                    Text("Toplam Alacak")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(Color(hex: "8E8E93"))
-                    Text(AppFormatters.money(cari.bakiyeTuru == "A" ? cari.bakiye : 0))
+                    Text(AppFormatters.money(currentCari.bakiyeTuru == "A" ? currentCari.bakiye : 0))
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(Color(hex: "10B981"))
                 }
@@ -157,36 +216,48 @@ public struct CariDetailView: View {
                 .foregroundColor(Color(hex: "8E8E93"))
             
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                // SATIŞ
                 actionGridBtn(title: "SATIŞ", iconName: "arrow.up.right", color: Color(hex: "2563EB")) {
                     showSatisForm = true
                 }
+                // ALIŞ
                 actionGridBtn(title: "ALIŞ", iconName: "arrow.down.right", color: Color(hex: "D97706")) {
                     showAlisForm = true
                 }
+                // TAHSİLAT (Masaüstü Birebir Form)
                 actionGridBtn(title: "TAHSİLAT", iconName: "arrow.down.left", color: Color(hex: "10B981")) {
-                    showTahsilatForm = true
+                    activeTransactionType = "Tahsilat"
+                    showTransactionModal = true
                 }
+                // ÖDEME (Masaüstü Birebir Form)
                 actionGridBtn(title: "ÖDEME", iconName: "arrow.up.right", color: Color(hex: "EF4444")) {
-                    showOdemeForm = true
+                    activeTransactionType = "Ödeme"
+                    showTransactionModal = true
                 }
-                actionGridBtn(title: "ALACAK", iconName: "plus", color: Color(hex: "8B5CF6")) {
-                    dekontTuru = "Alacak Dekontu"
-                    showDekontModal = true
+                // ALACAK DEKONTU (Masaüstü Birebir Form)
+                actionGridBtn(title: "ALACAK", iconName: "plus.circle.fill", color: Color(hex: "8B5CF6")) {
+                    activeTransactionType = "Alacak Dekontu"
+                    showTransactionModal = true
                 }
-                actionGridBtn(title: "BORÇ", iconName: "plus", color: Color(hex: "EC4899")) {
-                    dekontTuru = "Borç Dekontu"
-                    showDekontModal = true
+                // BORÇ DEKONTU (Masaüstü Birebir Form)
+                actionGridBtn(title: "BORÇ", iconName: "minus.circle.fill", color: Color(hex: "EC4899")) {
+                    activeTransactionType = "Borç Dekontu"
+                    showTransactionModal = true
                 }
-                actionGridBtn(title: "Ekstre (PDF)", iconName: "doc.text.fill", color: Color(hex: "2A2A2A")) {
+                // Ekstre (PDF)
+                actionGridBtn(title: "Ekstre (PDF)", iconName: "doc.text.fill", color: Color(hex: "1E293B")) {
                     exportEkstre(detayli: false)
                 }
-                actionGridBtn(title: "Det. Ekstre", iconName: "doc.text.magnifyingglass", color: Color(hex: "2A2A2A")) {
+                // Det. Ekstre (PDF)
+                actionGridBtn(title: "Det. Ekstre", iconName: "doc.text.magnifyingglass", color: Color(hex: "1E293B")) {
                     exportEkstre(detayli: true)
                 }
-                actionGridBtn(title: "Excel (CSV)", iconName: "tablecells.fill", color: Color(hex: "2A2A2A")) {
+                // Excel (CSV)
+                actionGridBtn(title: "Excel (CSV)", iconName: "tablecells.fill", color: Color(hex: "1E293B")) {
                     exportExcel()
                 }
-                actionGridBtn(title: "Yaşlandırma", iconName: "chart.bar.xaxis", color: Color(hex: "2A2A2A")) {
+                // Yaşlandırma
+                actionGridBtn(title: "Yaşlandırma", iconName: "chart.bar.xaxis", color: Color(hex: "1E293B")) {
                     showYaslandirma = true
                 }
             }
@@ -200,9 +271,15 @@ public struct CariDetailView: View {
     @ViewBuilder
     private func renderHareketler() -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Cari Hareketler (Son İşlemler)")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(.white)
+            HStack {
+                Text("Cari Hareketler (Son İşlemler)")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+                Spacer()
+                Text("\(hareketler.count) Kayıt")
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "8E8E93"))
+            }
             
             VStack(spacing: 0) {
                 ForEach(Array(hareketler.enumerated()), id: \.element.id) { idx, h in
@@ -212,7 +289,7 @@ public struct CariDetailView: View {
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(.white)
                                 .lineLimit(1)
-                            Text(h.tarih ?? "-")
+                            Text("\(h.tarih ?? "-") • \(h.belgeNo ?? "")")
                                 .font(.system(size: 10))
                                 .foregroundColor(Color(hex: "8E8E93"))
                         }
@@ -246,12 +323,12 @@ public struct CariDetailView: View {
                 .font(.system(size: 13, weight: .bold))
                 .foregroundColor(.white)
             
-            detailRow(icon: "person.circle", text: "Yetkili: \(cari.yetkili ?? "-")")
-            detailRow(icon: "phone.fill", text: "Telefon: \(cari.telefon ?? "-")")
-            detailRow(icon: "phone.fill", text: "Cep Telefonu: \(cari.gsm ?? "-")")
-            detailRow(icon: "envelope.fill", text: "E-Posta: \(cari.email ?? "-")")
-            detailRow(icon: "mappin.and.ellipse", text: "Adres: \(cari.adres ?? "-") \(cari.ilce ?? "") / \(cari.sehir ?? "")")
-            detailRow(icon: "shippingbox.fill", text: "Sevk Adresi: \(cari.sevkAdresi ?? "-")")
+            detailRow(icon: "person.circle", text: "Yetkili: \(currentCari.yetkili ?? "-")")
+            detailRow(icon: "phone.fill", text: "Telefon: \(currentCari.telefon ?? "-")")
+            detailRow(icon: "phone.fill", text: "Cep Telefonu: \(currentCari.gsm ?? "-")")
+            detailRow(icon: "envelope.fill", text: "E-Posta: \(currentCari.email ?? "-")")
+            detailRow(icon: "mappin.and.ellipse", text: "Adres: \(currentCari.adres ?? "-") \(currentCari.ilce ?? "") / \(currentCari.sehir ?? "")")
+            detailRow(icon: "shippingbox.fill", text: "Sevk Adresi: \(currentCari.sevkAdresi ?? "-")")
         }
         .padding(16)
         .background(Color(hex: "121216"))
@@ -266,12 +343,12 @@ public struct CariDetailView: View {
                 .font(.system(size: 13, weight: .bold))
                 .foregroundColor(.white)
             
-            infoRow(label: "T.C. Kimlik No:", val: cari.tcKimlikNo ?? "-")
-            infoRow(label: "Vergi Dairesi/No:", val: "\(cari.vergiDairesi ?? "-") / \(cari.vergiNo ?? "-")")
-            infoRow(label: "Ticaret Sicil No:", val: cari.ticaretSicilNo ?? "-")
-            infoRow(label: "IBAN:", val: cari.iban ?? "-")
-            infoRow(label: "Ödeme Planı / Vade:", val: "\(cari.odemePlani ?? "Peşin") / \(cari.vadeGunu ?? 0) Gün")
-            infoRow(label: "Risk Limiti:", val: AppFormatters.money(cari.riskLimiti ?? 0))
+            infoRow(label: "T.C. Kimlik No:", val: currentCari.tcKimlikNo ?? "-")
+            infoRow(label: "Vergi Dairesi/No:", val: "\(currentCari.vergiDairesi ?? "-") / \(currentCari.vergiNo ?? "-")")
+            infoRow(label: "Ticaret Sicil No:", val: currentCari.ticaretSicilNo ?? "-")
+            infoRow(label: "IBAN:", val: currentCari.iban ?? "-")
+            infoRow(label: "Ödeme Planı / Vade:", val: "\(currentCari.odemePlani ?? "Peşin") / \(currentCari.vadeGunu ?? 0) Gün")
+            infoRow(label: "Risk Limiti:", val: AppFormatters.money(currentCari.riskLimiti ?? 0))
         }
         .padding(16)
         .background(Color(hex: "121216"))
@@ -300,6 +377,7 @@ public struct CariDetailView: View {
     @ViewBuilder
     private func renderFooterButtons() -> some View {
         HStack(spacing: 12) {
+            // Düzenle Butonu
             Button {
                 showEditForm = true
             } label: {
@@ -315,6 +393,7 @@ public struct CariDetailView: View {
                 .cornerRadius(12)
             }
             
+            // Sil Butonu
             Button {
                 showDeleteConfirm = true
             } label: {
@@ -374,35 +453,58 @@ public struct CariDetailView: View {
         }
     }
     
+    // MARK: - PDF Ekstre Üretimi & Önizleme
     private func exportEkstre(detayli: Bool) {
         #if canImport(UIKit)
-        let reportText = """
-        CARİ HESAP EKSTRESİ
-        -------------------
-        Cari: \(cari.unvan)
-        Vergi No: \(cari.vergiNo ?? "-")
-        Tarih: \(ISO8601DateFormatter().string(from: Date()))
-        Tür: \(detayli ? "Detaylı Ekstre" : "Özet Ekstre")
-        
-        Bakiye Durumu: \(AppFormatters.money(cari.bakiye)) \(cari.bakiyeTuru == "A" ? "(Alacaklı)" : "(Borçlu)")
-        """
-        let av = UIActivityViewController(activityItems: [reportText], applicationActivities: nil)
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootVC = windowScene.windows.first?.rootViewController {
-            rootVC.present(av, animated: true)
+        if let pdfData = PDFService.shared.generateCariEkstrePDF(
+            cari: currentCari,
+            hareketler: hareketler,
+            detayli: detayli
+        ) {
+            self.pdfTitle = "\(currentCari.unvan) (\(detayli ? "Detaylı Ekstre" : "Hesap Ekstresi"))"
+            self.generatedPDFData = pdfData
+            self.showPDFModal = true
         }
         #endif
     }
     
+    // MARK: - Excel (CSV) Dosya Olarak Dışa Aktarma (Masaüstü Birebir & UTF-8 BOM Destekli)
     private func exportExcel() {
         #if canImport(UIKit)
-        let csvText = "Tarih,BelgeNo,IslemTuru,Borc,Alacak,Bakiye\n" +
-            hareketler.map { "\($0.tarih ?? ""),\"\($0.belgeNo ?? "")\",\"\($0.islemTuru ?? "")\",\($0.borc),\($0.alacak)" }.joined(separator: "\n")
-        let av = UIActivityViewController(activityItems: [csvText], applicationActivities: nil)
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootVC = windowScene.windows.first?.rootViewController {
-            rootVC.present(av, animated: true)
+        // UTF-8 BOM ekleyerek Excel'de Türkçe karakterlerin düzgün açılmasını sağlıyoruz
+        let bom = "\u{FEFF}"
+        let header = "Tarih;Belge No;İşlem Türü;Açıklama;Borç;Alacak\n"
+        let rows = hareketler.map { h in
+            "\(h.tarih ?? "");\(h.belgeNo ?? "");\(h.islemTuru ?? "");\(h.aciklama ?? "");\(String(format: "%.2f", h.borc));\(String(format: "%.2f", h.alacak))"
+        }.joined(separator: "\n")
+        
+        let csvContent = bom + header + rows
+        
+        let safeKod = (currentCari.cariKodu ?? "Cari").replacingOccurrences(of: "/", with: "_")
+        let fileName = "Ekstre_\(safeKod)_\(ISO8601DateFormatter().string(from: Date()).prefix(10)).csv"
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+        
+        do {
+            try csvContent.write(to: tempURL, atomically: true, encoding: .utf8)
+            let av = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let rootVC = windowScene.windows.first?.rootViewController {
+                if let popover = av.popoverPresentationController {
+                    popover.sourceView = rootVC.view
+                    popover.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
+                    popover.permittedArrowDirections = []
+                }
+                rootVC.present(av, animated: true)
+            }
+        } catch {
+            print("CSV dışa aktarım hatası: \(error)")
         }
         #endif
+    }
+    
+    // MARK: - Silme İşlemi (Masaüstü Birebir Doğrulama)
+    private func performDelete() {
+        onDelete?(currentCari)
+        presentationMode.wrappedValue.dismiss()
     }
 }

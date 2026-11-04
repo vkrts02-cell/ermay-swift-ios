@@ -3,11 +3,17 @@ import SwiftUI
 public struct DashboardView: View {
     @State private var activeTab: String = "recents" // "recents" | "receivables" | "payables"
     @State private var goalPeriod: String = "week" // "week" | "month"
+    @State private var activeFiscalYear: String = "2026"
+    @State private var showYearPicker: Bool = false
+    @State private var showNotifications: Bool = false
+    @State private var isSyncing: Bool = false
+    @State private var lastSyncTime: String = "Şimdi"
     
-    // Live calculated stats
+    // Live calculated stats (Masaüstü Birebir)
     @State private var gunlukCiro: Double = 42850.0
     @State private var toplamAlacak: Double = 184500.0
     @State private var toplamBorc: Double = 72300.0
+    @State private var kasaBankaMevcut: Double = 112200.0
     
     // Satış Hedefleri (Haftalık & Aylık)
     @State private var haftalikHedef: Double = 62500.0
@@ -15,7 +21,7 @@ public struct DashboardView: View {
     @State private var aylikHedef: Double = 250000.0
     @State private var aylikGerceklesen: Double = 312500.0
     
-    // Weekly Chart Data (Son 5 Hafta)
+    // Weekly Chart Data
     struct BarChartPoint: Identifiable {
         let id = UUID()
         let label: String
@@ -29,21 +35,6 @@ public struct DashboardView: View {
         BarChartPoint(label: "43.H", target: 62500, actual: 61200),
         BarChartPoint(label: "44.H", target: 62500, actual: 74800),
         BarChartPoint(label: "45.H", target: 62500, actual: 78400)
-    ]
-    
-    @State private var monthlyData: [BarChartPoint] = [
-        BarChartPoint(label: "Oca", target: 200000, actual: 185000),
-        BarChartPoint(label: "Şub", target: 200000, actual: 210000),
-        BarChartPoint(label: "Mar", target: 220000, actual: 245000),
-        BarChartPoint(label: "Nis", target: 220000, actual: 198000),
-        BarChartPoint(label: "May", target: 250000, actual: 260000),
-        BarChartPoint(label: "Haz", target: 250000, actual: 280000),
-        BarChartPoint(label: "Tem", target: 250000, actual: 240000),
-        BarChartPoint(label: "Ağu", target: 250000, actual: 275000),
-        BarChartPoint(label: "Eyl", target: 280000, actual: 295000),
-        BarChartPoint(label: "Eki", target: 280000, actual: 310000),
-        BarChartPoint(label: "Kas", target: 250000, actual: 312500),
-        BarChartPoint(label: "Ara", target: 300000, actual: 0)
     ]
     
     // Tab list data items
@@ -106,131 +97,34 @@ public struct DashboardView: View {
         isNetPozitif ? "Alacak Fazlası" : "Borç Fazlası"
     }
     
-    // Long Cari Name Compact Formatter (Exact to DashboardScreen.tsx formatDashboardCariName)
-    private func formatCariTitle(_ raw: String) -> String {
-        var name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        name = name.replacingOccurrences(of: "SANAYİ VE TİCARET LİMİTED ŞİRKETİ", with: "LTD.", options: .caseInsensitive)
-        name = name.replacingOccurrences(of: "SANAYI VE TICARET LIMITED SIRKETI", with: "LTD.", options: .caseInsensitive)
-        name = name.replacingOccurrences(of: "SANAYİ VE TİCARET ANONİM ŞİRKETİ", with: "A.Ş.", options: .caseInsensitive)
-        name = name.replacingOccurrences(of: "SANAYI VE TICARET ANONIM SIRKETI", with: "A.Ş.", options: .caseInsensitive)
-        name = name.replacingOccurrences(of: "SAN. VE TİC. LTD. ŞTİ.", with: "LTD.", options: .caseInsensitive)
-        name = name.replacingOccurrences(of: "SAN. VE TİC. A.Ş.", with: "A.Ş.", options: .caseInsensitive)
-        name = name.replacingOccurrences(of: "LİMİTED ŞİRKETİ", with: "LTD.", options: .caseInsensitive)
-        name = name.replacingOccurrences(of: "ANONİM ŞİRKETİ", with: "A.Ş.", options: .caseInsensitive)
-        name = name.replacingOccurrences(of: "LTD. ŞTİ.", with: "LTD.", options: .caseInsensitive)
-        name = name.replacingOccurrences(of: "ŞİRKETİ", with: "ŞTİ.", options: .caseInsensitive)
-        return name
-    }
-    
     public var body: some View {
         NavigationStack {
             ZStack {
-                Color.black.ignoresSafeArea()
+                Color(hex: "080A0C").ignoresSafeArea()
                 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 16) {
-                        // 1. Header (Exact text & style)
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Gösterge Paneli")
-                                    .font(.system(size: 24, weight: .heavy))
-                                    .foregroundColor(.white)
-                                    .tracking(-0.5)
-                                Text("Masaüstü sürümü ile anlık senkronize")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(Color(hex: "8E8E93"))
-                            }
-                            Spacer()
-                        }
-                        .padding(.horizontal, 4)
-                        .padding(.top, 6)
+                        // 1. Masaüstü Birebir Üst Bar (VK Logo + Mali Yıl + Senkron + Bildirim)
+                        renderDesktopHeaderBar()
                         
-                        // 2. 4'lü Dashboard Kartları (2x2 Grid)
-                        LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                            // GÜNLÜK CİRO
-                            mainCard(
-                                title: "GÜNLÜK CİRO",
-                                value: AppFormatters.money(gunlukCiro),
-                                subtitle: "Güncel Toplam",
-                                iconName: "banknote.fill",
-                                color: Color(hex: "FF9F0A"),
-                                valueColor: .white
-                            )
-                            
-                            // TOPLAM ALACAK
-                            mainCard(
-                                title: "TOPLAM ALACAK",
-                                value: AppFormatters.money(toplamAlacak),
-                                subtitle: "Güncel Toplam",
-                                iconName: "arrow.up.right",
-                                color: Color(hex: "30D158"),
-                                valueColor: .white
-                            )
-                            
-                            // TOPLAM BORÇ
-                            mainCard(
-                                title: "TOPLAM BORÇ",
-                                value: AppFormatters.money(toplamBorc),
-                                subtitle: "Güncel Toplam",
-                                iconName: "arrow.down.right",
-                                color: Color(hex: "FF453A"),
-                                valueColor: .white
-                            )
-                            
-                            // NET BAKİYE
-                            mainCard(
-                                title: "NET",
-                                value: netFormatted,
-                                subtitle: netSubtitle,
-                                iconName: "wallet.pass.fill",
-                                color: netColor,
-                                valueColor: netColor,
-                                isNet: true
-                            )
-                        }
+                        // 2. Masaüstü Birebir 4'lü Hızlı İşlem Butonları (ModernSaaS Gradientleri)
+                        renderQuickActionGrid()
                         
-                        // 3. HIZLI İŞLEMLER
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("HIZLI İŞLEMLER")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(Color(hex: "8E8E93"))
-                            
-                            HStack(spacing: 8) {
-                                // Alış Faturası
-                                quickActionButton(title: "Alış Faturası", iconName: "doc.badge.plus", color: Color(hex: "FF9F0A")) {
-                                    showAlisFatura = true
-                                }
-                                
-                                // Satış Faturası
-                                quickActionButton(title: "Satış Faturası", iconName: "tablecells.badge.ellipsis", color: Color(hex: "30D158")) {
-                                    showSatisFatura = true
-                                }
-                                
-                                // Yeni Sipariş
-                                quickActionButton(title: "Yeni Sipariş", iconName: "bag.fill", color: Color(hex: "0A84FF")) {
-                                    showSiparis = true
-                                }
-                                
-                                // Yeni Teklif
-                                quickActionButton(title: "Yeni Teklif", iconName: "plus.circle.fill", color: Color(hex: "BF5AF2")) {
-                                    showTeklif = true
-                                }
-                            }
-                        }
-                        .padding(16)
-                        .background(Color(hex: "121216"))
-                        .cornerRadius(20)
-                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                        // 3. Masaüstü Birebir 4'lü Finansal KPI Kartları
+                        renderKPICards()
                         
-                        // 4. HEDEF & GERÇEKLEŞME Kartı (Harman Model 2 Dual Chart)
+                        // 4. Hedef & Gerçekleşme Grafiği
                         renderGoalChartCard()
                         
-                        // 5. Dynamic Lists Tabs & Content
+                        // 5. Hareket ve Takip Sekmeleri
                         renderListSection()
                         
                         Spacer().frame(height: 110)
                     }
                     .padding(.horizontal, 16)
+                }
+                .refreshable {
+                    await syncWithCloud()
                 }
             }
             .navigationBarHidden(true)
@@ -246,336 +140,500 @@ public struct DashboardView: View {
             .sheet(isPresented: $showTeklif) {
                 TeklifFormView()
             }
+            .sheet(isPresented: $showNotifications) {
+                BildirimlerView()
+            }
+            .confirmationDialog("Mali Yıl Seçimi", isPresented: $showYearPicker, titleVisibility: .visible) {
+                Button("2026 (Aktif Yıl)") { activeFiscalYear = "2026"; Task { await syncWithCloud() } }
+                Button("2025") { activeFiscalYear = "2025"; Task { await syncWithCloud() } }
+                Button("2024") { activeFiscalYear = "2024"; Task { await syncWithCloud() } }
+                Button("Vazgeç", role: .cancel) {}
+            }
+            .task {
+                await syncWithCloud()
+            }
         }
     }
     
-    // MARK: - Main Stat Card Component
-    private func mainCard(
+    // MARK: - 1. Masaüstü Birebir Header Bar (MainView.axaml Exact Parity)
+    @ViewBuilder
+    private func renderDesktopHeaderBar() -> some View {
+        HStack(spacing: 10) {
+            // VK Logo & Title
+            HStack(spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(hex: "1E293B"))
+                        .frame(width: 34, height: 34)
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "2563EB").opacity(0.5), lineWidth: 1))
+                    
+                    #if canImport(UIKit)
+                    if let imgPath = Bundle.main.path(forResource: "vk_logo", ofType: "png"),
+                       let uiImg = UIImage(contentsOfFile: imgPath) {
+                        Image(uiImage: uiImg)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 24, height: 24)
+                    } else {
+                        Text("VK")
+                            .font(.system(size: 14, weight: .black))
+                            .foregroundColor(Color(hex: "60A5FA"))
+                    }
+                    #else
+                    Text("VK")
+                        .font(.system(size: 14, weight: .black))
+                        .foregroundColor(Color(hex: "60A5FA"))
+                    #endif
+                }
+                
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 4) {
+                        Text("VK")
+                            .font(.system(size: 17, weight: .black))
+                            .tracking(2)
+                            .foregroundColor(.white)
+                        
+                        // Canlı Senkronizasyon Rozeti
+                        HStack(spacing: 3) {
+                            Circle()
+                                .fill(isSyncing ? Color(hex: "F59E0B") : Color(hex: "10B981"))
+                                .frame(width: 6, height: 6)
+                            Text(isSyncing ? "Eşitleniyor" : "Bulut Senkron")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(isSyncing ? Color(hex: "F59E0B") : Color(hex: "10B981"))
+                        }
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.white.opacity(0.06))
+                        .cornerRadius(10)
+                    }
+                    
+                    Text("Ön Muhasebe & Finans")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(Color(hex: "8E8E93"))
+                }
+            }
+            
+            Spacer()
+            
+            // Mali Yıl Butonu (Masaüstü SwitchFiscalYearCommand Birebir)
+            Button {
+                showYearPicker = true
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color(hex: "38BDF8"))
+                    Text(activeFiscalYear)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9))
+                        .foregroundColor(Color(hex: "94A3B8"))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Color.white.opacity(0.06))
+                .cornerRadius(10)
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.12), lineWidth: 1))
+            }
+            
+            // Bildirim Butonu (Masaüstü Birebir Zil + Kırmızı Rozet)
+            Button {
+                showNotifications = true
+            } label: {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "bell.fill")
+                        .font(.system(size: 15))
+                        .foregroundColor(.white)
+                        .padding(8)
+                        .background(Color.white.opacity(0.06))
+                        .clipShape(Circle())
+                    
+                    Circle()
+                        .fill(Color(hex: "EF4444"))
+                        .frame(width: 8, height: 8)
+                        .offset(x: 2, y: -2)
+                }
+            }
+        }
+        .padding(.horizontal, 4)
+        .padding(.top, 8)
+    }
+    
+    // MARK: - 2. Masaüstü Birebir 4'lü Hızlı İşlem Grid (ModernSaaS Exact Gradients)
+    @ViewBuilder
+    private func renderQuickActionGrid() -> some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+            // 1. Alış (Fatura Girişi) - Kırmızı/Kızıl Gradient
+            desktopActionCard(
+                title: "Alış",
+                subtitle: "Fatura Girişi",
+                iconName: "cart.fill",
+                gradient: [Color(hex: "EF4444"), Color(hex: "DC2626")]
+            ) {
+                showAlisFatura = true
+            }
+            
+            // 2. Satış (Yeni Satış) - Neon Zümrüt Gradient
+            desktopActionCard(
+                title: "Satış",
+                subtitle: "Yeni Satış",
+                iconName: "tag.fill",
+                gradient: [Color(hex: "10B981"), Color(hex: "059669")]
+            ) {
+                showSatisFatura = true
+            }
+            
+            // 3. Sipariş (Sipariş Yaz) - Turuncu Gradient
+            desktopActionCard(
+                title: "Sipariş",
+                subtitle: "Sipariş Yaz",
+                iconName: "doc.text.fill",
+                gradient: [Color(hex: "F97316"), Color(hex: "EA580C")]
+            ) {
+                showSiparis = true
+            }
+            
+            // 4. Teklif (Teklif Hazırla) - Mavi Gradient
+            desktopActionCard(
+                title: "Teklif",
+                subtitle: "Teklif Hazırla",
+                iconName: "percent",
+                gradient: [Color(hex: "007ACC"), Color(hex: "005A9E")]
+            ) {
+                showTeklif = true
+            }
+        }
+    }
+    
+    private func desktopActionCard(
         title: String,
-        value: String,
         subtitle: String,
         iconName: String,
-        color: Color,
-        valueColor: Color,
-        isNet: Bool = false
+        gradient: [Color],
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.white.opacity(0.2))
+                        .frame(width: 40, height: 40)
+                    Image(systemName: iconName)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+                }
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .black))
+                        .foregroundColor(.white)
+                    Text(subtitle)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.85))
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                LinearGradient(colors: gradient, startPoint: .topLeading, endPoint: .bottomTrailing)
+            )
+            .cornerRadius(14)
+            .shadow(color: gradient.first?.opacity(0.3) ?? .clear, radius: 8, x: 0, y: 4)
+        }
+    }
+    
+    // MARK: - 3. Masaüstü Birebir 4'lü KPI Kartları
+    @ViewBuilder
+    private func renderKPICards() -> some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+            // GÜNLÜK SATIŞ (CİRO)
+            desktopKpiCard(
+                title: "GÜNLÜK SATIŞ",
+                amount: AppFormatters.money(gunlukCiro),
+                subtitle: "Günün Cirosu",
+                iconName: "wallet.pass.fill",
+                accentColor: Color(hex: "FACC15"),
+                isBorderGlow: true
+            )
+            
+            // TOPLAM ALACAK
+            desktopKpiCard(
+                title: "TOPLAM ALACAK",
+                amount: AppFormatters.money(toplamAlacak),
+                subtitle: "Tüm Müşteriler",
+                iconName: "arrow.up.right",
+                accentColor: Color(hex: "10B981")
+            )
+            
+            // TOPLAM BORÇ
+            desktopKpiCard(
+                title: "TOPLAM BORÇ",
+                amount: AppFormatters.money(toplamBorc),
+                subtitle: "Tüm Tedarikçiler",
+                iconName: "arrow.down.right",
+                accentColor: Color(hex: "EF4444")
+            )
+            
+            // NET KASA & BANKA
+            desktopKpiCard(
+                title: "NET BAKİYE",
+                amount: netFormatted,
+                subtitle: netSubtitle,
+                iconName: "building.columns.fill",
+                accentColor: netColor
+            )
+        }
+    }
+    
+    private func desktopKpiCard(
+        title: String,
+        amount: String,
+        subtitle: String,
+        iconName: String,
+        accentColor: Color,
+        isBorderGlow: Bool = false
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text(title)
                     .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(isNet ? color : Color(hex: "8E8E93"))
+                    .foregroundColor(Color(hex: "8E8E93"))
                 Spacer()
                 ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(color.opacity(0.15))
-                        .frame(width: 32, height: 32)
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(accentColor.opacity(0.15))
+                        .frame(width: 28, height: 28)
                     Image(systemName: iconName)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(color)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(accentColor)
                 }
             }
             
-            Spacer().frame(height: 14)
+            Spacer().frame(height: 10)
             
-            Text(value)
-                .font(.system(size: 18, weight: .heavy))
-                .foregroundColor(valueColor)
-                .tracking(-0.5)
+            Text(amount)
+                .font(.system(size: 17, weight: .heavy))
+                .foregroundColor(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             
             Text(subtitle)
                 .font(.system(size: 10, weight: .medium))
-                .foregroundColor(isNet ? color.opacity(0.85) : Color(hex: "636366"))
+                .foregroundColor(Color(hex: "94A3B8"))
                 .padding(.top, 4)
         }
-        .padding(14)
-        .frame(minHeight: 110, alignment: .topLeading)
-        .background(isNet ? Color(hex: "131419") : Color(hex: "121216"))
-        .cornerRadius(18)
+        .padding(12)
+        .frame(minHeight: 95, alignment: .topLeading)
+        .background(Color(hex: "121216"))
+        .cornerRadius(14)
         .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(isNet ? color.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(isBorderGlow ? accentColor.opacity(0.5) : Color.white.opacity(0.08), lineWidth: isBorderGlow ? 1.5 : 1)
         )
     }
     
-    // MARK: - Quick Action Button Component
-    private func quickActionButton(title: String, iconName: String, color: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(color.opacity(0.12))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: iconName)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(color)
-                }
-                Text(title)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(Color(hex: "E2E8F0"))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .frame(maxWidth: .infinity)
-        }
-    }
-    
-    // MARK: - Goal Chart Card (Radial Ring + Mini Stats + Dual Column Bars)
+    // MARK: - 4. Hedef & Gerçekleşme Kartı
+    @ViewBuilder
     private func renderGoalChartCard() -> some View {
-        let isWeekly = goalPeriod == "week"
-        let chartPoints = isWeekly ? weeklyData : monthlyData
-        let totalTarget = chartPoints.reduce(0) { $0 + $1.target }
-        let totalActual = chartPoints.reduce(0) { $0 + $1.actual }
-        let completionRate = totalTarget > 0 ? min(100.0, (totalActual / totalTarget) * 100.0) : 0
-        let diff = totalActual - totalTarget
-        let isGoalAchieved = totalActual >= totalTarget
-        let diffColor = isGoalAchieved ? Color(hex: "10B981") : Color(hex: "EF4444")
-        let diffText = isGoalAchieved
-            ? (diff == 0 ? "₺0" : "+\(AppFormatters.money(diff))")
-            : "-\(AppFormatters.money(abs(diff)))"
-        
-        return VStack(alignment: .leading, spacing: 14) {
-            // Header: Title & Hafta/Ay Toggle
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("HEDEF & GERÇEKLEŞME")
-                        .font(.system(size: 12, weight: .bold))
+                    Text("SATIŞ HEDEFİ & GERÇEKLEŞME")
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(Color(hex: "8E8E93"))
-                    Text(isWeekly ? "Son 5 Haftalık Performans" : "12 Aylık Performans")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(Color(hex: "64748B"))
+                    Text("\(goalPeriod == "week" ? "Haftalık" : "Aylık") Performans")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
                 }
+                
                 Spacer()
                 
-                // Toggle Buttons
-                HStack(spacing: 2) {
+                // Toggle Week / Month
+                HStack(spacing: 4) {
                     Button {
-                        withAnimation { goalPeriod = "week" }
+                        goalPeriod = "week"
                     } label: {
-                        Text("Hafta")
-                            .font(.system(size: 11, weight: isWeekly ? .bold : .medium))
-                            .foregroundColor(isWeekly ? .white : Color(hex: "94A3B8"))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(isWeekly ? Color(hex: "3B82F6") : Color.clear)
+                        Text("Haftalık")
+                            .font(.system(size: 11, weight: goalPeriod == "week" ? .bold : .medium))
+                            .foregroundColor(goalPeriod == "week" ? .white : Color(hex: "8E8E93"))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(goalPeriod == "week" ? Color(hex: "2563EB") : Color.clear)
                             .cornerRadius(6)
                     }
+                    
                     Button {
-                        withAnimation { goalPeriod = "month" }
+                        goalPeriod = "month"
                     } label: {
-                        Text("Ay")
-                            .font(.system(size: 11, weight: !isWeekly ? .bold : .medium))
-                            .foregroundColor(!isWeekly ? .white : Color(hex: "94A3B8"))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(!isWeekly ? Color(hex: "3B82F6") : Color.clear)
+                        Text("Aylık")
+                            .font(.system(size: 11, weight: goalPeriod == "month" ? .bold : .medium))
+                            .foregroundColor(goalPeriod == "month" ? .white : Color(hex: "8E8E93"))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(goalPeriod == "month" ? Color(hex: "2563EB") : Color.clear)
                             .cornerRadius(6)
                     }
                 }
-                .padding(2)
-                .background(Color.white.opacity(0.06))
+                .padding(3)
+                .background(Color.white.opacity(0.05))
                 .cornerRadius(8)
             }
             
-            // Top Row: Radial Ring + 3 Mini Badges
-            HStack(spacing: 16) {
-                // Radial Progress Ring
-                ZStack {
-                    Circle()
-                        .stroke(Color.white.opacity(0.08), lineWidth: 8)
-                        .frame(width: 82, height: 82)
-                    
-                    Circle()
-                        .trim(from: 0, to: CGFloat(min(1.0, completionRate / 100.0)))
-                        .stroke(
-                            LinearGradient(
-                                colors: isGoalAchieved ? [Color(hex: "10B981"), Color(hex: "00FF87")] : [Color(hex: "F87171"), Color(hex: "EF4444")],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                        )
-                        .frame(width: 82, height: 82)
-                        .rotationEffect(.degrees(-90))
-                    
-                    VStack(spacing: 1) {
-                        Text("%\(Int(completionRate))")
-                            .font(.system(size: 16, weight: .heavy))
-                            .foregroundColor(.white)
-                        Text(isGoalAchieved ? "BAŞARILI" : "TAMAMLANDI")
-                            .font(.system(size: 7, weight: .bold))
-                            .foregroundColor(isGoalAchieved ? Color(hex: "00FF87") : Color(hex: "EF4444"))
-                    }
+            // Progress Bar
+            let hedef = goalPeriod == "week" ? haftalikHedef : aylikHedef
+            let gercek = goalPeriod == "week" ? haftalikGerceklesen : aylikGerceklesen
+            let oran = hedef > 0 ? min(gercek / hedef, 1.5) : 0
+            
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Gerçekleşen: \(AppFormatters.money(gercek))")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(Color(hex: "10B981"))
+                    Spacer()
+                    Text("Hedef: \(AppFormatters.money(hedef))")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(Color(hex: "8E8E93"))
                 }
-                .frame(width: 88, height: 88)
                 
-                // 3 Mini Badges Column
-                VStack(spacing: 6) {
-                    miniStatBadge(title: isWeekly ? "🎯 Haftalık Hedef" : "🎯 Toplam Hedef", value: AppFormatters.money(totalTarget), borderLeft: Color(hex: "6366F1"), valueColor: .white)
-                    miniStatBadge(title: "🚀 Gerçekleşen", value: AppFormatters.money(totalActual), borderLeft: Color(hex: "00FF87"), valueColor: Color(hex: "00FF87"))
-                    miniStatBadge(title: "⚖️ Fark", value: diffText, borderLeft: diffColor, valueColor: diffColor, isBold: true)
-                }
-            }
-            
-            // Legend Row
-            HStack(spacing: 14) {
-                HStack(spacing: 6) {
-                    Circle().fill(Color(hex: "6366F1")).frame(width: 8, height: 8)
-                    Text("Hedef").font(.system(size: 11, weight: .medium)).foregroundColor(Color(hex: "94A3B8"))
-                }
-                HStack(spacing: 6) {
-                    Circle().fill(Color(hex: "00FF87")).frame(width: 8, height: 8)
-                    Text("Gerçekleşen").font(.system(size: 11, weight: .medium)).foregroundColor(Color(hex: "94A3B8"))
-                }
-            }
-            .padding(.top, 2)
-            
-            // Dual Column Bar Chart
-            let maxVal = max(chartPoints.map { max($0.target, $0.actual) }.max() ?? 100000, 100000)
-            HStack(alignment: .bottom, spacing: isWeekly ? 16 : 6) {
-                ForEach(chartPoints) { pt in
-                    VStack(spacing: 6) {
-                        HStack(alignment: .bottom, spacing: 3) {
-                            // Hedef Bar (Mor)
-                            RoundedRectangle(cornerRadius: 2.5)
-                                .fill(LinearGradient(colors: [Color(hex: "818CF8"), Color(hex: "4F46E5")], startPoint: .top, endPoint: .bottom))
-                                .frame(width: isWeekly ? 12 : 7, height: max(4, CGFloat(pt.target / maxVal) * 85))
-                            
-                            // Gerçekleşen Bar (Yeşil)
-                            RoundedRectangle(cornerRadius: 2.5)
-                                .fill(LinearGradient(colors: [Color(hex: "00FF87"), Color(hex: "06B6D4")], startPoint: .top, endPoint: .bottom))
-                                .frame(width: isWeekly ? 12 : 7, height: max(4, CGFloat(pt.actual / maxVal) * 85))
-                        }
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.white.opacity(0.06))
+                            .frame(height: 10)
                         
-                        Text(pt.label)
-                            .font(.system(size: 8.5, weight: .semibold))
-                            .foregroundColor(Color(hex: "94A3B8"))
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(
+                                LinearGradient(colors: [Color(hex: "10B981"), Color(hex: "3B82F6")], startPoint: .leading, endPoint: .trailing)
+                            )
+                            .frame(width: geo.size.width * CGFloat(min(oran, 1.0)), height: 10)
                     }
-                    .frame(maxWidth: .infinity)
                 }
+                .frame(height: 10)
             }
-            .frame(height: 115)
-            .padding(.top, 6)
         }
-        .padding(16)
+        .padding(14)
         .background(Color(hex: "121216"))
-        .cornerRadius(20)
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.08), lineWidth: 1))
+        .cornerRadius(16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.08), lineWidth: 1))
     }
     
-    private func miniStatBadge(title: String, value: String, borderLeft: Color, valueColor: Color, isBold: Bool = false) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundColor(Color(hex: "94A3B8"))
-                Text(value)
-                    .font(.system(size: 11, weight: isBold ? .heavy : .bold))
-                    .foregroundColor(valueColor)
-                    .lineLimit(1)
-            }
-            Spacer()
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Color.white.opacity(0.03))
-        .cornerRadius(6)
-        .overlay(
-            Rectangle()
-                .fill(borderLeft)
-                .frame(width: 3),
-            alignment: .leading
-        )
-    }
-    
-    // MARK: - 3 Sekmeli Liste (Son İşlemler | Alacak Takibi | Borç Takibi)
+    // MARK: - 5. Dynamic Lists Tabs & Content
+    @ViewBuilder
     private func renderListSection() -> some View {
-        let currentList: [DashboardListItem] = {
-            switch activeTab {
-            case "receivables": return alacakTakibi
-            case "payables": return borcTakibi
-            default: return sonIslemler
-            }
-        }()
-        
-        return VStack(alignment: .leading, spacing: 12) {
-            // Tab Buttons
-            HStack(spacing: 8) {
-                tabButton(title: "Son İşlemler", key: "recents")
-                tabButton(title: "Alacak Takibi", key: "receivables")
-                tabButton(title: "Borç Takibi", key: "payables")
+        VStack(spacing: 12) {
+            // Segmented Tabs
+            HStack(spacing: 6) {
+                tabButton(title: "Son İşlemler", tab: "recents")
+                tabButton(title: "Alacak Takibi", tab: "receivables")
+                tabButton(title: "Borç Takibi", tab: "payables")
             }
             
             // List Items
-            VStack(spacing: 0) {
-                if currentList.isEmpty {
-                    Text("Kayıt bulunamadı.")
-                        .font(.system(size: 13))
-                        .foregroundColor(Color(hex: "64748B"))
-                        .padding(24)
-                        .frame(maxWidth: .infinity)
-                } else {
-                    ForEach(Array(currentList.enumerated()), id: \.element.id) { index, item in
-                        HStack(spacing: 12) {
-                            // Circle Icon Badge with G / Ç
-                            ZStack {
-                                Circle()
-                                    .fill((item.type == "In" ? Color(hex: "00FF87") : Color(hex: "FF416C")).opacity(0.12))
-                                    .frame(width: 36, height: 36)
-                                Text(item.type == "In" ? "G" : "Ç")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(item.type == "In" ? Color(hex: "00FF87") : Color(hex: "FF416C"))
-                            }
-                            
-                            // Title & Subtitle
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(formatCariTitle(item.title))
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                
-                                Text("\(item.description) • \(item.date)\(item.vade != nil ? " • \(item.vade!) G" : "")")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(Color(hex: "8E8E93"))
-                                    .lineLimit(1)
-                            }
-                            
-                            Spacer()
-                            
-                            // Amount (+ / -)
-                            Text("\(item.type == "In" ? "+" : "-")\(AppFormatters.money(item.amount))")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(item.type == "In" ? Color(hex: "00FF87") : Color(hex: "FF416C"))
-                                .lineLimit(1)
+            let currentList = activeTab == "recents" ? sonIslemler : (activeTab == "receivables" ? alacakTakibi : borcTakibi)
+            VStack(spacing: 6) {
+                ForEach(currentList) { item in
+                    HStack(spacing: 10) {
+                        ZStack {
+                            Circle()
+                                .fill((item.type == "In" ? Color(hex: "10B981") : Color(hex: "EF4444")).opacity(0.15))
+                                .frame(width: 32, height: 32)
+                            Image(systemName: item.type == "In" ? "arrow.down.left" : "arrow.up.right")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(item.type == "In" ? Color(hex: "10B981") : Color(hex: "EF4444"))
                         }
-                        .padding(.vertical, 12)
                         
-                        if index < currentList.count - 1 {
-                            Divider().background(Color.white.opacity(0.06))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(item.title)
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                            Text("\(item.description) • \(item.date)")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(hex: "8E8E93"))
                         }
+                        
+                        Spacer()
+                        
+                        Text(AppFormatters.money(item.amount))
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(item.type == "In" ? Color(hex: "10B981") : Color(hex: "EF4444"))
                     }
+                    .padding(10)
+                    .background(Color.white.opacity(0.02))
+                    .cornerRadius(10)
                 }
             }
         }
-        .padding(16)
+        .padding(14)
         .background(Color(hex: "121216"))
-        .cornerRadius(20)
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.08), lineWidth: 1))
+        .cornerRadius(16)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.08), lineWidth: 1))
     }
     
-    private func tabButton(title: String, key: String) -> some View {
-        let isSelected = activeTab == key
-        return Button {
-            withAnimation(.easeInOut(duration: 0.2)) { activeTab = key }
+    private func tabButton(title: String, tab: String) -> some View {
+        Button {
+            activeTab = tab
         } label: {
             Text(title)
-                .font(.system(size: 12, weight: isSelected ? .bold : .medium))
-                .foregroundColor(isSelected ? .white : Color(hex: "8E8E93"))
+                .font(.system(size: 12, weight: activeTab == tab ? .bold : .medium))
+                .foregroundColor(activeTab == tab ? .white : Color(hex: "8E8E93"))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 9)
-                .background(isSelected ? Color(hex: "2563EB") : Color.white.opacity(0.04))
-                .cornerRadius(10)
+                .padding(.vertical, 8)
+                .background(activeTab == tab ? Color(hex: "2563EB") : Color.white.opacity(0.04))
+                .cornerRadius(8)
+        }
+    }
+    
+    // MARK: - Supabase Bulut Senkronizasyonu (Masaüstü ile Anlık Eşitleme)
+    private func syncWithCloud() async {
+        isSyncing = true
+        
+        do {
+            // 1. Cariler tablosundan canlı bakiye ve toplamları çek
+            let cariler: [CariKart] = try await SupabaseService.shared.fetch(from: "cariler")
+            if !cariler.isEmpty {
+                var topAlacak: Double = 0
+                var topBorc: Double = 0
+                for c in cariler {
+                    if c.bakiyeTuru == "A" {
+                        topAlacak += c.bakiye
+                    } else if c.bakiyeTuru == "B" {
+                        topBorc += c.bakiye
+                    }
+                }
+                await MainActor.run {
+                    self.toplamAlacak = topAlacak > 0 ? topAlacak : self.toplamAlacak
+                    self.toplamBorc = topBorc > 0 ? topBorc : self.toplamBorc
+                }
+            }
+            
+            // 2. Faturalar tablosundan bugünkü ciroyu çek
+            let faturalar: [Fatura] = try await SupabaseService.shared.fetch(from: "faturalar")
+            if !faturalar.isEmpty {
+                let today = AppFormatters.isoDate.string(from: Date())
+                let bugunSatis = faturalar
+                    .filter { $0.tarih.hasPrefix(today) && $0.faturaTuru.localizedCaseInsensitiveContains("satış") }
+                    .reduce(0.0) { $0 + $1.genelToplam }
+                if bugunSatis > 0 {
+                    await MainActor.run {
+                        self.gunlukCiro = bugunSatis
+                    }
+                }
+            }
+            
+            await MainActor.run {
+                self.lastSyncTime = "\(ISO8601DateFormatter().string(from: Date()).prefix(16))"
+                self.isSyncing = false
+            }
+        } catch {
+            print("Bulut senkronizasyon fallback: \(error)")
+            await MainActor.run {
+                self.isSyncing = false
+            }
         }
     }
 }
