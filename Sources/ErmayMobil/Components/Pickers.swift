@@ -119,7 +119,13 @@ public struct CariPickerSheet: View {
 
 public struct StokPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var stoklar: [StokKart] = []
+    @State private var stoklar: [StokKart] = [
+        StokKart(id: "1", stokKodu: "STK-001", stokAdi: "Bilyalı Rulman 6204-2RS", barkod: "8690001001", grupAdi: "Rulman", birim: "Adet", alisFiyati: 145.0, satisFiyati: 210.0, kdvOrani: 20.0, mevcutMiktar: 84.0),
+        StokKart(id: "2", stokKodu: "STK-002", stokAdi: "Hidrolik Keçe 35x50x10", barkod: "8690001002", grupAdi: "Sızdırmazlık", birim: "Adet", alisFiyati: 48.0, satisFiyati: 75.0, kdvOrani: 20.0, mevcutMiktar: 160.0),
+        StokKart(id: "3", stokKodu: "STK-003", stokAdi: "Endüstriyel Dişli Yağı ISO VG 220", barkod: "8690001003", grupAdi: "Madeni Yağ", birim: "Kg", alisFiyati: 820.0, satisFiyati: 1150.0, kdvOrani: 20.0, mevcutMiktar: 22.0),
+        StokKart(id: "4", stokKodu: "STK-004", stokAdi: "Çelik İmbus Cıvata M8x30", barkod: "8690001004", grupAdi: "Bağlantı", birim: "Adet", alisFiyati: 4.5, satisFiyati: 8.0, kdvOrani: 20.0, mevcutMiktar: 500.0),
+        StokKart(id: "5", stokKodu: "STK-005", stokAdi: "Konik Makaralı Rulman 30205", barkod: "8690001005", grupAdi: "Rulman", birim: "Adet", alisFiyati: 280.0, satisFiyati: 395.0, kdvOrani: 20.0, mevcutMiktar: 45.0)
+    ]
     @State private var searchText: String = ""
     @State private var isLoading: Bool = false
     public let onSelect: (StokKart) -> Void
@@ -219,21 +225,16 @@ public struct StokPickerSheet: View {
         }
     }
     
+    @MainActor
     private func loadStoklar() async {
         isLoading = true
         do {
             let items: [StokKart] = try await SupabaseService.shared.fetch(from: "stoklar", orderBy: "stok_adi.asc")
-            await MainActor.run {
+            if !items.isEmpty {
                 self.stoklar = items
             }
         } catch {
-            if stoklar.isEmpty {
-                stoklar = [
-                    StokKart(stokKodu: "STK-001", stokAdi: "Endüstriyel Rulman 6204-2RS", grupAdi: "Genel", birim: "Adet", alisFiyati: 280.0, satisFiyati: 450.0, kdvOrani: 20, mevcutMiktar: 120.0),
-                    StokKart(stokKodu: "STK-002", stokAdi: "Paslanmaz Çelik Civata M8x30", grupAdi: "Genel", birim: "Adet", alisFiyati: 12.0, satisFiyati: 24.0, kdvOrani: 20, mevcutMiktar: 450.0),
-                    StokKart(stokKodu: "STK-003", stokAdi: "Yüksek Basınç Hidrolik Yağı 20L", grupAdi: "Genel", birim: "Teneke", alisFiyati: 1400.0, satisFiyati: 2100.0, kdvOrani: 20, mevcutMiktar: 15.0)
-                ]
-            }
+            print("[StokPickerSheet] Supabase stok çekme hatası (yerel liste devrede): \(error.localizedDescription)")
         }
         isLoading = false
     }

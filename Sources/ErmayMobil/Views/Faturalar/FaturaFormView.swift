@@ -370,7 +370,19 @@ public struct FaturaFormView: View {
                 }
             }
             .sheet(isPresented: $showAddKalemSheet) {
-                AddKalemView { k in
+                StokPickerSheet { selectedStok in
+                    let isAlis = tur.contains("Alış")
+                    let fiyat = isAlis ? (selectedStok.alisFiyati > 0 ? selectedStok.alisFiyati : selectedStok.satisFiyati) : selectedStok.satisFiyati
+                    let k = FaturaKalem(
+                        stokId: selectedStok.id,
+                        stokKodu: selectedStok.stokKodu,
+                        stokAdi: selectedStok.stokAdi,
+                        birim: selectedStok.birim,
+                        miktar: 1.0,
+                        birimFiyat: fiyat,
+                        kdvOrani: selectedStok.kdvOrani,
+                        iskontoOrani: 0.0
+                    )
                     items.append(k)
                 }
             }

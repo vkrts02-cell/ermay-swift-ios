@@ -49,46 +49,6 @@ public struct CariFormView: View {
                 
                 ScrollView {
                     VStack(spacing: 14) {
-                        // Header Actions (Rehberden Aktar & GPS Konumu Al)
-                        HStack(spacing: 10) {
-                            Button {
-                                unvan = "Rehber Örnek Müşteri Ltd."
-                                telefon = "0212 555 9988"
-                                cepTelefon = "0532 999 8877"
-                                eposta = "info@rehbermusteri.com"
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "person.crop.circle.badge.plus")
-                                    Text("Rehberden Aktar")
-                                }
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(Color(hex: "00FF87"))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .background(Color(hex: "00FF87").opacity(0.12))
-                                .cornerRadius(10)
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(hex: "00FF87").opacity(0.3), lineWidth: 1))
-                            }
-                            
-                            Button {
-                                il = "İstanbul"
-                                ilce = "Başakşehir"
-                                adres = "İkitelli OSB Metal-İş Sanayi Sitesi 12. Blok No: 34"
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "location.fill")
-                                    Text("GPS Konumu Al")
-                                }
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(Color(hex: "0061FF"))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .background(Color(hex: "0061FF").opacity(0.12))
-                                .cornerRadius(10)
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(hex: "0061FF").opacity(0.3), lineWidth: 1))
-                            }
-                        }
-                        
                         if let err = errorMessage {
                             Text(err)
                                 .font(.system(size: 13, weight: .bold))

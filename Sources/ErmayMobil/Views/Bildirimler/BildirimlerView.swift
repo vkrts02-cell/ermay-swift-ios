@@ -10,13 +10,9 @@ public struct BildirimItem: Identifiable, Sendable {
 }
 
 public struct BildirimlerView: View {
-    @State private var bildirimler: [BildirimItem] = [
-        BildirimItem(id: "1", baslik: "Kritik Stok Uyarısı", mesaj: "Endüstriyel Rulman 6204 stok seviyesi kritik eşiğin altına indi (Mevcut: 3 Adet).", zaman: "10 dk önce", tur: "TEHLIKE", okunduMu: false),
-        BildirimItem(id: "2", baslik: "Vadesi Geçen Alacak", mesaj: "Ermay Bilişim Ltd. Şti. cari hesabının ₺45.200,00 tutarındaki faturasının vadesi 13 gün geçti.", zaman: "1 saat önce", tur: "UYARI", okunduMu: false),
-        BildirimItem(id: "3", baslik: "Bulut Senkronizasyonu", mesaj: "Çevrimdışı yapılan 4 adet işlem başarıyla Supabase bulut veritabanına eşitlendi.", zaman: "Dün", tur: "BASARI", okunduMu: true),
-        BildirimItem(id: "4", baslik: "Yeni Sipariş Alındı", mesaj: "Kaya Metal A.Ş. tarafından SIP-2026-089 nolu ₺28.500,00 tutarlı sipariş onaylandı.", zaman: "2 gün önce", tur: "BILGI", okunduMu: true)
-    ]
+    @ObservedObject private var manager = NotificationManager.shared
     @Environment(\.dismiss) private var dismiss
+    @State private var showDeleteConfirm: Bool = false
     
     public init() {}
     
@@ -26,66 +22,118 @@ public struct BildirimlerView: View {
                 AppTheme.background.ignoresSafeArea()
                 
                 VStack(spacing: 14) {
-                    HStack {
-                        Text("Bildirim Merkezi")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(AppTheme.textPrimary)
-                        Spacer()
+                    // Header Bar
+                    HStack(spacing: 12) {
                         Button {
-                            for idx in bildirimler.indices {
-                                bildirimler[idx].okunduMu = true
-                            }
+                            dismiss()
                         } label: {
-                            Text("Tümünü Oku")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(AppTheme.primary)
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(Color(hex: "8E8E93"))
+                        }
+                        
+                        Text("Bildirim Merkezi")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(AppTheme.textPrimary)
+                        
+                        Spacer()
+                        
+                        if !manager.bildirimler.isEmpty {
+                            Button {
+                                manager.markAllAsRead()
+                            } label: {
+                                Text("Tümünü Oku")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(AppTheme.primary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 5)
+                                    .background(AppTheme.primary.opacity(0.12))
+                                    .cornerRadius(6)
+                            }
+                            
+                            Button {
+                                showDeleteConfirm = true
+                            } label: {
+                                Image(systemName: "trash.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(AppTheme.danger)
+                                    .padding(6)
+                                    .background(AppTheme.danger.opacity(0.12))
+                                    .clipShape(Circle())
+                            }
                         }
                     }
                     .padding(.horizontal)
-                    .padding(.top, 8)
+                    .padding(.top, 14)
                     
-                    List {
-                        ForEach(bildirimler) { b in
-                            GlassCard(cornerRadius: 14, padding: 14) {
-                                HStack(alignment: .top, spacing: 12) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(iconColor(b.tur).opacity(0.15))
-                                            .frame(width: 38, height: 38)
-                                        Image(systemName: iconName(b.tur))
-                                            .font(.system(size: 16, weight: .bold))
-                                            .foregroundColor(iconColor(b.tur))
-                                    }
-                                    
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        HStack {
-                                            Text(b.baslik)
-                                                .font(.system(size: 13, weight: b.okunduMu ? .medium : .bold))
-                                                .foregroundColor(AppTheme.textPrimary)
-                                            Spacer()
-                                            Text(b.zaman)
-                                                .font(.system(size: 10))
-                                                .foregroundColor(AppTheme.textMuted)
+                    if manager.bildirimler.isEmpty {
+                        Spacer()
+                        VStack(spacing: 12) {
+                            Image(systemName: "bell.slash.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(Color(hex: "64748B"))
+                            Text("Henüz bildiriminiz bulunmuyor.")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(Color(hex: "8E8E93"))
+                        }
+                        Spacer()
+                    } else {
+                        List {
+                            ForEach(manager.bildirimler) { b in
+                                GlassCard(cornerRadius: 14, padding: 14) {
+                                    HStack(alignment: .top, spacing: 12) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(iconColor(b.tur).opacity(0.15))
+                                                .frame(width: 38, height: 38)
+                                            Image(systemName: iconName(b.tur))
+                                                .font(.system(size: 16, weight: .bold))
+                                                .foregroundColor(iconColor(b.tur))
                                         }
                                         
-                                        Text(b.mesaj)
-                                            .font(.system(size: 12))
-                                            .foregroundColor(AppTheme.textSecondary)
-                                            .lineSpacing(2)
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            HStack {
+                                                Text(b.baslik)
+                                                    .font(.system(size: 13, weight: b.okunduMu ? .medium : .bold))
+                                                    .foregroundColor(AppTheme.textPrimary)
+                                                Spacer()
+                                                Text(b.zaman)
+                                                    .font(.system(size: 10))
+                                                    .foregroundColor(AppTheme.textMuted)
+                                            }
+                                            
+                                            Text(b.mesaj)
+                                                .font(.system(size: 12))
+                                                .foregroundColor(AppTheme.textSecondary)
+                                                .lineSpacing(2)
+                                        }
                                     }
                                 }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        manager.delete(id: b.id)
+                                    } label: {
+                                        Label("Sil", systemImage: "trash")
+                                    }
+                                }
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                             }
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         }
+                        .listStyle(.plain)
                     }
-                    .listStyle(.plain)
-                    
-                    Spacer().frame(height: 70)
                 }
             }
             .navigationBarHidden(true)
+            .alert("Tüm Bildirimleri Sil", isPresented: $showDeleteConfirm) {
+                Button("Tümünü Sil", role: .destructive) {
+                    manager.deleteAll()
+                }
+                Button("Vazgeç", role: .cancel) {}
+            } message: {
+                Text("Tüm bildirim geçmişini silmek istediğinize emin misiniz?")
+            }
         }
     }
     

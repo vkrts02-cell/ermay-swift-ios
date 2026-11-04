@@ -9,6 +9,7 @@ public struct AracToolItem: Identifiable {
 }
 
 public struct AraclarView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var activeTab: String? = nil
     
     // 1. Döviz Kurları & Otomasyon & Çevirici
@@ -137,60 +138,71 @@ public struct AraclarView: View {
     ]
     
     public var body: some View {
-        NavigationStack {
-            ZStack {
-                Color(hex: "0A0A0A").ignoresSafeArea()
+        ZStack {
+            Color(hex: "0A0A0A").ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                renderHeader()
                 
-                VStack(spacing: 0) {
-                    renderHeader()
-                    
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 16) {
-                            if activeTab == nil {
-                                renderToolsGrid()
-                            } else {
-                                Button {
-                                    activeTab = nil
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "arrow.left")
-                                        Text("Araçlar Listesine Dön")
-                                    }
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundColor(Color(hex: "E2E8F0"))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.vertical, 4)
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 16) {
+                        if activeTab == nil {
+                            renderToolsGrid()
+                        } else {
+                            Button {
+                                activeTab = nil
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.left")
+                                    Text("Araçlar Listesine Dön")
                                 }
-                                
-                                renderActiveToolContent()
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(Color(hex: "E2E8F0"))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 4)
                             }
                             
-                            Spacer().frame(height: 110)
+                            renderActiveToolContent()
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 14)
+                        
+                        Spacer().frame(height: 110)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 14)
                 }
             }
-            .navigationBarHidden(true)
         }
+        .navigationBarHidden(true)
     }
     
     // MARK: - Header
     @ViewBuilder
     private func renderHeader() -> some View {
         HStack(spacing: 12) {
+            Button {
+                if activeTab != nil {
+                    activeTab = nil
+                } else {
+                    dismiss()
+                }
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(Color(hex: "0061FF"))
+                    .padding(4)
+            }
+            
             Image(systemName: "wrench.and.screwdriver.fill")
-                .font(.system(size: 26))
+                .font(.system(size: 24))
                 .foregroundColor(Color(hex: "0061FF"))
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(activeTab != nil ? (toolsList.first(where: { $0.id == activeTab })?.title ?? "Araçlar") : "Araçlar ve Modüller")
-                    .font(.system(size: 22, weight: .heavy))
+                    .font(.system(size: 20, weight: .heavy))
                     .foregroundColor(.white)
                     .tracking(-0.5)
                 Text(activeTab != nil ? (toolsList.first(where: { $0.id == activeTab })?.description ?? "") : "İşletmenizin dijital dönüşümünde size yardımcı olacak interaktif araçlar.")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundColor(Color(hex: "8E8E93"))
                     .lineLimit(1)
             }

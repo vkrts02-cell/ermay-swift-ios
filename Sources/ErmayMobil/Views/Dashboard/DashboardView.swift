@@ -6,6 +6,7 @@ public struct DashboardView: View {
     @State private var activeFiscalYear: String = "2026"
     @State private var showYearPicker: Bool = false
     @State private var showNotifications: Bool = false
+    @ObservedObject private var notificationManager = NotificationManager.shared
     @State private var isSyncing: Bool = false
     @State private var lastSyncTime: String = "Şimdi"
     
@@ -216,9 +217,21 @@ public struct DashboardView: View {
             
             Spacer()
             
-            // Mali Yıl Butonu (Masaüstü SwitchFiscalYearCommand Birebir)
-            Button {
-                showYearPicker = true
+            // Mali Yıl Butonu (Masaüstü SwitchFiscalYearCommand Birebir Menü)
+            Menu {
+                ForEach(["2027", "2026", "2025", "2024", "2023"], id: \.self) { year in
+                    Button {
+                        activeFiscalYear = year
+                        Task { await syncWithCloud() }
+                    } label: {
+                        HStack {
+                            Text("Mali Yıl \(year)")
+                            if activeFiscalYear == year {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
             } label: {
                 HStack(spacing: 4) {
                     Image(systemName: "calendar")
@@ -238,7 +251,7 @@ public struct DashboardView: View {
                 .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.12), lineWidth: 1))
             }
             
-            // Bildirim Butonu (Masaüstü Birebir Zil + Kırmızı Rozet)
+            // Bildirim Butonu (Masaüstü Birebir Zil + Canlı Dinamik Rozet)
             Button {
                 showNotifications = true
             } label: {
@@ -250,10 +263,12 @@ public struct DashboardView: View {
                         .background(Color.white.opacity(0.06))
                         .clipShape(Circle())
                     
-                    Circle()
-                        .fill(Color(hex: "EF4444"))
-                        .frame(width: 8, height: 8)
-                        .offset(x: 2, y: -2)
+                    if notificationManager.unreadCount > 0 {
+                        Circle()
+                            .fill(Color(hex: "EF4444"))
+                            .frame(width: 9, height: 9)
+                            .offset(x: 2, y: -2)
+                    }
                 }
             }
         }
@@ -513,6 +528,84 @@ public struct DashboardView: View {
                     }
                 }
                 .frame(height: 10)
+            }
+            
+            // Haftalık Karşılaştırmalı Çubuk Grafiği (Target vs Actual Bars)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Haftalık İlerleme Grafiği")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(Color(hex: "94A3B8"))
+                    Spacer()
+                    // Oran rozeti
+                    HStack(spacing: 3) {
+                        Image(systemName: oran >= 1.0 ? "checkmark.circle.fill" : "arrow.up.right")
+                        Text("%\(Int(oran * 100))")
+                    }
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(oran >= 1.0 ? Color(hex: "10B981") : Color(hex: "38BDF8"))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background((oran >= 1.0 ? Color(hex: "10B981") : Color(hex: "38BDF8")).opacity(0.12))
+                    .cornerRadius(6)
+                }
+                .padding(.top, 6)
+                
+                // 5 Haftalık Bar Grafiği
+                let maxVal = max(weeklyData.map { max($0.target, $0.actual) }.max() ?? 100000, 1000)
+                HStack(alignment: .bottom, spacing: 12) {
+                    ForEach(weeklyData) { point in
+                        VStack(spacing: 6) {
+                            HStack(alignment: .bottom, spacing: 4) {
+                                // Hedef Çubuğu (Koyu Gri)
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(Color.white.opacity(0.15))
+                                    .frame(width: 12, height: CGFloat(point.target / maxVal) * 55)
+                                
+                                // Gerçekleşen Çubuğu (Neon Gradient)
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color(hex: "10B981"), Color(hex: "3B82F6")],
+                                            startPoint: .bottom,
+                                            endPoint: .top
+                                        )
+                                    )
+                                    .frame(width: 12, height: CGFloat(point.actual / maxVal) * 55)
+                            }
+                            .frame(height: 60, alignment: .bottom)
+                            
+                            Text(point.label)
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(Color(hex: "94A3B8"))
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                .padding(.vertical, 4)
+                
+                // Lejant
+                HStack(spacing: 16) {
+                    HStack(spacing: 5) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.white.opacity(0.2))
+                            .frame(width: 8, height: 8)
+                        Text("Hedef")
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(hex: "94A3B8"))
+                    }
+                    
+                    HStack(spacing: 5) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color(hex: "10B981"))
+                            .frame(width: 8, height: 8)
+                        Text("Gerçekleşen")
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(hex: "94A3B8"))
+                    }
+                    Spacer()
+                }
+                .padding(.top, 2)
             }
         }
         .padding(14)

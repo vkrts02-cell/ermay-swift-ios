@@ -9,6 +9,7 @@ public struct SettingCategory: Identifiable {
 }
 
 public struct AyarlarView: View {
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject var authService = AuthService.shared
     @ObservedObject var lockService = BiometricLockService.shared
     
@@ -95,43 +96,41 @@ public struct AyarlarView: View {
     ]
     
     public var body: some View {
-        NavigationStack {
-            ZStack {
-                Color(hex: "0A0A0A").ignoresSafeArea()
+        ZStack {
+            Color(hex: "0A0A0A").ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                renderHeader()
                 
-                VStack(spacing: 0) {
-                    renderHeader()
-                    
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 16) {
-                            if currentCategory == nil {
-                                renderCategoriesGrid()
-                            } else {
-                                renderCategoryDetail(categoryId: currentCategory!)
-                            }
-                            
-                            Spacer().frame(height: 100)
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 16) {
+                        if currentCategory == nil {
+                            renderCategoriesGrid()
+                        } else {
+                            renderCategoryDetail(categoryId: currentCategory!)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 16)
+                        
+                        Spacer().frame(height: 100)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
                 }
             }
-            .navigationBarHidden(true)
-            .alert(alertMessage, isPresented: $showAlert) {
-                Button("Tamam", role: .cancel) {}
+        }
+        .navigationBarHidden(true)
+        .alert(alertMessage, isPresented: $showAlert) {
+            Button("Tamam", role: .cancel) {}
+        }
+        .alert("Onay", isPresented: $showConfirmAlert) {
+            Button("Evet", role: .destructive) {
+                confirmAction?()
             }
-            .alert("Onay", isPresented: $showConfirmAlert) {
-                Button("Evet", role: .destructive) {
-                    confirmAction?()
-                }
-                Button("Vazgeç", role: .cancel) {}
-            } message: {
-                Text(alertMessage)
-            }
-            .sheet(isPresented: $showShareSheet) {
-                ShareSheet(activityItems: [backupShareContent])
-            }
+            Button("Vazgeç", role: .cancel) {}
+        } message: {
+            Text(alertMessage)
+        }
+        .sheet(isPresented: $showShareSheet) {
+            ShareSheet(activityItems: [backupShareContent])
         }
     }
     
@@ -140,35 +139,38 @@ public struct AyarlarView: View {
     private func renderHeader() -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 12) {
-                if currentCategory != nil {
-                    Button {
+                Button {
+                    if currentCategory != nil {
                         currentCategory = nil
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(Color(hex: "0061FF"))
+                    } else {
+                        dismiss()
                     }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(Color(hex: "0061FF"))
+                        .padding(4)
                 }
                 
                 Image(systemName: "gearshape.fill")
-                    .font(.system(size: 26, weight: .bold))
+                    .font(.system(size: 24, weight: .bold))
                     .foregroundColor(Color(hex: "0061FF"))
                 
                 Text(currentCategory != nil ? (categories.first(where: { $0.id == currentCategory })?.title ?? "Ayarlar") : "Sistem Ayarları")
-                    .font(.system(size: 22, weight: .black))
+                    .font(.system(size: 20, weight: .black))
                     .foregroundColor(.white)
                 
                 Spacer()
             }
             
             Text(currentCategory != nil ? (categories.first(where: { $0.id == currentCategory })?.description ?? "") : "Bulut veritabanı, masaüstü senkronizasyonu ve firma yapılandırması")
-                .font(.system(size: 13))
+                .font(.system(size: 12))
                 .foregroundColor(Color(hex: "64748B"))
-                .padding(.leading, currentCategory != nil ? 34 : 38)
+                .padding(.leading, 34)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 14)
-        .padding(.bottom, 14)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 12)
         .background(Color(hex: "0A0A0A"))
         .overlay(Divider().background(Color.white.opacity(0.08)), alignment: .bottom)
     }

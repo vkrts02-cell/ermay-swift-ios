@@ -1003,48 +1003,52 @@ public struct RaporDetayInteractiveView: View {
     
     private func openPDF() {
         #if canImport(UIKit)
-        if let pdfData = PDFService.shared.generateReportPDF(
-            title: report.title,
-            category: report.category,
-            headers: report.headers,
-            rows: report.defaultRows,
-            dateFilter: dateFilter,
-            cariName: cariName,
-            isHeatmap: report.isHeatmap
-        ) {
-            self.generatedPDFData = pdfData
-            self.showPDFModal = true
+        Task { @MainActor in
+            if let pdfData = await PDFService.shared.fetchOrGenerateReportPDF(
+                title: report.title,
+                category: report.category,
+                headers: report.headers,
+                rows: report.defaultRows,
+                dateFilter: dateFilter,
+                cariName: cariName,
+                isHeatmap: report.isHeatmap
+            ) {
+                self.generatedPDFData = pdfData
+                self.showPDFModal = true
+            }
         }
         #endif
     }
     
     private func shareReport() {
         #if canImport(UIKit)
-        if let pdfData = PDFService.shared.generateReportPDF(
-            title: report.title,
-            category: report.category,
-            headers: report.headers,
-            rows: report.defaultRows,
-            dateFilter: dateFilter,
-            cariName: cariName,
-            isHeatmap: report.isHeatmap
-        ) {
-            let safeName = report.title.replacingOccurrences(of: " ", with: "_")
-            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(safeName)_\(dateFilter).pdf")
-            do {
-                try pdfData.write(to: tempURL)
-                let av = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
-                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                   let rootVC = windowScene.windows.first?.rootViewController {
-                    if let popover = av.popoverPresentationController {
-                        popover.sourceView = rootVC.view
-                        popover.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
-                        popover.permittedArrowDirections = []
+        Task { @MainActor in
+            if let pdfData = await PDFService.shared.fetchOrGenerateReportPDF(
+                title: report.title,
+                category: report.category,
+                headers: report.headers,
+                rows: report.defaultRows,
+                dateFilter: dateFilter,
+                cariName: cariName,
+                isHeatmap: report.isHeatmap
+            ) {
+                let safeName = report.title.replacingOccurrences(of: " ", with: "_")
+                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(safeName)_\(dateFilter).pdf")
+                do {
+                    try pdfData.write(to: tempURL)
+                    let av = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                       let rootVC = windowScene.windows.first?.rootViewController {
+                        if let popover = av.popoverPresentationController {
+                            popover.sourceView = rootVC.view
+                            popover.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
+                            popover.permittedArrowDirections = []
+                        }
+                        rootVC.present(av, animated: true)
                     }
-                    rootVC.present(av, animated: true)
+                } catch {
+                    print("PDF paylaşım hatası: \(error)")
                 }
-            } catch {
-                print("PDF paylaşım hatası: \(error)")
             }
         }
         #endif

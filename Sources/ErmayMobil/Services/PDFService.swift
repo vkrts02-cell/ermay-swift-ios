@@ -96,6 +96,92 @@ public final class PDFService {
         return data
     }
     
+    // MARK: - Rapor PDF Üretimi (QuestPDF Cloud & Yerel Motor Paritesi)
+    public func fetchOrGenerateReportPDF(
+        title: String,
+        category: String,
+        headers: [String],
+        rows: [[String]],
+        dateFilter: String,
+        cariName: String? = nil,
+        isHeatmap: Bool = false,
+        firma: FirmaProfili = FirmaProfili.varsayilan
+    ) async -> Data? {
+        // 1. Önce 7/24 Canlı Google Cloud Run QuestPDF Sunucusunu Dene
+        if let cloudPdf = await fetchCloudReportPdf(
+            title: title,
+            category: category,
+            headers: headers,
+            rows: rows,
+            dateFilter: dateFilter,
+            cariName: cariName
+        ) {
+            return cloudPdf
+        }
+        
+        // 2. Çevrimdışı / Yerel Motor Fallback
+        return generateReportPDF(
+            title: title,
+            category: category,
+            headers: headers,
+            rows: rows,
+            dateFilter: dateFilter,
+            cariName: cariName,
+            isHeatmap: isHeatmap,
+            firma: firma
+        )
+    }
+    
+    private func fetchCloudReportPdf(
+        title: String,
+        category: String,
+        headers: [String],
+        rows: [[String]],
+        dateFilter: String,
+        cariName: String?
+    ) async -> Data? {
+        guard let url = URL(string: "https://ermay-pdf-api-390930978984.europe-west1.run.app/generate/generic") else {
+            return nil
+        }
+        
+        var subtitle = "Kategori: \(category) • Dönem: \(dateFilter == "All" ? "Tüm Zamanlar" : dateFilter)"
+        if let c = cariName, !c.isEmpty {
+            subtitle += " • Filtre: \(c)"
+        }
+        
+        let requestPayload: [String: Any] = [
+            "Title": title.uppercased(with: Locale(identifier: "tr_TR")),
+            "Headers": headers,
+            "Rows": rows,
+            "Subtitle": subtitle,
+            "ShowLogo": false
+        ]
+        
+        guard let httpBody = try? JSONSerialization.data(withJSONObject: requestPayload, options: []) else {
+            return nil
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = httpBody
+        request.timeoutInterval = 7.0
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            if let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200, data.count > 1000 {
+                if let prefix = String(data: data.prefix(5), encoding: .ascii), prefix.hasPrefix("%PDF") {
+                    print("[PDFService] Cloud QuestPDF Raporu başarıyla üretildi (\(data.count) bytes).")
+                    return data
+                }
+            }
+        } catch {
+            print("[PDFService] Cloud QuestPDF Rapor hatası: \(error.localizedDescription)")
+        }
+        
+        return nil
+    }
+    
     // MARK: - Rapor PDF Üretimi (31+ Rapor ve Isı Haritası)
     public func generateReportPDF(
         title: String,
