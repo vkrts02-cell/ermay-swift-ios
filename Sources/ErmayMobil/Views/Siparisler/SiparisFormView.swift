@@ -1,5 +1,38 @@
 import SwiftUI
 
+private struct SiparisStrictInsertPayload: Encodable {
+    let id: Int
+    let siparis_no: String
+    let siparis_turu: String?
+    let cari_id: Int?
+    let cari_unvan: String?
+    let tarih: String
+    let teslim_tarihi: String?
+    let ara_toplam: Double
+    let kdv_toplam: Double
+    let genel_toplam: Double
+    let durum: String
+    let aciklama: String?
+    let tenant_id: String
+    let uuid: String
+    let version: Int
+}
+
+private struct SiparisDetayStrictInsertPayload: Encodable {
+    let id: Int
+    let siparis_id: Int
+    let stok_id: Int?
+    let stok_adi: String?
+    let miktar: Double
+    let birim: String
+    let birim_fiyat: Double
+    let kdv_orani: Double
+    let toplam_tutar: Double
+    let tenant_id: String
+    let uuid: String
+    let version: Int
+}
+
 public struct SiparisFormView: View {
     @Environment(\.dismiss) private var dismiss
     public var onSave: ((Siparis) -> Void)?
@@ -71,7 +104,10 @@ public struct SiparisFormView: View {
                 }
             }
             .navigationBarHidden(true)
+            .scrollDismissesKeyboard(.interactively)
             .enableSwipeBack()
+            .keyboardDismissToolbar(buttonTitle: "Bitti")
+            .hideKeyboardOnTap()
             .onAppear {
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyy-MM-dd"
@@ -578,25 +614,84 @@ public struct SiparisFormView: View {
         }
         
         isSaving = true
+        errorMessage = nil
+        
+        let sipId = IdGenerator.generateMobileRecordId()
+        let tenantId = SupabaseService.shared.tenantId
+        let cIdInt = cariId != nil ? Int(cariId!) : nil
+        
         let newSip = Siparis(
+            id: String(sipId),
             siparisNo: siparisNo,
             siparisTuru: "ALINAN",
             cariId: cariId ?? "1",
             cariUnvan: cariUnvan,
             tarih: tarihStr,
             teslimTarihi: teslimatTarihiStr,
+            araToplam: araToplam,
+            kdvToplami: kdvToplami,
+            iskontoToplami: 0,
             genelToplam: genelToplam,
             durum: durum,
             aciklama: aciklama,
-            kalemler: kalemler
+            kalemler: kalemler,
+            syncGuid: UUID().uuidString,
+            tenantId: tenantId
+        )
+        
+        let sipPayload = SiparisStrictInsertPayload(
+            id: sipId,
+            siparis_no: siparisNo,
+            siparis_turu: "ALINAN",
+            cari_id: cIdInt,
+            cari_unvan: cariUnvan,
+            tarih: tarihStr,
+            teslim_tarihi: teslimatTarihiStr,
+            ara_toplam: araToplam,
+            kdv_toplam: kdvToplami,
+            genel_toplam: genelToplam,
+            durum: durum,
+            aciklama: aciklama,
+            tenant_id: tenantId,
+            uuid: UUID().uuidString,
+            version: 1
         )
         
         Task {
-            try? await SupabaseService.shared.insert(into: "siparisler", item: newSip)
-            await MainActor.run {
-                onSave?(newSip)
-                isSaving = false
-                dismiss()
+            do {
+                try await SupabaseService.shared.insert(into: "siparisler", item: sipPayload)
+                
+                for it in kalemler {
+                    let dId = IdGenerator.generateMobileRecordId()
+                    let intStok = it.stokId != nil ? Int(it.stokId!) : nil
+                    let dPayload = SiparisDetayStrictInsertPayload(
+                        id: dId,
+                        siparis_id: sipId,
+                        stok_id: intStok,
+                        stok_adi: it.stokAdi,
+                        miktar: it.miktar,
+                        birim: it.birim ?? "Adet",
+                        birim_fiyat: it.birimFiyat,
+                        kdv_orani: it.kdvOrani,
+                        toplam_tutar: it.tutar,
+                        tenant_id: tenantId,
+                        uuid: UUID().uuidString,
+                        version: 1
+                    )
+                    try? await SupabaseService.shared.insert(into: "siparis_detaylar", item: dPayload)
+                }
+                
+                await MainActor.run {
+                    HardwareService.shared.hapticSuccess()
+                    onSave?(newSip)
+                    isSaving = false
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = "Sipariş kaydedilemedi: " + error.localizedDescription
+                    self.isSaving = false
+                }
             }
         }
     }

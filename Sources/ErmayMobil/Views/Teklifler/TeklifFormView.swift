@@ -1,5 +1,37 @@
 import SwiftUI
 
+private struct TeklifStrictInsertPayload: Encodable {
+    let id: Int
+    let teklif_no: String
+    let cari_id: Int?
+    let cari_unvan: String?
+    let tarih: String
+    let gecerlilik_tarihi: String?
+    let ara_toplam: Double
+    let kdv_toplam: Double
+    let genel_toplam: Double
+    let durum: String
+    let aciklama: String?
+    let tenant_id: String
+    let uuid: String
+    let version: Int
+}
+
+private struct TeklifDetayStrictInsertPayload: Encodable {
+    let id: Int
+    let teklif_id: Int
+    let stok_id: Int?
+    let stok_adi: String?
+    let miktar: Double
+    let birim: String
+    let birim_fiyat: Double
+    let kdv_orani: Double
+    let toplam_tutar: Double
+    let tenant_id: String
+    let uuid: String
+    let version: Int
+}
+
 public struct TeklifFormView: View {
     @Environment(\.dismiss) private var dismiss
     public var onSave: ((Teklif) -> Void)?
@@ -67,7 +99,10 @@ public struct TeklifFormView: View {
                 }
             }
             .navigationBarHidden(true)
+            .scrollDismissesKeyboard(.interactively)
             .enableSwipeBack()
+            .keyboardDismissToolbar(buttonTitle: "Bitti")
+            .hideKeyboardOnTap()
             .onAppear {
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyy-MM-dd"
@@ -517,24 +552,81 @@ public struct TeklifFormView: View {
         }
         
         isSaving = true
+        errorMessage = nil
+        
+        let teklifId = IdGenerator.generateMobileRecordId()
+        let tenantId = SupabaseService.shared.tenantId
+        let cIdInt = cariId != nil ? Int(cariId!) : nil
+        
         let newTeklif = Teklif(
+            id: String(teklifId),
             teklifNo: teklifNo,
             cariId: cariId ?? "1",
             cariUnvan: cariUnvan,
             tarih: tarihStr,
             gecerlilikTarihi: gecerlilikTarihiStr,
+            araToplam: araToplam,
+            kdvToplami: kdvToplami,
             genelToplam: genelToplam,
             durum: durum,
             aciklama: aciklama,
-            kalemler: kalemler
+            kalemler: kalemler,
+            syncGuid: UUID().uuidString,
+            tenantId: tenantId
+        )
+        
+        let teklifPayload = TeklifStrictInsertPayload(
+            id: teklifId,
+            teklif_no: teklifNo,
+            cari_id: cIdInt,
+            cari_unvan: cariUnvan,
+            tarih: tarihStr,
+            gecerlilik_tarihi: gecerlilikTarihiStr,
+            ara_toplam: araToplam,
+            kdv_toplam: kdvToplami,
+            genel_toplam: genelToplam,
+            durum: durum,
+            aciklama: aciklama,
+            tenant_id: tenantId,
+            uuid: UUID().uuidString,
+            version: 1
         )
         
         Task {
-            try? await SupabaseService.shared.insert(into: "teklifler", item: newTeklif)
-            await MainActor.run {
-                onSave?(newTeklif)
-                isSaving = false
-                dismiss()
+            do {
+                try await SupabaseService.shared.insert(into: "teklifler", item: teklifPayload)
+                
+                for it in kalemler {
+                    let dId = IdGenerator.generateMobileRecordId()
+                    let intStok = it.stokId != nil ? Int(it.stokId!) : nil
+                    let dPayload = TeklifDetayStrictInsertPayload(
+                        id: dId,
+                        teklif_id: teklifId,
+                        stok_id: intStok,
+                        stok_adi: it.stokAdi,
+                        miktar: it.miktar,
+                        birim: it.birim ?? "Adet",
+                        birim_fiyat: it.birimFiyat,
+                        kdv_orani: it.kdvOrani,
+                        toplam_tutar: it.tutar,
+                        tenant_id: tenantId,
+                        uuid: UUID().uuidString,
+                        version: 1
+                    )
+                    try? await SupabaseService.shared.insert(into: "teklif_detaylar", item: dPayload)
+                }
+                
+                await MainActor.run {
+                    HardwareService.shared.hapticSuccess()
+                    onSave?(newTeklif)
+                    isSaving = false
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = "Teklif kaydedilemedi: " + error.localizedDescription
+                    self.isSaving = false
+                }
             }
         }
     }

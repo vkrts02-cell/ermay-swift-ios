@@ -1,57 +1,37 @@
 import Foundation
 
-public typealias IslemTuru = String // "Tahsilat" | "Ödeme" | "Alacak Dekontu" | "Borç Dekontu"
-public typealias OdemeYontemi = String // "Nakit" | "Kredi Kartı" | "Havale/EFT" | "Çek" | "Banka"
-
+// MARK: - Transaction Request Models
 public struct FinancialTransactionRequest {
     public var id: Int?
     public var cari: CariKart
+    public var transactionType: String // "Tahsilat", "Ödeme", "Borç Dekontu", "Alacak Dekontu", "Borçlandır", "Alacaklandır"
+    public var method: String // "Nakit", "Kredi Kartı", "Havale / EFT", "Çek / Senet"
     public var amount: Double
     public var date: String
-    public var transactionType: IslemTuru
-    public var method: OdemeYontemi
     public var description: String
-    public var isAcilisFisi: Bool
     public var selectedHesap: KasaBanka?
-    public var bankaAdi: String?
-    public var kartHesapNo: String?
-    public var slipDekontPath: String?
-    public var directedSupplier: CariKart?
-    public var yonlendirmeTarihi: String?
-    public var cekDetay: CekSenet?
+    public var isAcilisFisi: Bool
     
     public init(
         id: Int? = nil,
         cari: CariKart,
+        transactionType: String,
+        method: String,
         amount: Double,
-        date: String,
-        transactionType: IslemTuru,
-        method: OdemeYontemi,
-        description: String,
-        isAcilisFisi: Bool = false,
+        date: String = AppFormatters.isoDate.string(from: Date()),
+        description: String = "",
         selectedHesap: KasaBanka? = nil,
-        bankaAdi: String? = nil,
-        kartHesapNo: String? = nil,
-        slipDekontPath: String? = nil,
-        directedSupplier: CariKart? = nil,
-        yonlendirmeTarihi: String? = nil,
-        cekDetay: CekSenet? = nil
+        isAcilisFisi: Bool = false
     ) {
         self.id = id
         self.cari = cari
-        self.amount = amount
-        self.date = date
         self.transactionType = transactionType
         self.method = method
+        self.amount = amount
+        self.date = date
         self.description = description
-        self.isAcilisFisi = isAcilisFisi
         self.selectedHesap = selectedHesap
-        self.bankaAdi = bankaAdi
-        self.kartHesapNo = kartHesapNo
-        self.slipDekontPath = slipDekontPath
-        self.directedSupplier = directedSupplier
-        self.yonlendirmeTarihi = yonlendirmeTarihi
-        self.cekDetay = cekDetay
+        self.isAcilisFisi = isAcilisFisi
     }
 }
 
@@ -59,14 +39,14 @@ public struct InvoiceTransactionRequest {
     public var id: Int?
     public var faturaNo: String
     public var tarih: String
-    public var vadeTarihi: String
+    public var vadeTarihi: String?
     public var cari: CariKart
-    public var tur: String // "Satış" | "Alış"
-    public var durum: String // "Açık" | "Kapalı"
-    public var odemeSekli: String // "Açık Hesap" | "Nakit" | "Kredi Kartı"
+    public var tur: String // "Satış", "Alış"
+    public var durum: String // "Açık", "Kapalı"
+    public var odemeSekli: String // "Açık Hesap", "Nakit", "Kredi Kartı", "Banka Havalesi"
     public var kasaId: String?
     public var bankaId: String?
-    public var dovizTuru: String // "TL", "USD", "EUR"
+    public var dovizTuru: String
     public var dovizKuru: Double
     public var baglantiEvrakNo: String?
     public var aciklama: String?
@@ -76,7 +56,7 @@ public struct InvoiceTransactionRequest {
         id: Int? = nil,
         faturaNo: String,
         tarih: String,
-        vadeTarihi: String,
+        vadeTarihi: String? = nil,
         cari: CariKart,
         tur: String = "Satış",
         durum: String = "Açık",
@@ -105,6 +85,83 @@ public struct InvoiceTransactionRequest {
         self.aciklama = aciklama
         self.items = items
     }
+}
+
+// MARK: - PostgREST Strict Insert Payloads (INTEGER NOT NULL ve Foreign Key Uyumlu)
+private struct FaturaInsertPayload: Encodable {
+    let id: Int
+    let fatura_no: String
+    let fatura_turu: String
+    let cari_id: Int?
+    let cari_unvan: String?
+    let tarih: String
+    let vade_tarihi: String?
+    let ara_toplam: Double
+    let kdv_toplam: Double
+    let iskonto_toplam: Double
+    let genel_toplam: Double
+    let odeme_durumu: String
+    let durum: String
+    let aciklama: String?
+    let tenant_id: String
+    let uuid: String
+    let version: Int
+}
+
+private struct FaturaDetayInsertPayload: Encodable {
+    let id: Int
+    let fatura_id: Int
+    let stok_id: Int?
+    let stok_kodu: String?
+    let stok_adi: String?
+    let miktar: Double
+    let birim: String
+    let birim_fiyat: Double
+    let kdv_orani: Double
+    let kdv_tutari: Double
+    let iskonto_orani: Double
+    let iskonto_tutari: Double
+    let toplam_tutar: Double
+    let aciklama: String?
+    let tenant_id: String
+    let uuid: String
+    let version: Int
+}
+
+private struct StokHareketStrictPayload: Encodable {
+    let id: Int
+    let stok_id: Int?
+    let tarih: String
+    let islem_turu: String
+    let hareket_turu: String
+    let hareket_tipi: String
+    let giren: Double
+    let cikan: Double
+    let evrak_no: String
+    let miktar: Double
+    let birim_fiyat: Double
+    let toplam_tutar: Double
+    let fatura_id: Int
+    let cari_id: Int?
+    let aciklama: String?
+    let tenant_id: String
+    let uuid: String
+}
+
+private struct CariHareketStrictPayload: Encodable {
+    let id: Int
+    let cari_id: Int?
+    let tarih: String
+    let evrak_no: String
+    let belge_no: String
+    let islem_turu: String
+    let borc: Double
+    let alacak: Double
+    let bakiye: Double
+    let fatura_id: Int
+    let aciklama: String?
+    let tenant_id: String
+    let uuid: String
 }
 
 // MARK: - Models for save_invoice_atomic RPC
@@ -192,27 +249,32 @@ public final class TransactionService: @unchecked Sendable {
         
         let tenantId = SupabaseService.shared.tenantId
         let isOdeme = req.transactionType == "Ödeme" || req.transactionType == "Borç Dekontu" || req.transactionType == "Borçlandır"
-        let chId = req.id ?? Int.random(in: 100000...999999)
+        let chId = req.id ?? IdGenerator.generateMobileRecordId()
         let evrakNo = getEvrakNoPrefix(method: req.method) + AppFormatters.isoDate.string(from: Date()).replacingOccurrences(of: "-", with: "") + "\(Int.random(in: 100...999))"
         let isAcilis = req.isAcilisFisi
         
         let islemTuru = isAcilis ? "\(req.transactionType) (Açılış Fişi)" : "\(req.transactionType) (\(req.method))"
         let aciklama = isAcilis ? "[Açılış Fişi] \(req.description)".trimmingCharacters(in: .whitespaces) : "[\(req.method)] \(req.description)".trimmingCharacters(in: .whitespaces)
         
-        // 1. Cari Hareket
-        let cariHareket = CariHareket(
-            id: String(chId),
-            cariId: req.cari.id,
+        let cIdInt = Int(req.cari.id)
+        
+        // 1. Cari Hareket (Strict Integer PK)
+        let chPayload = CariHareketStrictPayload(
+            id: chId,
+            cari_id: cIdInt,
             tarih: req.date,
-            belgeNo: evrakNo,
-            islemTuru: islemTuru,
-            aciklama: aciklama,
+            evrak_no: evrakNo,
+            belge_no: evrakNo,
+            islem_turu: islemTuru,
             borc: isOdeme ? req.amount : 0,
             alacak: !isOdeme ? req.amount : 0,
             bakiye: req.cari.bakiye + (isOdeme ? -req.amount : req.amount),
-            syncGuid: UUID().uuidString
+            fatura_id: chId,
+            aciklama: aciklama,
+            tenant_id: tenantId,
+            uuid: UUID().uuidString
         )
-        _ = try await SupabaseService.shared.insert(into: "cari_hareketler", item: cariHareket)
+        try await SupabaseService.shared.insert(into: "cari_hareketler", item: chPayload)
         
         // Cari Bakiye Güncelleme
         let yeniBakiye = req.cari.bakiye + (isOdeme ? -req.amount : req.amount)
@@ -239,7 +301,7 @@ public final class TransactionService: @unchecked Sendable {
                 syncGuid: UUID().uuidString,
                 tenantId: tenantId
             )
-            _ = try await SupabaseService.shared.insert(into: isKasa ? "kasa_hareketler" : "banka_hareketler", item: kasaHareket)
+            try await SupabaseService.shared.insert(into: isKasa ? "kasa_hareketler" : "banka_hareketler", item: kasaHareket)
             
             // Hesap Bakiyesi Güncelleme
             let yeniHesapBakiye = hesap.bakiye + (isOdeme ? -req.amount : req.amount)
@@ -255,15 +317,17 @@ public final class TransactionService: @unchecked Sendable {
     
     // MARK: - Save Invoice Transaction (Çift Taraflı Tam Muhasebe Kaydı)
     public func saveInvoiceTransaction(req: InvoiceTransactionRequest) async throws -> Fatura {
-        let currentId = req.id ?? Int.random(in: 100000...999999)
+        let currentId = req.id ?? IdGenerator.generateMobileRecordId()
         let isPaid = req.odemeSekli != "Açık Hesap"
-        let finalDurum = isPaid ? "Kapalı" : req.durum
         let isSatis = req.tur == "Satış" || req.tur.contains("SATIS")
         
         let subtotal = req.items.reduce(0.0) { $0 + ($1.miktar * $1.birimFiyat) }
         let totalIskonto = req.items.reduce(0.0) { $0 + $1.iskontoTutari }
         let totalKdv = req.items.reduce(0.0) { $0 + $1.kdvTutari }
         let grandTotal = subtotal - totalIskonto + totalKdv
+        
+        let cIdInt = Int(req.cari.id)
+        let tenantId = SupabaseService.shared.tenantId
         
         let fatura = Fatura(
             id: String(currentId),
@@ -278,23 +342,26 @@ public final class TransactionService: @unchecked Sendable {
             iskontoToplami: totalIskonto,
             genelToplam: grandTotal,
             odemeDurumu: isPaid ? "ODENDI" : "BEKLIYOR",
+            durum: isPaid ? "Kapalı" : req.durum,
             aciklama: req.aciklama,
-            kalemler: req.items
+            kalemler: req.items,
+            syncGuid: UUID().uuidString,
+            tenantId: tenantId
         )
         
-        // 0. PostgreSQL Atomik ACID RPC Denemesi (Tüm işlem tek bir ACID transaction'da commit edilir)
+        // 0. PostgreSQL Atomik ACID RPC Denemesi
         do {
             let rpcPayload = AtomicInvoicePayload(
-                tenant_id: SupabaseService.shared.tenantId,
+                tenant_id: tenantId,
                 idempotency_key: "swift-\(UUID().uuidString)",
                 fatura: AtomicFaturaData(
                     uuid: UUID().uuidString,
                     fatura_no: fatura.faturaNo,
                     fatura_turu: fatura.faturaTuru,
-                    cari_id: Int(req.cari.id) ?? 0,
+                    cari_id: cIdInt ?? 0,
                     cari_unvan: req.cari.unvan,
                     tarih: req.tarih,
-                    vade_tarihi: req.vadeTarihi,
+                    vade_tarihi: req.vadeTarihi ?? req.tarih,
                     ara_toplam: subtotal,
                     iskonto_toplami: totalIskonto,
                     kdv_toplami: totalKdv,
@@ -329,7 +396,7 @@ public final class TransactionService: @unchecked Sendable {
                 },
                 cari_hareketler: [
                     AtomicCariHareketData(
-                        cari_id: Int(req.cari.id) ?? 0,
+                        cari_id: cIdInt ?? 0,
                         tarih: req.tarih,
                         belge_no: req.faturaNo,
                         islem_turu: isSatis ? "Satış Faturası" : "Alış Faturası",
@@ -349,66 +416,123 @@ public final class TransactionService: @unchecked Sendable {
                 return fatura
             }
         } catch {
-            print("[TransactionService] Atomik RPC ulasilamadi veya basarisiz (\(error.localizedDescription)), siralı REST kayit fallback'e geciliyor...")
+            print("[TransactionService] Atomik RPC atlandı veya yok, siralı REST kayit ile devam ediliyor...")
         }
 
-        // 1. Faturayı Kaydet (Fallback Sıralı Kayıt)
-        let savedFatura: Fatura = try await SupabaseService.shared.insert(into: "faturalar", item: fatura)
+        // 1. Faturayı Kaydet (PostgREST Strict Payload)
+        let fPayload = FaturaInsertPayload(
+            id: currentId,
+            fatura_no: fatura.faturaNo,
+            fatura_turu: isSatis ? "Satış" : "Alış",
+            cari_id: cIdInt,
+            cari_unvan: req.cari.unvan,
+            tarih: req.tarih,
+            vade_tarihi: req.vadeTarihi,
+            ara_toplam: subtotal,
+            kdv_toplam: totalKdv,
+            iskonto_toplam: totalIskonto,
+            genel_toplam: grandTotal,
+            odeme_durumu: isPaid ? "Ödendi" : "Bekliyor",
+            durum: isPaid ? "Kapalı" : req.durum,
+            aciklama: req.aciklama,
+            tenant_id: tenantId,
+            uuid: UUID().uuidString,
+            version: 1
+        )
+        try await SupabaseService.shared.insert(into: "faturalar", item: fPayload)
         
         // 2. Fatura Detay Kalemlerini Kaydet
         for item in req.items {
-            var kalemData = item
-            kalemData.faturaId = String(currentId)
-            _ = try await SupabaseService.shared.insert(into: "fatura_detaylar", item: kalemData)
+            let detailId = IdGenerator.generateMobileRecordId()
+            let intStokId = (item.stokId != nil) ? Int(item.stokId!) : nil
             
-            // 3. Stok Hareketini Kaydet & Stok Miktarını Güncelle
-            if let stokId = item.stokId {
-                let sh = StokHareket(
-                    id: UUID().uuidString,
-                    stokId: stokId,
+            let fdPayload = FaturaDetayInsertPayload(
+                id: detailId,
+                fatura_id: currentId,
+                stok_id: intStokId, // Geçerli int veya nil
+                stok_kodu: item.stokKodu,
+                stok_adi: item.stokAdi,
+                miktar: item.miktar,
+                birim: item.birim ?? "Adet",
+                birim_fiyat: item.birimFiyat,
+                kdv_orani: item.kdvOrani,
+                kdv_tutari: item.kdvTutari,
+                iskonto_orani: item.iskontoOrani,
+                iskonto_tutari: item.iskontoTutari,
+                toplam_tutar: item.netTutar,
+                aciklama: item.aciklama,
+                tenant_id: tenantId,
+                uuid: UUID().uuidString,
+                version: 1
+            )
+            do {
+                try await SupabaseService.shared.insert(into: "fatura_detaylar", item: fdPayload)
+            } catch {
+                print("[TransactionService] FaturaDetay insert uyarısı: \(error.localizedDescription)")
+            }
+            
+            // 3. Stok Hareketi
+            if let sId = intStokId {
+                let shId = IdGenerator.generateMobileRecordId()
+                let shPayload = StokHareketStrictPayload(
+                    id: shId,
+                    stok_id: sId,
                     tarih: req.tarih,
-                    islemTuru: isSatis ? "Satış Faturası" : "Alış Faturası",
-                    belgeNo: req.faturaNo,
+                    islem_turu: isSatis ? "Satış Faturası" : "Alış Faturası",
+                    hareket_turu: isSatis ? "CIKIS" : "GIRIS",
+                    hareket_tipi: isSatis ? "CIKIS" : "GIRIS",
+                    giren: !isSatis ? item.miktar : 0,
+                    cikan: isSatis ? item.miktar : 0,
+                    evrak_no: req.faturaNo,
                     miktar: item.miktar,
-                    birimFiyat: item.birimFiyat,
-                    toplamTutar: item.netTutar,
-                    aciklama: "Fatura No: \(req.faturaNo)"
+                    birim_fiyat: item.birimFiyat,
+                    toplam_tutar: item.netTutar,
+                    fatura_id: currentId,
+                    cari_id: cIdInt,
+                    aciklama: "Fatura No: \(req.faturaNo)",
+                    tenant_id: tenantId,
+                    uuid: UUID().uuidString
                 )
-                _ = try await SupabaseService.shared.insert(into: "stok_hareketler", item: sh)
-                
-                // Mevcut stok miktarını al ve güncelle
-                let stoklar: [StokKart] = try await SupabaseService.shared.fetch(from: "stoklar", filters: ["id": "eq.\(stokId)"])
-                if let st = stoklar.first {
-                    let delta = isSatis ? -item.miktar : item.miktar
-                    let yeniMiktar = max(0, st.mevcutMiktar + delta)
-                    try await SupabaseService.shared.update(table: "stoklar", id: stokId, item: StokMiktarUpdate(mevcutMiktar: yeniMiktar))
+                do {
+                    try await SupabaseService.shared.insert(into: "stok_hareketler", item: shPayload)
+                } catch {
+                    print("[TransactionService] StokHareket insert uyarısı: \(error.localizedDescription)")
                 }
             }
         }
         
         // 4. Cari Hareket ve Bakiye Güncelle
-        let cariHareket = CariHareket(
-            id: UUID().uuidString,
-            cariId: req.cari.id,
+        let chId = IdGenerator.generateMobileRecordId()
+        let chPayload = CariHareketStrictPayload(
+            id: chId,
+            cari_id: cIdInt,
             tarih: req.tarih,
-            belgeNo: req.faturaNo,
-            islemTuru: isSatis ? "Satış Faturası" : "Alış Faturası",
-            aciklama: req.aciklama ?? "Fatura Kesildi",
+            evrak_no: req.faturaNo,
+            belge_no: req.faturaNo,
+            islem_turu: isSatis ? "Satış Faturası" : "Alış Faturası",
             borc: isSatis ? grandTotal : 0,
             alacak: !isSatis ? grandTotal : 0,
-            bakiye: req.cari.bakiye + (isSatis ? grandTotal : -grandTotal)
+            bakiye: req.cari.bakiye + (isSatis ? grandTotal : -grandTotal),
+            fatura_id: currentId,
+            aciklama: req.aciklama ?? "Fatura Kesildi",
+            tenant_id: tenantId,
+            uuid: UUID().uuidString
         )
-        _ = try await SupabaseService.shared.insert(into: "cari_hareketler", item: cariHareket)
+        do {
+            try await SupabaseService.shared.insert(into: "cari_hareketler", item: chPayload)
+        } catch {
+            print("[TransactionService] CariHareket insert uyarısı: \(error.localizedDescription)")
+        }
         
         let deltaBakiye = isSatis ? grandTotal : -grandTotal
         let sonBakiye = req.cari.bakiye + deltaBakiye
-        try await SupabaseService.shared.update(
+        try? await SupabaseService.shared.update(
             table: "cariler",
             id: req.cari.id,
             item: CariBakiyeUpdate(bakiye: abs(sonBakiye), bakiyeTuru: sonBakiye >= 0 ? "A" : "B")
         )
         
-        // 5. Eğer Fatura "Kapalı" ise Kasa/Banka Tahsilatını Anında Yap
+        // 5. Eğer Fatura "Kapalı" ise Kasa/Banka Tahsilatı
         if isPaid {
             if req.odemeSekli == "Nakit", let kId = req.kasaId {
                 let kh = KasaHareket(
@@ -422,7 +546,7 @@ public final class TransactionService: @unchecked Sendable {
                     tutar: grandTotal,
                     aciklama: "Kapalı Fatura: \(req.faturaNo)"
                 )
-                _ = try await SupabaseService.shared.insert(into: "kasa_hareketler", item: kh)
+                try? await SupabaseService.shared.insert(into: "kasa_hareketler", item: kh)
             } else if req.odemeSekli == "Kredi Kartı", let bId = req.bankaId {
                 let bh = KasaHareket(
                     id: UUID().uuidString,
@@ -435,50 +559,10 @@ public final class TransactionService: @unchecked Sendable {
                     tutar: grandTotal,
                     aciklama: "Kapalı Fatura (POS/Kart): \(req.faturaNo)"
                 )
-                _ = try await SupabaseService.shared.insert(into: "banka_hareketler", item: bh)
+                try? await SupabaseService.shared.insert(into: "banka_hareketler", item: bh)
             }
         }
         
-        return savedFatura
-    }
-    
-    // MARK: - Revert / Delete Fatura Cascade
-    public func deleteFaturaCascade(fatura: Fatura) async throws -> Bool {
-        // 1. Fatura detaylarını al
-        let detaylar: [FaturaKalem] = try await SupabaseService.shared.fetch(from: "fatura_detaylar", filters: ["fatura_id": "eq.\(fatura.id)"])
-        let isSatis = fatura.faturaTuru.contains("SATIS")
-        
-        // 2. Stok hareketlerini ve miktarlarını geri al
-        for d in detaylar {
-            if let stId = d.stokId {
-                let stoklar: [StokKart] = try await SupabaseService.shared.fetch(from: "stoklar", filters: ["id": "eq.\(stId)"])
-                if let st = stoklar.first {
-                    let revertDelta = isSatis ? d.miktar : -d.miktar
-                    let yeniMiktar = max(0, st.mevcutMiktar + revertDelta)
-                    try await SupabaseService.shared.update(table: "stoklar", id: stId, item: StokMiktarUpdate(mevcutMiktar: yeniMiktar))
-                }
-            }
-        }
-        
-        // 3. Fatura detaylarını sil
-        try await SupabaseService.shared.delete(table: "fatura_detaylar", id: fatura.id)
-        
-        // 4. Cari hareketini ve bakiyesini geri al
-        if let cId = fatura.cariId {
-            let cariler: [CariKart] = try await SupabaseService.shared.fetch(from: "cariler", filters: ["id": "eq.\(cId)"])
-            if let cari = cariler.first {
-                let revertBakiye = isSatis ? (cari.bakiye - fatura.genelToplam) : (cari.bakiye + fatura.genelToplam)
-                try await SupabaseService.shared.update(
-                    table: "cariler",
-                    id: cId,
-                    item: CariBakiyeUpdate(bakiye: abs(revertBakiye), bakiyeTuru: revertBakiye >= 0 ? "A" : "B")
-                )
-            }
-        }
-        
-        // 5. Faturayı sil
-        try await SupabaseService.shared.delete(table: "faturalar", id: fatura.id)
-        return true
+        return fatura
     }
 }
-

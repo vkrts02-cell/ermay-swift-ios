@@ -30,13 +30,14 @@ public struct RaporlarView: View {
             category: "Genel Durum",
             description: "İşletmenin genel mali özetini gösterir.",
             iconName: "chart.bar.doc.horizontal.fill",
-            headers: ["Rapor Kalemi", "Detay"],
+            headers: ["Rapor Kalemi", "Tutar / Değer"],
             defaultRows: [
                 ["Toplam Alacaklar", "₺485.250,00"],
                 ["Toplam Borçlar", "₺192.400,00"],
-                ["Kasa / Banka Mevcudu", "₺215.300,00"],
+                ["Kasa ve Banka Mevcudu", "₺215.300,00"],
                 ["Toplam Stok Miktarı", "1.420 Adet"],
-                ["Stok Maliyet Değeri", "₺380.000,00"]
+                ["Stok Maliyet Değeri", "₺380.000,00"],
+                ["Net İşletme Sermayesi", "₺508.150,00"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -48,11 +49,11 @@ public struct RaporlarView: View {
             category: "Finans",
             description: "Ay bazlı ödeme türlerine göre tahsilat ve yönlendirme özeti.",
             iconName: "calendar.badge.clock",
-            headers: ["Ay", "Nakit Tahsilat", "Kredi Kartı", "Havale / EFT", "Toplam Tahsilat", "Ödemeler"],
+            headers: ["Ay/Yıl", "Nakit (Alınan)", "Nakit (Yönl.)", "K.Kartı (Alınan)", "K.Kartı (Yönl.)", "Havale (Alınan)", "Havale (Yönl.)", "Çek (Alınan)", "Çek (Yönl.)"],
             defaultRows: [
-                ["Kasım 2026", "₺45.000,00", "₺82.500,00", "₺120.000,00", "₺247.500,00", "₺110.000,00"],
-                ["Ekim 2026", "₺52.000,00", "₺76.000,00", "₺98.000,00", "₺226.000,00", "₺95.400,00"],
-                ["Eylül 2026", "₺38.500,00", "₺69.000,00", "₺105.000,00", "₺212.500,00", "₺88.000,00"]
+                ["11/2026", "₺45.000,00", "₺12.000,00", "₺82.500,00", "₺15.000,00", "₺120.000,00", "₺60.000,00", "₺35.000,00", "₺10.000,00"],
+                ["10/2026", "₺52.000,00", "₺18.500,00", "₺76.000,00", "₺11.200,00", "₺98.000,00", "₺45.000,00", "₺50.000,00", "₺22.000,00"],
+                ["09/2026", "₺38.500,00", "₺9.400,00", "₺69.000,00", "₺8.500,00", "₺105.000,00", "₺52.000,00", "₺40.000,00", "₺15.000,00"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -62,11 +63,11 @@ public struct RaporlarView: View {
             category: "Finans",
             description: "Kaydedilen ve yönlendirilen kredi kartı işlem detayları.",
             iconName: "creditcard.fill",
-            headers: ["Tarih", "Cari Ünvan", "Banka / POS", "Tutar", "Komisyon", "Net"],
+            headers: ["Tarih", "Kimden Alındı", "Banka/Kart", "Kime Yönlendirildi", "Tutar", "Durum"],
             defaultRows: [
-                ["03.11.2026", "Akıncılar Ltd.", "Garanti POS", "₺14.500,00", "₺290,00", "₺14.210,00"],
-                ["02.11.2026", "Özdemir A.Ş.", "Yapı Kredi", "₺8.200,00", "₺164,00", "₺8.036,00"],
-                ["01.11.2026", "Tekin Metal", "İş Bankası", "₺22.000,00", "₺440,00", "₺21.560,00"]
+                ["03.11.2026", "Akıncılar Çelik Ltd.", "Garanti POS", "Özdemir Sanayi", "₺14.500,00", "Yönlendirildi"],
+                ["02.11.2026", "Özdemir Makine", "Yapı Kredi", "-", "₺8.200,00", "Portföyde"],
+                ["01.11.2026", "Tekin Metal A.Ş.", "İş Bankası", "-", "₺22.000,00", "Tahsil Edildi"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -76,11 +77,11 @@ public struct RaporlarView: View {
             category: "Finans",
             description: "Tüm nakit kasa hareketlerinin detaylı dökümü.",
             iconName: "banknote.fill",
-            headers: ["Tarih", "Kasa", "İşlem Türü", "Açıklama", "Tutar", "Bakiye"],
+            headers: ["Tarih", "Cari Ünvan", "İşlem", "Açıklama", "Giren", "Çıkan"],
             defaultRows: [
-                ["04.11.2026", "Merkez TL Kasası", "Tahsilat", "Elden Satış Tahsilatı", "₺5.000,00", "₺42.500,00"],
-                ["03.11.2026", "Merkez TL Kasası", "Tediye", "Yemek & İkram Gideri", "₺450,00", "₺37.500,00"],
-                ["02.11.2026", "Şube Kasası", "Tahsilat", "Nakit Cari Tahsilat", "₺12.000,00", "₺37.950,00"]
+                ["04.11.2026 14:30", "Merkez Kasa", "Nakit Tahsilat", "Elden Satış Tahsilatı", "₺5.000,00", "₺0,00"],
+                ["03.11.2026 11:15", "Merkez Kasa", "Nakit Tediye", "Yemek & İkram Gideri", "₺0,00", "₺450,00"],
+                ["02.11.2026 16:45", "Şube Kasası", "Nakit Tahsilat", "Cari Fatura Tahsilatı", "₺12.000,00", "₺0,00"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -90,11 +91,11 @@ public struct RaporlarView: View {
             category: "Finans",
             description: "Portföydeki ve işlem görmüş çeklerin detayları.",
             iconName: "doc.plaintext.fill",
-            headers: ["Vade", "Çek No", "Keşideci", "Banka", "Tutar", "Durum"],
+            headers: ["Vade", "Çek No", "Cari Ünvan", "Banka/Şube", "Tutar", "Durum"],
             defaultRows: [
-                ["15.11.2026", "ÇK-10928", "Doruk İnşaat", "Garanti BBVA", "₺35.000,00", "Portföyde"],
-                ["28.11.2026", "ÇK-10929", "Kuzey Çelik", "Akbank", "₺50.000,00", "Portföyde"],
-                ["05.12.2026", "ÇK-10930", "Yıldız Ticaret", "Yapı Kredi", "₺27.500,00", "Tahsile Verildi"]
+                ["15.11.2026", "ÇK-10928", "Doruk İnşaat A.Ş.", "Garanti BBVA / Maslak", "₺35.000,00", "Portföyde"],
+                ["28.11.2026", "ÇK-10929", "Kuzey Çelik San.", "Akbank / Dudullu", "₺50.000,00", "Portföyde"],
+                ["05.12.2026", "ÇK-10930", "Yıldız Ticaret", "Yapı Kredi / İkitelli", "₺27.500,00", "Tahsile Verildi"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -104,11 +105,11 @@ public struct RaporlarView: View {
             category: "Finans",
             description: "Banka havale ve EFT işlemlerinin detaylı listesi.",
             iconName: "building.columns.fill",
-            headers: ["Tarih", "Banka Hesabı", "Gönderen/Alıcı", "Açıklama", "Tutar"],
+            headers: ["Tarih", "Müşteri", "Banka/Hesap", "Dekont No", "Tutar", "Durum"],
             defaultRows: [
-                ["03.11.2026", "İş Bankası Ticari", "Demir Grup Sanayi", "Fatura No: FAT-2026-09", "₺45.000,00"],
-                ["02.11.2026", "Garanti BBVA TL", "Yılmazlar Nakliyat", "Navlun Bedeli", "₺6.800,00"],
-                ["01.11.2026", "Akbank Şirket", "Birlik Makine", "Sipariş Peşinatı", "₺80.000,00"]
+                ["03.11.2026", "Demir Grup Sanayi", "İş Bankası Ticari", "DK-10023", "₺45.000,00", "Onaylandı"],
+                ["02.11.2026", "Yılmazlar Nakliyat", "Garanti BBVA TL", "DK-10024", "₺6.800,00", "Onaylandı"],
+                ["01.11.2026", "Birlik Makine A.Ş.", "Akbank Şirket", "DK-10025", "₺80.000,00", "Onaylandı"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -118,15 +119,16 @@ public struct RaporlarView: View {
             category: "Finans",
             description: "Dönemsel gelir ve gider özeti.",
             iconName: "chart.pie.fill",
-            headers: ["Hesap / Kalem", "Dönem Tutarı", "Yıllık Toplam"],
+            headers: ["Kalem", "Tutar"],
             defaultRows: [
-                ["Brüt Satış Gelirleri", "₺428.500,00", "₺3.850.000,00"],
-                ["Satış İndirimleri (-)", "₺8.200,00", "₺72.000,00"],
-                ["Net Satışlar", "₺420.300,00", "₺3.778.000,00"],
-                ["Satışların Maliyeti (-)", "₺215.300,00", "₺1.940.000,00"],
-                ["Brüt Faaliyet Kârı", "₺205.000,00", "₺1.838.000,00"],
-                ["Faaliyet Giderleri (-)", "₺42.000,00", "₺380.000,00"],
-                ["Net Dönem Kârı", "₺163.000,00", "₺1.458.000,00"]
+                ["Brüt Satış Gelirleri", "₺1.850.000,00"],
+                ["Satış İndirimleri ve İadeler (-)", "₺42.500,00"],
+                ["Net Satışlar", "₺1.807.500,00"],
+                ["Satılan Malın Maliyeti (SMM) (-)", "₺1.310.000,00"],
+                ["BRÜT SATIŞ KÂRI", "₺497.500,00"],
+                ["Faaliyet Giderleri (-)", "₺145.000,00"],
+                ["FAALİYET KÂRI (EBIT)", "₺352.500,00"],
+                ["DÖNEM NET KÂRI", "₺320.500,00"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -135,15 +137,14 @@ public struct RaporlarView: View {
             title: "Nakit Akış Tablosu",
             category: "Finans",
             description: "Nakit giriş ve çıkışlarının takibi.",
-            iconName: "flame.fill",
-            headers: ["Tarih", "Satış", "Alış", "Kasa Giriş", "Kasa Çıkış", "Net Akış"],
+            iconName: "arrow.triangle.swap",
+            headers: ["Tarih", "Açıklama", "Giren", "Çıkan", "Bakiye"],
             defaultRows: [
-                ["04.11.2026", "₺24.500", "₺12.000", "₺5.000", "₺2.500", "+₺15.000"],
-                ["03.11.2026", "₺18.200", "₺15.000", "₺2.000", "₺1.800", "+₺3.400"],
-                ["02.11.2026", "₺12.000", "₺22.000", "₺4.000", "₺3.000", "-₺9.000"],
-                ["01.11.2026", "₺35.000", "₺8.000", "₺6.000", "₺1.000", "+₺32.000"]
+                ["04.11.2026", "Akıncılar Fatura Tahsilatı", "₺48.500,00", "₺0,00", "₺215.300,00"],
+                ["03.11.2026", "Tedarikçi Mal Alımı Ödemesi", "₺0,00", "₺32.000,00", "₺166.800,00"],
+                ["02.11.2026", "Özdemir Makine Nakit Tahsilat", "₺15.000,00", "₺0,00", "₺198.800,00"]
             ],
-            isHeatmap: true,
+            isHeatmap: false,
             needsCari: false
         ),
         
@@ -155,10 +156,9 @@ public struct RaporlarView: View {
             iconName: "person.2.fill",
             headers: ["Ünvan", "Şehir", "Borç", "Alacak", "Bakiye", "Durum"],
             defaultRows: [
-                ["Akıncılar Çelik Ltd.", "İstanbul", "₺95.000,00", "₺12.000,00", "₺83.000,00", "Borçlu"],
-                ["Özdemir Makine San.", "Bursa", "₺34.200,00", "₺0,00", "₺34.200,00", "Borçlu"],
-                ["Tekin Metal Sanayi", "Ankara", "₺0,00", "₺45.000,00", "-₺45.000,00", "Alacaklı"],
-                ["Kuzey Yapı Market", "İzmir", "₺18.500,00", "₺18.500,00", "₺0,00", "Dengede"]
+                ["Akıncılar Çelik Ltd.", "İstanbul", "₺0,00", "₺142.500,00", "₺142.500,00", "Alacaklı (+)"],
+                ["Özdemir Makine San.", "Bursa", "₺35.200,00", "₺0,00", "₺35.200,00", "Borçlu (-)"],
+                ["Doruk İnşaat A.Ş.", "Ankara", "₺0,00", "₺88.000,00", "₺88.000,00", "Alacaklı (+)"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -167,12 +167,12 @@ public struct RaporlarView: View {
             title: "Cari Hareket Dökümü",
             category: "Cari Hesap",
             description: "Cari hesapların işlem detayları.",
-            iconName: "list.bullet.rectangle.portrait.fill",
-            headers: ["Tarih", "İşlem", "Evrak No", "Borç", "Alacak"],
+            iconName: "clock.arrow.circlepath",
+            headers: ["Tarih", "İşlem Türü", "Evrak No", "Açıklama", "Borç", "Alacak", "Bakiye"],
             defaultRows: [
-                ["02.11.2026", "Satış Faturası", "FAT-2026-0042", "₺28.500,00", "₺0,00"],
-                ["28.10.2026", "Havale / EFT", "EFT-88392", "₺0,00", "₺20.000,00"],
-                ["15.10.2026", "Satış Faturası", "FAT-2026-0038", "₺45.000,00", "₺0,00"]
+                ["04.11.2026", "Satış Faturası", "MB-FTR-101", "Demir & Profil Satışı", "₺48.500,00", "₺0,00", "₺48.500,00"],
+                ["02.11.2026", "Banka Tahsilat", "EFT-8812", "Cari Hesap Tahsilatı", "₺0,00", "₺25.000,00", "₺23.500,00"],
+                ["28.10.2026", "Satış Faturası", "MB-FTR-098", "Kaynak Teli ve Sac", "₺32.000,00", "₺0,00", "₺55.500,00"]
             ],
             isHeatmap: false,
             needsCari: true
@@ -182,11 +182,11 @@ public struct RaporlarView: View {
             category: "Cari Hesap",
             description: "Borç/alacak yaşlandırma analizi.",
             iconName: "hourglass",
-            headers: ["Cari Ünvan", "0-30 Gün", "31-60 Gün", "61-90 Gün", "90+ Gün", "Toplam"],
+            headers: ["Ünvan", "0-30 Gün", "31-60 Gün", "61-90 Gün", "90+ Gün", "Toplam"],
             defaultRows: [
-                ["Akıncılar Çelik", "₺35.000,00", "₺28.000,00", "₺20.000,00", "₺0,00", "₺83.000,00"],
-                ["Özdemir Makine", "₺14.200,00", "₺20.000,00", "₺0,00", "₺0,00", "₺34.200,00"],
-                ["Birlik Hırdavat", "₺0,00", "₺5.000,00", "₺12.000,00", "₺8.400,00", "₺25.400,00"]
+                ["Akıncılar Çelik Ltd.", "₺65.000,00", "₺45.000,00", "₺22.500,00", "₺10.000,00", "₺142.500,00"],
+                ["Doruk İnşaat A.Ş.", "₺40.000,00", "₺28.000,00", "₺15.000,00", "₺5.000,00", "₺88.000,00"],
+                ["Tekin Metal San.", "₺25.000,00", "₺18.000,00", "₺8.400,00", "₺0,00", "₺51.400,00"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -195,12 +195,12 @@ public struct RaporlarView: View {
             title: "Hareketsiz Cariler",
             category: "Cari Hesap",
             description: "İşlem görmeyen cari hesaplar.",
-            iconName: "person.crop.circle.badge.minus",
-            headers: ["Cari Ünvan", "Son İşlem Tarihi", "Bakiye", "Telefon", "Yetkili"],
+            iconName: "person.fill.xmark",
+            headers: ["Ünvan", "Grup", "Telefon", "Son İşlem", "Gün"],
             defaultRows: [
-                ["Asil Otomotiv Ltd.", "12.04.2026", "₺0,00", "0532 111 2233", "Kenan Bey"],
-                ["Güneş Rulman San.", "24.05.2026", "₺1.200,00", "0544 555 6677", "Selin Hanım"],
-                ["Erler Civata Dağıtım", "08.06.2026", "-₺450,00", "0555 999 8811", "Murat Bey"]
+                ["Asil Otomotiv Sanayi", "Müşteri", "0212 555 12 34", "12.04.2026", "206 Gün"],
+                ["Güneş Rulman Ltd.", "Müşteri", "0216 444 88 99", "24.05.2026", "164 Gün"],
+                ["Erler Civata Dağıtım", "Müşteri", "0224 333 11 22", "08.06.2026", "149 Gün"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -209,12 +209,12 @@ public struct RaporlarView: View {
             title: "Vadesi Geçmiş Alacaklar",
             category: "Cari Hesap",
             description: "Ödeme süresi geçmiş tahsilatlar.",
-            iconName: "clock.badge.exclamationmark.fill",
-            headers: ["Cari Ünvan", "Evrak No", "Vade Tarihi", "Gecikme (Gün)", "Tutar"],
+            iconName: "bell.badge.fill",
+            headers: ["Müşteri", "Cari Bakiyesi", "Ort. Gecikme Günü", "Fatura / Evrak No", "Fatura Bakiyesi", "Gecikme (Gün)"],
             defaultRows: [
-                ["Akıncılar Çelik", "FAT-2026-0021", "15.10.2026", "20 Gün", "₺28.000,00"],
-                ["Birlik Hırdavat", "FAT-2026-0019", "01.10.2026", "34 Gün", "₺12.000,00"],
-                ["Özdemir Makine", "FAT-2026-0030", "25.10.2026", "10 Gün", "₺20.000,00"]
+                ["Akıncılar Çelik Ltd.", "₺142.500,00", "28 Gün", "MB-FTR-082", "₺35.000,00", "32 Gün"],
+                ["Doruk İnşaat A.Ş.", "₺88.000,00", "19 Gün", "MB-FTR-089", "₺28.000,00", "24 Gün"],
+                ["Güneş Rulman Ltd.", "₺54.500,00", "45 Gün", "MB-FTR-074", "₺18.500,00", "52 Gün"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -225,12 +225,12 @@ public struct RaporlarView: View {
             title: "Stok Mevcudu",
             category: "Stok",
             description: "Güncel stok miktarları ve değerleri.",
-            iconName: "shippingbox.fill",
+            iconName: "cube.box.fill",
             headers: ["Stok Kodu", "Stok Adı", "Kategori", "Miktar", "Ort. Alış F.", "Ort. Satış F.", "Satış F."],
             defaultRows: [
-                ["STK-001", "Paslanmaz Sac 2mm", "Sac Grubu", "120.00", "₺450,00", "₺620,00", "₺650,00"],
-                ["STK-002", "Profil Boru 40x40", "Profil", "85.00", "₺180,00", "₺260,00", "₺275,00"],
-                ["STK-003", "Kaynak Teli 1.2mm", "Sarf Malzeme", "40.00", "₺85,00", "₺130,00", "₺140,00"]
+                ["STK-001", "Paslanmaz Çelik Sac 2mm", "Sac Grubu", "450 Adet", "₺480,00", "₺620,00", "₺650,00"],
+                ["STK-002", "Sanayi Profil Boru 40x40", "Profil", "820 Metre", "₺195,00", "₺260,00", "₺275,00"],
+                ["STK-003", "Gazaltı Kaynak Teli 1.2mm", "Kaynak", "150 Makara", "₺95,00", "₺130,00", "₺140,00"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -239,12 +239,12 @@ public struct RaporlarView: View {
             title: "Stok Hareketleri",
             category: "Stok",
             description: "Giriş-çıkış stok hareket dökümü.",
-            iconName: "arrow.triangle.swap",
+            iconName: "arrow.left.arrow.right",
             headers: ["Tarih", "Stok Adı", "İşlem", "Giren", "Çıkan", "Birim Fiyat", "Kalan"],
             defaultRows: [
-                ["03.11.2026", "Paslanmaz Sac 2mm", "Satış", "0", "15", "₺650,00", "120"],
-                ["01.11.2026", "Paslanmaz Sac 2mm", "Alış", "50", "0", "₺450,00", "135"],
-                ["30.10.2026", "Profil Boru 40x40", "Satış", "0", "20", "₺275,00", "85"]
+                ["04.11.2026", "Paslanmaz Sac 2mm", "Satış Faturası", "0", "50", "₺650,00", "450"],
+                ["03.11.2026", "Profil Boru 40x40", "Satış Faturası", "0", "120", "₺275,00", "820"],
+                ["01.11.2026", "Kaynak Teli 1.2mm", "Alış Faturası", "100", "0", "₺95,00", "150"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -254,11 +254,11 @@ public struct RaporlarView: View {
             category: "Stok",
             description: "Minimum seviyenin altındaki ürünler.",
             iconName: "exclamationmark.triangle.fill",
-            headers: ["Stok Kodu", "Stok Adı", "Mevcut", "Kritik Seviye", "Fark", "Durum"],
+            headers: ["Stok Kodu", "Stok Adı", "Mevcut", "Min. Seviye", "Durum", "Satış Fiyatı"],
             defaultRows: [
-                ["STK-003", "Kaynak Teli 1.2mm", "8 Adet", "20 Adet", "-12 Adet", "Kritik Sipariş!"],
-                ["STK-012", "Kesme Taşı 180mm", "4 Adet", "15 Adet", "-11 Adet", "Kritik Sipariş!"],
-                ["STK-019", "Cıvata M10x50", "25 Adet", "50 Adet", "-25 Adet", "Azalıyor"]
+                ["STK-008", "Kare Profil 50x50x3", "8 Adet", "25 Adet", "KRİTİK (-17)", "₺420,00"],
+                ["STK-014", "Elektrot 3.25mm Askaynak", "5 Paket", "20 Paket", "KRİTİK (-15)", "₺380,00"],
+                ["STK-022", "Kesici Taş 180x3 Karbosan", "12 Adet", "50 Adet", "KRİTİK (-38)", "₺65,00"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -266,12 +266,12 @@ public struct RaporlarView: View {
         ReportItemInfo(
             title: "Ölü Stok Raporu",
             category: "Stok",
-            description: "Çakışan stok kartlarının listesi (Birleştirilmesi Gerekenler).",
+            description: "Çakışan veya hareketsiz stok kartları.",
             iconName: "archivebox.fill",
-            headers: ["Stok Adı", "Kategori", "Adet", "Grup", "Öneri"],
+            headers: ["Stok Adı", "Barkod", "Stok Kodu", "Mevcut Miktar", "Çakışma Nedeni"],
             defaultRows: [
-                ["Paslanmaz Çelik Sac 2mm", "Sac Grubu", "2 Benzer Kart", "Sac-2", "Birleştirme Önerilir"],
-                ["Profil Boru 40*40", "Profil", "2 Benzer Kart", "Boru-40", "Birleştirme Önerilir"]
+                ["Çelik Lama 30x5mm", "869000100234", "STK-112", "180 Metre", "6 Aydır Hareket Görmedi"],
+                ["T-Demiri 40x40", "869000100567", "STK-145", "65 Adet", "8 Aydır Hareket Görmedi"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -280,28 +280,26 @@ public struct RaporlarView: View {
             title: "Stok Devir Hızı",
             category: "Stok",
             description: "Stokların dönüşüm hızı analizi.",
-            iconName: "repeat",
-            headers: ["Stok Adı", "Satılan Adet", "Ortalama Stok", "Devir Hızı", "Devir Süresi"],
+            iconName: "chart.line.uptrend.xyaxis",
+            headers: ["Stok Adı", "Mevcut Stok", "Toplam Satış (Çıkan)", "Stok Devir Hızı", "Kategori"],
             defaultRows: [
-                ["Paslanmaz Sac 2mm", "240 Adet", "100 Adet", "2.40x", "152 Gün"],
-                ["Profil Boru 40x40", "310 Adet", "70 Adet", "4.42x", "82 Gün"],
-                ["Kaynak Teli 1.2mm", "180 Adet", "30 Adet", "6.00x", "60 Gün"]
+                ["Paslanmaz Sac 2mm", "450 Adet", "1.250 Adet", "2.78 / Yıl", "Sac Grubu"],
+                ["Profil Boru 40x40", "820 Metre", "3.400 Metre", "4.15 / Yıl", "Profil"]
             ],
             isHeatmap: false,
             needsCari: false
         ),
         
-        // 5. Satış & Karlılık
+        // 5. Satış
         ReportItemInfo(
             title: "Satış Faturası Dökümü",
             category: "Satış",
             description: "Kesilen satış faturalarının listesi.",
-            iconName: "cart.fill",
-            headers: ["Fatura No", "Tarih", "Müşteri Ünvanı", "KDV Hariç", "KDV", "Genel Toplam"],
+            iconName: "doc.text.fill",
+            headers: ["Fatura No", "Tarih", "Müşteri", "Ara Toplam", "KDV", "Genel Toplam"],
             defaultRows: [
-                ["FAT-2026-0045", "03.11.2026", "Akıncılar Çelik", "₺35.000,00", "₺7.000,00", "₺42.000,00"],
-                ["FAT-2026-0044", "02.11.2026", "Özdemir Makine", "₺18.500,00", "₺3.700,00", "₺22.200,00"],
-                ["FAT-2026-0043", "01.11.2026", "Birlik Hırdavat", "₺8.400,00", "₺1.680,00", "₺10.080,00"]
+                ["MB-FTR-101", "04.11.2026", "Akıncılar Çelik Ltd.", "₺40.416,67", "₺8.083,33", "₺48.500,00"],
+                ["MB-FTR-098", "28.10.2026", "Doruk İnşaat A.Ş.", "₺26.666,67", "₺5.333,33", "₺32.000,00"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -310,26 +308,27 @@ public struct RaporlarView: View {
             title: "En Çok Satan Ürünler",
             category: "Satış",
             description: "Satış adedine göre top listeler.",
-            iconName: "flame.circle.fill",
-            headers: ["Sıra", "Ürün Adı", "Satış Adedi", "Toplam Tutar", "Ciro Payı"],
+            iconName: "star.fill",
+            headers: ["Sıra", "Ürün Adı", "Mevcut Stok", "Satış Fiyatı", "Kategori"],
             defaultRows: [
-                ["1", "Paslanmaz Sac 2mm", "240 Adet", "₺156.000,00", "%36.4"],
-                ["2", "Profil Boru 40x40", "310 Adet", "₺85.250,00", "%19.8"],
-                ["3", "Kaynak Teli 1.2mm", "180 Adet", "₺25.200,00", "%5.8"]
+                ["1", "Sanayi Profil Boru 40x40", "820 Metre", "₺275,00", "Profil"],
+                ["2", "Paslanmaz Çelik Sac 2mm", "450 Adet", "₺650,00", "Sac Grubu"],
+                ["3", "Gazaltı Kaynak Teli 1.2mm", "150 Makara", "₺140,00", "Kaynak"]
             ],
             isHeatmap: false,
             needsCari: false
         ),
+        
+        // 6. Karlılık
         ReportItemInfo(
             title: "Ürün Karlılık Raporu",
             category: "Karlılık",
             description: "Ürün bazlı kar/zarar analizi.",
-            iconName: "chart.line.uptrend.xyaxis",
-            headers: ["Ürün Adı", "Satış Geliri", "Alış Maliyeti", "Net Kâr", "Kâr Marjı"],
+            iconName: "tag.fill",
+            headers: ["Ürün Adı", "Alış Fiyatı", "Satış Fiyatı", "Kar", "Kar Marjı %"],
             defaultRows: [
-                ["Paslanmaz Sac 2mm", "₺156.000,00", "₺108.000,00", "₺48.000,00", "%30.7"],
-                ["Profil Boru 40x40", "₺85.250,00", "₺55.800,00", "₺29.450,00", "%34.5"],
-                ["Kaynak Teli 1.2mm", "₺25.200,00", "₺15.300,00", "₺9.900,00", "%39.2"]
+                ["Paslanmaz Çelik Sac 2mm", "₺480,00", "₺650,00", "₺170,00", "%26.2"],
+                ["Sanayi Profil Boru 40x40", "₺195,00", "₺275,00", "₺80,00", "%29.1"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -338,12 +337,11 @@ public struct RaporlarView: View {
             title: "Müşteri Karlılık Analizi",
             category: "Karlılık",
             description: "Müşteri bazlı kar/zarar analizi.",
-            iconName: "person.crop.rectangle.stack.fill",
-            headers: ["Müşteri Ünvanı", "Toplam Ciro", "Ürün Maliyeti", "Sağlanan Kâr", "Kâr Oranı"],
+            iconName: "person.crop.circle.badge.checkmark",
+            headers: ["Müşteri", "Toplam Satış", "Tahmini Maliyet", "Net Kar", "Kar Marjı (%)", "Fatura Sayısı"],
             defaultRows: [
-                ["Akıncılar Çelik Ltd.", "₺185.000,00", "₺122.000,00", "₺63.000,00", "%34.0"],
-                ["Özdemir Makine San.", "₺94.500,00", "₺61.000,00", "₺33.500,00", "%35.4"],
-                ["Birlik Hırdavat", "₺42.000,00", "₺26.800,00", "₺15.200,00", "%36.1"]
+                ["Akıncılar Çelik Ltd.", "₺840.000,00", "₺610.000,00", "₺230.000,00", "%27.4", "18 Fatura"],
+                ["Özdemir Makine San.", "₺480.000,00", "₺345.000,00", "₺135.000,00", "%28.1", "12 Fatura"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -351,31 +349,28 @@ public struct RaporlarView: View {
         ReportItemInfo(
             title: "Detaylı Gelir ve Maliyet Analizi",
             category: "Karlılık",
-            description: "Tarih bazlı ürün satışlarının kime yapıldığı, en son kimden ne kadara alındığı ve satır bazlı kâr analizi.",
-            iconName: "list.clipboard.fill",
-            headers: ["Tarih", "Ürün", "Müşteri", "Satış F.", "Son Alış Tedarikçi", "Son Alış F.", "Fark Kâr"],
+            description: "Satır bazlı ürün maliyet ve kâr analizi.",
+            iconName: "tablecells",
+            headers: ["Tarih", "Ürün Adı", "Müşteri (Kime)", "Miktar", "Satış Fiyatı", "Tutar (Net/KDV)", "Tahsilat Yöntemi & Süresi", "En Son Tedarikçi", "Alış Fiyatı & Değişim", "Maliyet", "Net Kar & Durum", "Marj", "Ödeme Yöntemi & Süresi"],
             defaultRows: [
-                ["03.11.2026", "Paslanmaz Sac", "Akıncılar Çelik", "₺650,00", "Ereğli Demir Çelik", "₺450,00", "+₺200,00 (%30.7)"],
-                ["02.11.2026", "Profil Boru", "Özdemir Makine", "₺275,00", "Borusan Mannesmann", "₺180,00", "+₺95,00 (%34.5)"],
-                ["01.11.2026", "Kaynak Teli", "Birlik Hırdavat", "₺140,00", "Magmaweld Sanayi", "₺85,00", "+₺55,00 (%39.2)"]
+                ["04.11.2026", "Paslanmaz Sac 2mm", "Akıncılar Çelik Ltd.", "50 Adet", "₺650,00", "₺32.500 (+KDV)", "Nakit • 0 Gün", "Ereğli Demir Çelik", "₺480,00 (%0)", "₺24.000,00", "₺8.500 (Kâr)", "%26.2", "Vadeli • 30 Gün"],
+                ["03.11.2026", "Profil Boru 40x40", "Özdemir Makine", "120 Metre", "₺275,00", "₺33.000 (+KDV)", "Kredi Kartı • 1 Gün", "Borusan Mannesmann", "₺195,00 (+%4)", "₺23.400,00", "₺9.600 (Kâr)", "%29.1", "Peşin • 0 Gün"]
             ],
             isHeatmap: false,
             needsCari: false
         ),
         
-        // 6. Stratejik Analiz
+        // 7. Stratejik
         ReportItemInfo(
             title: "Müşteri ABC Analizi",
             category: "Stratejik",
-            description: "Ciroya göre müşteri sınıflandırması. A Sınıfı: En yüksek %80, B Sınıfı: Sonraki %15, C Sınıfı: Kalan %5",
-            iconName: "a.square.fill",
-            headers: ["Sınıf", "Müşteri Ünvanı", "Ciro", "Ciro Payı", "Kümülatif Pay"],
+            description: "Ciroya göre müşteri sınıflandırması.",
+            iconName: "chart.bar.xaxis",
+            headers: ["Müşteri", "Toplam Satış", "Yüzde", "Sınıf"],
             defaultRows: [
-                ["A Sınıfı", "Akıncılar Çelik Ltd.", "₺185.000,00", "%43.1", "%43.1"],
-                ["A Sınıfı", "Özdemir Makine San.", "₺94.500,00", "%22.0", "%65.1"],
-                ["A Sınıfı", "Doruk İnşaat A.Ş.", "₺65.000,00", "%15.1", "%80.2"],
-                ["B Sınıfı", "Birlik Hırdavat", "₺42.000,00", "%9.8", "%90.0"],
-                ["C Sınıfı", "Diğer 12 Cari", "₺42.000,00", "%10.0", "%100.0"]
+                ["Akıncılar Çelik Ltd.", "₺840.000,00", "%45.4", "A Sınıfı (Önemli)"],
+                ["Özdemir Makine San.", "₺480.000,00", "%25.9", "A Sınıfı (Önemli)"],
+                ["Doruk İnşaat A.Ş.", "₺320.000,00", "%17.3", "B Sınıfı (Orta)"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -399,11 +394,11 @@ public struct RaporlarView: View {
             category: "Stratejik",
             description: "Kayıp riski olan pasif müşteriler.",
             iconName: "person.crop.circle.badge.exclamationmark",
-            headers: ["Müşteri Ünvanı", "Son Sipariş", "Boşta Kalan Gün", "Eski Aylık Hacim", "Risk Seviyesi"],
+            headers: ["Müşteri", "Son İşlem", "Geçen Gün", "Kayıp Riski"],
             defaultRows: [
-                ["Asil Otomotiv Ltd.", "12.04.2026", "206 Gün", "₺45.000,00", "YÜKSEK (Kayıp)"],
-                ["Güneş Rulman San.", "24.05.2026", "164 Gün", "₺28.000,00", "YÜKSEK (Kayıp)"],
-                ["Erler Civata Dağıtım", "08.06.2026", "149 Gün", "₺18.500,00", "ORTA (Riskli)"]
+                ["Asil Otomotiv Ltd.", "12.04.2026", "206 Gün", "YÜKSEK (Kayıp)"],
+                ["Güneş Rulman San.", "24.05.2026", "164 Gün", "YÜKSEK (Kayıp)"],
+                ["Erler Civata Dağıtım", "08.06.2026", "149 Gün", "ORTA (Riskli)"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -413,11 +408,11 @@ public struct RaporlarView: View {
             category: "Stratejik",
             description: "Ürün fiyat değişim trendleri.",
             iconName: "waveform.path.ecg",
-            headers: ["Ürün Adı", "3 Ay Önce", "Geçen Ay", "Güncel Fiyat", "Değişim"],
+            headers: ["Ürün", "Min Fiyat", "Max Fiyat", "Ort Fiyat", "Fark %"],
             defaultRows: [
-                ["Paslanmaz Sac 2mm", "₺540,00", "₺610,00", "₺650,00", "+%20.3"],
-                ["Profil Boru 40x40", "₺220,00", "₺250,00", "₺275,00", "+%25.0"],
-                ["Kaynak Teli 1.2mm", "₺110,00", "₺125,00", "₺140,00", "+%27.2"]
+                ["Paslanmaz Sac 2mm", "₺540,00", "₺650,00", "₺595,00", "+%20.3"],
+                ["Profil Boru 40x40", "₺220,00", "₺275,00", "₺247,50", "+%25.0"],
+                ["Kaynak Teli 1.2mm", "₺110,00", "₺140,00", "₺125,00", "+%27.2"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -427,11 +422,11 @@ public struct RaporlarView: View {
             category: "Stratejik",
             description: "Müşteri yaşam boyu değer analizi.",
             iconName: "crown.fill",
-            headers: ["Müşteri Ünvanı", "Toplam Sipariş", "Toplam Hacim", "Kâr Katkısı", "LTV Skoru"],
+            headers: ["Müşteri", "İlk Alışveriş", "Son Alışveriş", "Toplam Harcama", "Ortalama Sepet"],
             defaultRows: [
-                ["Akıncılar Çelik Ltd.", "48 Sipariş", "₺840.000,00", "₺285.000,00", "98/100 (VIP)"],
-                ["Özdemir Makine San.", "32 Sipariş", "₺480.000,00", "₺168.000,00", "89/100 (Sadık)"],
-                ["Doruk İnşaat A.Ş.", "19 Sipariş", "₺320.000,00", "₺112.000,00", "78/100 (İyi)"]
+                ["Akıncılar Çelik Ltd.", "14.02.2024", "04.11.2026", "₺840.000,00", "₺46.666,67"],
+                ["Özdemir Makine San.", "18.06.2024", "03.11.2026", "₺480.000,00", "₺40.000,00"],
+                ["Doruk İnşaat A.Ş.", "10.09.2024", "28.10.2026", "₺320.000,00", "₺40.000,00"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -441,12 +436,11 @@ public struct RaporlarView: View {
             category: "Stratejik",
             description: "Günlük finansal aktivite yoğunluğu.",
             iconName: "square.grid.3x3.fill",
-            headers: ["Tarih", "Satış", "Alış", "Kasa Giriş", "Kasa Çıkış", "Net Akış"],
+            headers: ["Tarih", "Satış", "Alış", "Kasa Giren", "Kasa Çıkan", "Net Akış"],
             defaultRows: [
-                ["04.11.2026", "₺24.500", "₺12.000", "₺5.000", "₺2.500", "+₺15.000"],
-                ["03.11.2026", "₺18.200", "₺15.000", "₺2.000", "₺1.800", "+₺3.400"],
-                ["02.11.2026", "₺12.000", "₺22.000", "₺4.000", "₺3.000", "-₺9.000"],
-                ["01.11.2026", "₺35.000", "₺8.000", "₺6.000", "₺1.000", "+₺32.000"]
+                ["04.11.2026", "₺24.500,00", "₺12.000,00", "₺5.000,00", "₺2.500,00", "+₺15.000,00"],
+                ["03.11.2026", "₺18.200,00", "₺15.000,00", "₺2.000,00", "₺1.800,00", "+₺3.400,00"],
+                ["02.11.2026", "₺12.000,00", "₺22.000,00", "₺4.000,00", "₺3.000,00", "-₺9.000,00"]
             ],
             isHeatmap: true,
             needsCari: false
@@ -455,12 +449,12 @@ public struct RaporlarView: View {
             title: "Tahsilat Süresi (DSO)",
             category: "Stratejik",
             description: "Ortalama tahsilat hızı (gün).",
-            iconName: "timer",
-            headers: ["Müşteri Grubu", "Ortalama Vade", "Fiili Tahsilat", "DSO (Gün)", "Hedef Vade"],
+            iconName: "speedometer",
+            headers: ["Müşteri", "Ortalama Tahsilat Süresi (Gün)", "Toplam Alacak", "Durum"],
             defaultRows: [
-                ["Toptan Müşteriler", "45 Gün", "52 Gün", "52 Gün", "45 Gün"],
-                ["Perakende Satışlar", "Peşin / KK", "2 Gün", "2 Gün", "Peşin"],
-                ["İnşaat / Proje Grubu", "60 Gün", "78 Gün", "78 Gün (Risk)", "60 Gün"]
+                ["Akıncılar Çelik Ltd.", "28 Gün", "₺142.500,00", "Normal (Vadesinde)"],
+                ["Doruk İnşaat A.Ş.", "34 Gün", "₺88.000,00", "Kabul Edilebilir"],
+                ["Güneş Rulman San.", "52 Gün", "₺54.500,00", "Gecikmeli (Riskli)"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -470,11 +464,11 @@ public struct RaporlarView: View {
             category: "Stratejik",
             description: "Aylık hedeflere ulaşma durumu.",
             iconName: "target",
-            headers: ["Hedef Kalemi", "Aylık Hedef", "Gerçekleşen", "Kalan", "Başarı %"],
+            headers: ["Dönem (Ay)", "Hedeflenen Ciro", "Gerçekleşen Satış", "Fark", "Başarı Oranı %"],
             defaultRows: [
-                ["Aylık Toplam Ciro", "₺500.000,00", "₺428.500,00", "₺71.500,00", "%85.7"],
-                ["Nakit Tahsilat", "₺250.000,00", "₺247.500,00", "₺2.500,00", "%99.0"],
-                ["Yeni Müşteri Kazanımı", "10 Firma", "8 Firma", "2 Firma", "%80.0"]
+                ["Kasım (Hedef)", "₺450.000,00", "₺95.000,00", "-₺355.000,00", "%21.1"],
+                ["Ekim 2026", "₺400.000,00", "₺428.500,00", "+₺28.500,00", "%107.1"],
+                ["Eylül 2026", "₺380.000,00", "₺395.000,00", "+₺15.000,00", "%103.9"]
             ],
             isHeatmap: false,
             needsCari: false
@@ -874,140 +868,14 @@ public struct RaporDetayInteractiveView: View {
         isLoadingData = true
         defer { isLoadingData = false }
         
-        do {
-            let title = report.title.lowercased()
-            let cat = report.category.lowercased()
-            
-            // 1. Cari ile ilgili raporlar (Cari Bakiye, Yaşlandırma, Cari Hareket, vb.)
-            if title.contains("cari") || title.contains("bakiye") || title.contains("yaşlandırma") || cat.contains("cari") {
-                let cariler: [CariKart] = try await SupabaseService.shared.fetch(from: "cariler")
-                if !cariler.isEmpty {
-                    var rows: [[String]] = []
-                    for c in cariler {
-                        let b = c.bakiye
-                        let bakiyeStr = AppFormatters.money(b)
-                        let bakiyeTuru = (c.bakiyeTuru == "A") ? "Alacaklı (+)" : "Borçlu (-)"
-                        let vadeStr = "\(c.vadeGunu ?? 30) Gün"
-                        
-                        if report.headers.count == 5 {
-                            rows.append([
-                                c.cariKodu ?? "CR-\(c.id)",
-                                c.unvan,
-                                bakiyeStr,
-                                bakiyeTuru,
-                                vadeStr
-                            ])
-                        } else if report.headers.count == 4 {
-                            rows.append([
-                                c.cariKodu ?? "CR-\(c.id)",
-                                c.unvan,
-                                bakiyeStr,
-                                bakiyeTuru
-                            ])
-                        } else if report.headers.count == 6 {
-                            rows.append([
-                                "04.11.2026",
-                                c.cariKodu ?? "CR-\(c.id)",
-                                c.unvan,
-                                AppFormatters.money(c.bakiyeTuru == "B" ? c.bakiye : 0),
-                                AppFormatters.money(c.bakiyeTuru == "A" ? c.bakiye : 0),
-                                bakiyeStr
-                            ])
-                        } else {
-                            rows.append([c.unvan, bakiyeStr])
-                        }
-                    }
-                    if !rows.isEmpty {
-                        let finalRows = rows
-                        await MainActor.run { self.liveRows = finalRows }
-                        return
-                    }
-                }
-            }
-            
-            // 2. Kasa / Banka / Nakit Raporları
-            if title.contains("kasa") || title.contains("nakit") || title.contains("banka") || cat.contains("kasa") {
-                let kasalar: [KasaBanka] = try await SupabaseService.shared.fetch(from: "kasalar")
-                let bankalar: [BankaKart] = try await SupabaseService.shared.fetch(from: "bankalar")
-                var rows: [[String]] = []
-                for k in kasalar {
-                    rows.append([
-                        "04.11.2026",
-                        k.hesapAdi,
-                        "Kasa Bakiye",
-                        k.hesapTuru,
-                        AppFormatters.money(k.bakiye),
-                        k.dovizCinsi ?? "TL"
-                    ])
-                }
-                for b in bankalar {
-                    rows.append([
-                        "04.11.2026",
-                        b.bankaAdi,
-                        "Banka Hesabı",
-                        b.hesapNo ?? "-",
-                        AppFormatters.money(b.bakiye),
-                        b.dovizTuru ?? "TL"
-                    ])
-                }
-                if !rows.isEmpty {
-                    let finalRows = rows
-                    await MainActor.run { self.liveRows = finalRows }
-                    return
-                }
-            }
-            
-            // 3. Genel Özet Raporu
-            if title.contains("genel") || title.contains("özet") {
-                let cariler: [CariKart] = try await SupabaseService.shared.fetch(from: "cariler")
-                var topAlacak: Double = 0
-                var topBorc: Double = 0
-                for c in cariler {
-                    if c.bakiyeTuru == "A" {
-                        topAlacak += c.bakiye
-                    } else {
-                        topBorc += c.bakiye
-                    }
-                }
-                if topAlacak == 0 { topAlacak = 222120.0 }
-                if topBorc == 0 { topBorc = 12000.0 }
-                
-                let rows: [[String]] = [
-                    ["Toplam Alacaklar", AppFormatters.money(topAlacak)],
-                    ["Toplam Borçlar", AppFormatters.money(topBorc)],
-                    ["Net Finansal Bakiye", AppFormatters.money(topAlacak - topBorc)],
-                    ["Kayıtlı Aktif Cari Sayısı", "\(cariler.count > 0 ? cariler.count : 31) Firma"],
-                    ["Mali Durum", topAlacak >= topBorc ? "Pozitif (Güçlü Nakit)" : "Risk Analizinde"]
-                ]
-                let finalRows = rows
-                await MainActor.run { self.liveRows = finalRows }
-                return
-            }
-            
-            // 4. Faturalar / Satış Raporları
-            if title.contains("fatura") || title.contains("satış") || title.contains("karlılık") {
-                let faturalar: [Fatura] = try await SupabaseService.shared.fetch(from: "faturalar")
-                if !faturalar.isEmpty {
-                    var rows: [[String]] = []
-                    for f in faturalar {
-                        rows.append([
-                            String(f.tarih.prefix(10)),
-                            f.faturaNo,
-                            f.cariUnvan ?? "Cari",
-                            AppFormatters.money(f.araToplam),
-                            AppFormatters.money(f.kdvToplami),
-                            AppFormatters.money(f.genelToplam)
-                        ])
-                    }
-                    if !rows.isEmpty {
-                        let finalRows = rows
-                        await MainActor.run { self.liveRows = finalRows }
-                        return
-                    }
-                }
-            }
-        } catch {
-            print("Canlı rapor verisi çekilirken fallback kullanılıyor: \(error)")
+        let calculated = await ReportCalculationService.shared.calculateReport(
+            report: report,
+            dateFilter: dateFilter,
+            cariName: cariName
+        )
+        
+        await MainActor.run {
+            self.liveRows = calculated.rows
         }
     }
     
