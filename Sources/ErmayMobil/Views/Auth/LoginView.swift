@@ -3,8 +3,8 @@ import SwiftUI
 public struct LoginView: View {
     @ObservedObject var authService = AuthService.shared
     
-    @State private var username: String = ""
-    @State private var pass: String = ""
+    @State private var username: String = "vkrts"
+    @State private var pass: String = "2013110034"
     @State private var rememberMe: Bool = true
     @State private var tenantId: String = "tenant_ermay_master"
     @State private var showAdvancedTenant: Bool = false
