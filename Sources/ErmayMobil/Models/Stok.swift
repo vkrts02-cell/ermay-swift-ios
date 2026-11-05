@@ -168,6 +168,25 @@ public struct StokKart: Identifiable, Codable, Hashable {
         self.syncGuid = (try? c.decode(String.self, forKey: .syncGuid)) ?? (try? c.decode(String.self, forKey: .uuid))
         self.tenantId = try? c.decode(String.self, forKey: .tenantId)
     }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(stokKodu, forKey: .stokKodu)
+        try container.encode(stokAdi, forKey: .stokAdi)
+        try container.encodeIfPresent(barkod, forKey: .barkod)
+        try container.encodeIfPresent(grupAdi, forKey: .grupAdi)
+        try container.encodeIfPresent(birim, forKey: .birim)
+        try container.encode(alisFiyati, forKey: .alisFiyati)
+        try container.encode(satisFiyati, forKey: .satisFiyati)
+        try container.encode(kdvOrani, forKey: .kdvOrani)
+        try container.encode(mevcutMiktar, forKey: .mevcutMiktar)
+        try container.encodeIfPresent(kritikMiktar, forKey: .kritikMiktar)
+        try container.encodeIfPresent(aciklama, forKey: .aciklama)
+        try container.encodeIfPresent(aktif, forKey: .aktif)
+        try container.encodeIfPresent(syncGuid, forKey: .syncGuid)
+        try container.encodeIfPresent(tenantId, forKey: .tenantId)
+    }
 }
 
 public struct StokHareket: Identifiable, Codable, Hashable {
@@ -184,6 +203,10 @@ public struct StokHareket: Identifiable, Codable, Hashable {
     public var cariId: String?
     public var cariUnvan: String?
     public var syncGuid: String?
+    
+    public var toplamTutar: Double {
+        miktar * birimFiyat
+    }
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -205,11 +228,12 @@ public struct StokHareket: Identifiable, Codable, Hashable {
     
     public init(
         id: String = UUID().uuidString,
-        stokId: String,
+        stokId: String = "",
         tarih: String? = nil,
         islemTuru: String? = "GIRIS",
         miktar: Double = 0.0,
         birimFiyat: Double = 0.0,
+        toplamTutar: Double? = nil,
         kdvOrani: Double? = 20.0,
         belgeNo: String? = nil,
         aciklama: String? = nil,
@@ -290,4 +314,34 @@ public struct StokHareket: Identifiable, Codable, Hashable {
         self.cariUnvan = try? c.decode(String.self, forKey: .cariUnvan)
         self.syncGuid = (try? c.decode(String.self, forKey: .syncGuid)) ?? (try? c.decode(String.self, forKey: .uuid))
     }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(stokId, forKey: .stokId)
+        try container.encodeIfPresent(tarih, forKey: .tarih)
+        try container.encodeIfPresent(islemTuru, forKey: .islemTuru)
+        try container.encode(miktar, forKey: .miktar)
+        try container.encode(birimFiyat, forKey: .birimFiyat)
+        try container.encodeIfPresent(kdvOrani, forKey: .kdvOrani)
+        try container.encodeIfPresent(belgeNo, forKey: .belgeNo)
+        try container.encodeIfPresent(aciklama, forKey: .aciklama)
+        try container.encodeIfPresent(faturaId, forKey: .faturaId)
+        try container.encodeIfPresent(cariId, forKey: .cariId)
+        try container.encodeIfPresent(cariUnvan, forKey: .cariUnvan)
+        try container.encodeIfPresent(syncGuid, forKey: .syncGuid)
+    }
 }
+
+public struct StokGrup: Identifiable, Codable, Hashable {
+    public var id: String
+    public var grupAdi: String
+    public var aciklama: String?
+    
+    public init(id: String = UUID().uuidString, grupAdi: String, aciklama: String? = nil) {
+        self.id = id
+        self.grupAdi = grupAdi
+        self.aciklama = aciklama
+    }
+}
+

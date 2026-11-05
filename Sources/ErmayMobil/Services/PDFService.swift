@@ -45,7 +45,7 @@ public final class PDFService {
         ]
         
         let detaylarArray: [[String: Any]] = kalemler.enumerated().map { idx, k in
-            let stId = Int(k.stokId) ?? (idx + 1)
+            let stId = Int(k.stokId ?? "") ?? (idx + 1)
             return [
                 "Id": idx + 1,
                 "FaturaId": fId,
@@ -102,7 +102,7 @@ public final class PDFService {
         ]
         
         let detaylarArray: [[String: Any]] = kalemler.enumerated().map { idx, k in
-            let stId = Int(k.stokId) ?? (idx + 1)
+            let stId = Int(k.stokId ?? "") ?? (idx + 1)
             return [
                 "Id": idx + 1,
                 "TeklifId": tId,
@@ -171,7 +171,7 @@ public final class PDFService {
         ]
         
         let detaylarArray: [[String: Any]] = kalemler.enumerated().map { idx, k in
-            let stId = Int(k.stokId) ?? (idx + 1)
+            let stId = Int(k.stokId ?? "") ?? (idx + 1)
             return [
                 "Id": idx + 1,
                 "SiparisId": sId,
@@ -528,7 +528,7 @@ public final class PDFService {
             kdvToplami: teklif.kdvToplami,
             iskontoToplami: 0,
             genelToplam: teklif.genelToplam,
-            kalemler: kalemler.map { FaturaKalem(stokId: $0.stokId, stokKodu: $0.stokKodu, stokAdi: $0.stokAdi, miktar: $0.miktar, birim: $0.birim, birimFiyat: $0.birimFiyat, kdvOrani: $0.kdvOrani, toplamTutar: $0.toplamTutar) }
+            kalemler: kalemler.map { FaturaKalem(stokId: $0.stokId, stokKodu: $0.stokKodu, stokAdi: $0.stokAdi, miktar: $0.miktar, birim: $0.birim ?? "Adet", birimFiyat: $0.birimFiyat, kdvOrani: $0.kdvOrani, toplamTutar: $0.toplamTutar) }
         )
         return generateFaturaPDF(fatura: dummyFatura, firma: firma)
     }
@@ -551,7 +551,7 @@ public final class PDFService {
             kdvToplami: siparis.kdvToplami,
             iskontoToplami: siparis.iskontoToplami,
             genelToplam: siparis.genelToplam,
-            kalemler: kalemler.map { FaturaKalem(stokId: $0.stokId, stokKodu: $0.stokKodu, stokAdi: $0.stokAdi, miktar: $0.miktar, birim: $0.birim, birimFiyat: $0.birimFiyat, kdvOrani: $0.kdvOrani, toplamTutar: $0.toplamTutar) }
+            kalemler: kalemler.map { FaturaKalem(stokId: $0.stokId, stokKodu: $0.stokKodu, stokAdi: $0.stokAdi, miktar: $0.miktar, birim: $0.birim ?? "Adet", birimFiyat: $0.birimFiyat, kdvOrani: $0.kdvOrani, toplamTutar: $0.toplamTutar) }
         )
         return generateFaturaPDF(fatura: dummyFatura, firma: firma)
     }

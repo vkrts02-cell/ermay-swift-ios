@@ -3,8 +3,8 @@ import SwiftUI
 public struct StokDetailView: View {
     public let stok: StokKart
     @State private var hareketler: [StokHareket] = [
-        StokHareket(id: "1", tarih: "02.11.2026", islemTuru: "Satış Faturası", belgeNo: "FTR-2026-0012", miktar: 5, birimFiyat: 220, toplamTutar: 1100, aciklama: "Ermay Ltd. Şti. Satışı"),
-        StokHareket(id: "2", tarih: "25.10.2026", islemTuru: "Alış Faturası", belgeNo: "FTR-2026-0004", miktar: 50, birimFiyat: 140, toplamTutar: 7000, aciklama: "Akıncılar Çelik Alımı")
+        StokHareket(id: "1", stokId: "1", tarih: "02.11.2026", islemTuru: "Satış Faturası", miktar: 5, birimFiyat: 220, toplamTutar: 1100, belgeNo: "FTR-2026-0012", aciklama: "Ermay Ltd. Şti. Satışı"),
+        StokHareket(id: "2", stokId: "1", tarih: "25.10.2026", islemTuru: "Alış Faturası", miktar: 50, birimFiyat: 140, toplamTutar: 7000, belgeNo: "FTR-2026-0004", aciklama: "Akıncılar Çelik Alımı")
     ]
     
     public init(stok: StokKart) {

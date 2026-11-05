@@ -120,6 +120,24 @@ public struct Teklif: Identifiable, Codable, Hashable {
         self.syncGuid = (try? c.decode(String.self, forKey: .syncGuid)) ?? (try? c.decode(String.self, forKey: .uuid))
         self.tenantId = try? c.decode(String.self, forKey: .tenantId)
     }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(teklifNo, forKey: .teklifNo)
+        try container.encodeIfPresent(cariId, forKey: .cariId)
+        try container.encodeIfPresent(cariUnvan, forKey: .cariUnvan)
+        try container.encode(tarih, forKey: .tarih)
+        try container.encodeIfPresent(gecerlilikTarihi, forKey: .gecerlilikTarihi)
+        try container.encode(araToplam, forKey: .araToplam)
+        try container.encode(kdvToplami, forKey: .kdvToplami)
+        try container.encode(genelToplam, forKey: .genelToplam)
+        try container.encode(durum, forKey: .durum)
+        try container.encodeIfPresent(aciklama, forKey: .aciklama)
+        try container.encodeIfPresent(kalemler, forKey: .kalemler)
+        try container.encodeIfPresent(syncGuid, forKey: .syncGuid)
+        try container.encodeIfPresent(tenantId, forKey: .tenantId)
+    }
 }
 
 public struct TeklifKalem: Identifiable, Codable, Hashable {
@@ -212,5 +230,20 @@ public struct TeklifKalem: Identifiable, Codable, Hashable {
         self.kdvOrani = (try? c.decode(Double.self, forKey: .kdvOrani)) ?? 20.0
         self.tutar = (try? c.decode(Double.self, forKey: .tutar)) ?? (try? c.decode(Double.self, forKey: .toplamTutar)) ?? (self.miktar * self.birimFiyat)
         self.aciklama = try? c.decode(String.self, forKey: .aciklama)
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(teklifId, forKey: .teklifId)
+        try container.encodeIfPresent(stokId, forKey: .stokId)
+        try container.encodeIfPresent(stokKodu, forKey: .stokKodu)
+        try container.encode(stokAdi, forKey: .stokAdi)
+        try container.encode(miktar, forKey: .miktar)
+        try container.encodeIfPresent(birim, forKey: .birim)
+        try container.encode(birimFiyat, forKey: .birimFiyat)
+        try container.encode(kdvOrani, forKey: .kdvOrani)
+        try container.encode(tutar, forKey: .tutar)
+        try container.encodeIfPresent(aciklama, forKey: .aciklama)
     }
 }

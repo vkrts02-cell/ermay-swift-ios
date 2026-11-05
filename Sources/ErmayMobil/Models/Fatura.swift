@@ -156,6 +156,27 @@ public struct Fatura: Identifiable, Codable, Hashable {
         self.syncGuid = (try? c.decode(String.self, forKey: .syncGuid)) ?? (try? c.decode(String.self, forKey: .uuid))
         self.tenantId = try? c.decode(String.self, forKey: .tenantId)
     }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(faturaNo, forKey: .faturaNo)
+        try container.encode(faturaTuru, forKey: .faturaTuru)
+        try container.encodeIfPresent(cariId, forKey: .cariId)
+        try container.encodeIfPresent(cariUnvan, forKey: .cariUnvan)
+        try container.encode(tarih, forKey: .tarih)
+        try container.encodeIfPresent(vadeTarihi, forKey: .vadeTarihi)
+        try container.encode(araToplam, forKey: .araToplam)
+        try container.encode(kdvToplami, forKey: .kdvToplami)
+        try container.encode(iskontoToplami, forKey: .iskontoToplami)
+        try container.encode(genelToplam, forKey: .genelToplam)
+        try container.encodeIfPresent(tevkifatTutari, forKey: .tevkifatTutari)
+        try container.encodeIfPresent(odemeDurumu, forKey: .odemeDurumu)
+        try container.encodeIfPresent(aciklama, forKey: .aciklama)
+        try container.encodeIfPresent(kalemler, forKey: .kalemler)
+        try container.encodeIfPresent(syncGuid, forKey: .syncGuid)
+        try container.encodeIfPresent(tenantId, forKey: .tenantId)
+    }
 }
 
 public struct FaturaKalem: Identifiable, Codable, Hashable {
@@ -340,5 +361,24 @@ public struct FaturaKalem: Identifiable, Codable, Hashable {
         
         self.aciklama = try? c.decode(String.self, forKey: .aciklama)
         self.syncGuid = try? c.decode(String.self, forKey: .syncGuid)
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encodeIfPresent(faturaId, forKey: .faturaId)
+        try container.encodeIfPresent(stokId, forKey: .stokId)
+        try container.encodeIfPresent(stokKodu, forKey: .stokKodu)
+        try container.encode(stokAdi, forKey: .stokAdi)
+        try container.encodeIfPresent(birim, forKey: .birim)
+        try container.encode(miktar, forKey: .miktar)
+        try container.encode(birimFiyat, forKey: .birimFiyat)
+        try container.encode(kdvOrani, forKey: .kdvOrani)
+        try container.encode(kdvTutari, forKey: .kdvTutari)
+        try container.encode(iskontoOrani, forKey: .iskontoOrani)
+        try container.encode(iskontoTutari, forKey: .iskontoTutari)
+        try container.encode(netTutar, forKey: .netTutar)
+        try container.encodeIfPresent(aciklama, forKey: .aciklama)
+        try container.encodeIfPresent(syncGuid, forKey: .syncGuid)
     }
 }
