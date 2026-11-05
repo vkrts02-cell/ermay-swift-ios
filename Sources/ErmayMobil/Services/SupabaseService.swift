@@ -40,13 +40,18 @@ public final class SupabaseService: @unchecked Sendable {
         select: String = "*",
         filters: [String: String] = [:],
         orderBy: String? = nil,
-        limit: Int? = nil
+        limit: Int? = nil,
+        applyTenantFilter: Bool = true
     ) async throws -> [T] {
         var components = URLComponents(string: "\(baseUrl)/rest/v1/\(table)")
         var queryItems = [
-            URLQueryItem(name: "select", value: select),
-            URLQueryItem(name: "tenant_id", value: "eq.\(tenantId)")
+            URLQueryItem(name: "select", value: select)
         ]
+        
+        if applyTenantFilter {
+            // Canlı veritabanındaki tenant_id çeşitliliğini (tenant_ermay_master, default, null) kapsayan filtre
+            queryItems.append(URLQueryItem(name: "or", value: "(tenant_id.eq.\(tenantId),tenant_id.eq.default,tenant_id.is.null)"))
+        }
         
         for (key, val) in filters {
             queryItems.append(URLQueryItem(name: key, value: val))
@@ -76,6 +81,37 @@ public final class SupabaseService: @unchecked Sendable {
         }
         
         return try decoder.decode([T].self, from: data)
+    }
+    
+    // MARK: - Convenience Fetch Methods for Exact Desktop Parity
+    public func fetchCariler() async throws -> [CariKart] {
+        return try await fetch(from: "cariler", orderBy: "unvan.asc", limit: 500)
+    }
+    
+    public func fetchCariHareketler(cariId: String) async throws -> [CariHareket] {
+        return try await fetch(
+            from: "cari_hareketler",
+            filters: ["cari_id": "eq.\(cariId)"],
+            orderBy: "tarih.desc",
+            limit: 200,
+            applyTenantFilter: false
+        )
+    }
+    
+    public func fetchStoklar() async throws -> [StokKart] {
+        return try await fetch(from: "stoklar", orderBy: "stok_adi.asc", limit: 500)
+    }
+    
+    public func fetchFaturalar() async throws -> [Fatura] {
+        return try await fetch(from: "faturalar", orderBy: "tarih.desc", limit: 200)
+    }
+    
+    public func fetchSiparisler() async throws -> [Siparis] {
+        return try await fetch(from: "siparisler", orderBy: "tarih.desc", limit: 200)
+    }
+    
+    public func fetchTeklifler() async throws -> [Teklif] {
+        return try await fetch(from: "teklifler", orderBy: "tarih.desc", limit: 200)
     }
     
     // MARK: - PostgREST Insert
@@ -126,7 +162,7 @@ public final class SupabaseService: @unchecked Sendable {
     
     // MARK: - PostgREST Raw Update
     public func updateRaw(table: String, id: String, data: Data) async throws {
-        guard let url = URL(string: "\(baseUrl)/rest/v1/\(table)?id=eq.\(id)&tenant_id=eq.\(tenantId)") else {
+        guard let url = URL(string: "\(baseUrl)/rest/v1/\(table)?id=eq.\(id)") else {
             throw URLError(.badURL)
         }
         var request = URLRequest(url: url)
@@ -142,7 +178,7 @@ public final class SupabaseService: @unchecked Sendable {
     
     // MARK: - PostgREST Update
     public func update<T: Encodable>(table: String, id: String, item: T) async throws {
-        guard let url = URL(string: "\(baseUrl)/rest/v1/\(table)?id=eq.\(id)&tenant_id=eq.\(tenantId)") else {
+        guard let url = URL(string: "\(baseUrl)/rest/v1/\(table)?id=eq.\(id)") else {
             throw URLError(.badURL)
         }
         
@@ -160,7 +196,7 @@ public final class SupabaseService: @unchecked Sendable {
     
     // MARK: - PostgREST Delete
     public func delete(table: String, id: String) async throws {
-        guard let url = URL(string: "\(baseUrl)/rest/v1/\(table)?id=eq.\(id)&tenant_id=eq.\(tenantId)") else {
+        guard let url = URL(string: "\(baseUrl)/rest/v1/\(table)?id=eq.\(id)") else {
             throw URLError(.badURL)
         }
         
@@ -195,4 +231,3 @@ public final class SupabaseService: @unchecked Sendable {
         return try decoder.decode(R.self, from: data)
     }
 }
-

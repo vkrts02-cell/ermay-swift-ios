@@ -4,6 +4,8 @@ public struct TeklifDetailView: View {
     @State public var teklif: Teklif
     @State private var showConvertAlert: Bool = false
     @State private var convertedNotice: String? = nil
+    @State private var pdfData: Data? = nil
+    @State private var showShareSheet: Bool = false
     
     public init(teklif: Teklif) {
         self._teklif = State(initialValue: teklif)
@@ -107,6 +109,23 @@ public struct TeklifDetailView: View {
                     
                     // Aksiyon Butonları
                     VStack(spacing: 10) {
+                        ActionButton(
+                            title: "PDF Görüntüle & Paylaş",
+                            icon: "square.and.arrow.up.fill",
+                            color: AppTheme.primary
+                        ) {
+                            #if canImport(UIKit)
+                            Task { @MainActor in
+                                self.pdfData = await PDFService.shared.fetchOrGenerateTeklifPDF(
+                                    teklif: teklif,
+                                    kalemler: teklif.kalemler ?? [],
+                                    firma: .varsayilan
+                                )
+                                self.showShareSheet = true
+                            }
+                            #endif
+                        }
+                        
                         if teklif.durum != "ONAYLANDI" {
                             ActionButton(
                                 title: "Teklifi Onayla",
@@ -134,6 +153,13 @@ public struct TeklifDetailView: View {
         }
         .navigationTitle("Teklif Detayı")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showShareSheet) {
+            #if canImport(UIKit)
+            if let data = pdfData {
+                ShareSheet(activityItems: [data])
+            }
+            #endif
+        }
         .alert("Siparişe Dönüştür", isPresented: $showConvertAlert) {
             Button("Evet, Sipariş Oluştur") {
                 convertToSiparis()

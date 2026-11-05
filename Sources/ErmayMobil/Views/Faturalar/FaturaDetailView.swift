@@ -139,15 +139,21 @@ public struct FaturaDetailView: View {
                     }
                     .padding(.horizontal)
                     
-                    // PDF Oluştur ve Paylaş Butonu
+                    // PDF Oluştur ve Paylaş Butonu (QuestPDF Destekli)
                     ActionButton(
                         title: "PDF Görüntüle & Paylaş",
                         icon: "square.and.arrow.up.fill",
                         color: AppTheme.primary
                     ) {
                         #if canImport(UIKit)
-                        self.pdfData = PDFService.shared.generateFaturaPDF(fatura: fatura, firma: .varsayilan)
-                        self.showShareSheet = true
+                        Task { @MainActor in
+                            self.pdfData = await PDFService.shared.fetchOrGenerateFaturaPDF(
+                                fatura: fatura,
+                                kalemler: fatura.kalemler ?? [],
+                                firma: .varsayilan
+                            )
+                            self.showShareSheet = true
+                        }
                         #endif
                     }
                     .padding(.horizontal)

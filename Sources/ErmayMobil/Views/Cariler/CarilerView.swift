@@ -1,15 +1,8 @@
 import SwiftUI
 
 public struct CarilerView: View {
-    @State private var cariler: [CariKart] = [
-        CariKart(id: "1", cariKodu: "CARI-001", unvan: "Ermay Makine ve Tekstil San. Tic. Ltd. Şti.", cariTuru: "Müşteri", yetkili: "Ahmet Yılmaz", vergiDairesi: "İkitelli", vergiNo: "3829104921", telefon: "0212 555 1234", gsm: "0532 111 2233", sehir: "İstanbul", ilce: "Başakşehir", bakiye: 45200.0, bakiyeTuru: "A"),
-        CariKart(id: "2", cariKodu: "CARI-002", unvan: "Akıncılar Çelik Döküm ve Sanayi A.Ş.", cariTuru: "Tedarikçi", yetkili: "Mehmet Akıncı", vergiDairesi: "Uluçınar", vergiNo: "1122334455", telefon: "0216 444 5678", gsm: "0533 222 3344", sehir: "Kocaeli", ilce: "Gebze", bakiye: 32000.0, bakiyeTuru: "B"),
-        CariKart(id: "3", cariKodu: "CARI-003", unvan: "Kaya Metal Sanayi ve Ticaret A.Ş.", cariTuru: "Müşteri", yetkili: "Kemal Kaya", vergiDairesi: "Beylikdüzü", vergiNo: "9988776655", telefon: "0212 666 7890", gsm: "0535 333 4455", sehir: "İstanbul", ilce: "Esenyurt", bakiye: 28500.0, bakiyeTuru: "A"),
-        CariKart(id: "4", cariKodu: "CARI-004", unvan: "Tekno Hammadde ve Kimya A.Ş.", cariTuru: "Tedarikçi", yetkili: "Selin Demir", vergiDairesi: "Ostim", vergiNo: "5544332211", telefon: "0312 333 4455", gsm: "0542 444 5566", sehir: "Ankara", ilce: "Ostim", bakiye: 19400.0, bakiyeTuru: "B"),
-        CariKart(id: "5", cariKodu: "CARI-005", unvan: "Birlik Otomotiv Yedek Parça Ltd.", cariTuru: "Müşteri", yetkili: "Hasan Çetin", vergiDairesi: "Nilüfer", vergiNo: "7766554433", telefon: "0224 222 3344", gsm: "0536 555 6677", sehir: "Bursa", ilce: "Nilüfer", bakiye: 14200.0, bakiyeTuru: "A"),
-        CariKart(id: "6", cariKodu: "CARI-006", unvan: "Doğuş Hammadde Sanayi Ticaret", cariTuru: "Tedarikçi", yetkili: "Murat Doğuş", vergiDairesi: "Hasan Tahsin", vergiNo: "3322114455", telefon: "0232 444 1122", gsm: "0537 666 7788", sehir: "İzmir", ilce: "Bornova", bakiye: 9700.0, bakiyeTuru: "B")
-    ]
-    
+    @State private var cariler: [CariKart] = []
+    @State private var isLoading: Bool = false
     @State private var searchQuery: String = ""
     
     // Sıralama & Filtreleme Durumları (Desktop & CarilerScreen.tsx Exact Parity)
@@ -219,7 +212,11 @@ public struct CarilerView: View {
                     // 4. Liste
                     ScrollView(showsIndicators: false) {
                         LazyVStack(spacing: 8) {
-                            if filteredCariler.isEmpty {
+                            if isLoading && cariler.isEmpty {
+                                ProgressView()
+                                    .tint(.white)
+                                    .padding(.top, 40)
+                            } else if filteredCariler.isEmpty {
                                 Text("Hiç cari bulunamadı.")
                                     .font(.system(size: 14))
                                     .foregroundColor(Color(hex: "64748B"))
@@ -234,6 +231,9 @@ public struct CarilerView: View {
                                             }
                                         },
                                         onDelete: { deleted in
+                                            Task {
+                                                try? await SupabaseService.shared.delete(table: "cariler", id: deleted.id)
+                                            }
                                             cariler.removeAll { $0.id == deleted.id }
                                         }
                                     )) {
@@ -246,6 +246,9 @@ public struct CarilerView: View {
                         }
                         .padding(.horizontal, 16)
                     }
+                    .refreshable {
+                        await loadLiveCariler()
+                    }
                 }
             }
             .navigationBarHidden(true)
@@ -256,6 +259,39 @@ public struct CarilerView: View {
                     } else {
                         cariler.insert(saved, at: 0)
                     }
+                }
+            }
+            .onAppear {
+                if cariler.isEmpty {
+                    Task {
+                        await loadLiveCariler()
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Live Supabase Sync
+    private func loadLiveCariler() async {
+        isLoading = true
+        do {
+            let fetched = try await SupabaseService.shared.fetchCariler()
+            await MainActor.run {
+                if !fetched.isEmpty {
+                    self.cariler = fetched
+                }
+                self.isLoading = false
+            }
+        } catch {
+            print("[CarilerView] Supabase cariler çekme hatası: \(error)")
+            await MainActor.run {
+                self.isLoading = false
+                // Çevrimdışı / fallback cariler
+                if self.cariler.isEmpty {
+                    self.cariler = [
+                        CariKart(id: "1", cariKodu: "CARI-001", unvan: "Ermay Makine ve Tekstil San. Tic. Ltd. Şti.", cariTuru: "Müşteri", yetkili: "Ahmet Yılmaz", vergiDairesi: "İkitelli", vergiNo: "3829104921", telefon: "0212 555 1234", gsm: "0532 111 2233", sehir: "İstanbul", ilce: "Başakşehir", bakiye: 45200.0, bakiyeTuru: "A"),
+                        CariKart(id: "2", cariKodu: "CARI-002", unvan: "Akıncılar Çelik Döküm ve Sanayi A.Ş.", cariTuru: "Tedarikçi", yetkili: "Mehmet Akıncı", vergiDairesi: "Uluçınar", vergiNo: "1122334455", telefon: "0216 444 5678", gsm: "0533 222 3344", sehir: "Kocaeli", ilce: "Gebze", bakiye: 32000.0, bakiyeTuru: "B")
+                    ]
                 }
             }
         }

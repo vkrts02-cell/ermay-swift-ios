@@ -23,7 +23,7 @@ public struct StokKart: Identifiable, Codable, Hashable {
         set { grupAdi = newValue }
     }
     
-        public var minimumSeviye: Double? {
+    public var minimumSeviye: Double? {
         get { kritikMiktar }
         set { kritikMiktar = newValue }
     }
@@ -36,18 +36,28 @@ public struct StokKart: Identifiable, Codable, Hashable {
     enum CodingKeys: String, CodingKey {
         case id
         case stokKodu = "stok_kodu"
+        case kod
         case stokAdi = "stok_adi"
         case barkod
         case grupAdi = "grup_adi"
+        case grup
+        case kategori
         case birim
         case alisFiyati = "alis_fiyati"
         case satisFiyati = "satis_fiyati"
         case kdvOrani = "kdv_orani"
+        case kdv
         case mevcutMiktar = "mevcut_miktar"
+        case miktar
         case kritikMiktar = "kritik_miktar"
+        case kritikStok = "kritik_stok"
+        case kritikSeviye = "kritik_seviye"
         case aciklama
         case aktif
+        case isActive = "is_active"
+        case isDeleted = "is_deleted"
         case syncGuid = "sync_guid"
+        case uuid
         case tenantId = "tenant_id"
     }
     
@@ -61,10 +71,8 @@ public struct StokKart: Identifiable, Codable, Hashable {
         alisFiyati: Double = 0.0,
         satisFiyati: Double = 0.0,
         kdvOrani: Double = 20.0,
-        bakiye: Double = 0.0,
-        kategori: String? = "Genel",
         mevcutMiktar: Double = 0.0,
-        kritikMiktar: Double? = 5.0,
+        kritikMiktar: Double? = 0.0,
         aciklama: String? = nil,
         aktif: Bool? = true,
         syncGuid: String? = UUID().uuidString,
@@ -74,12 +82,12 @@ public struct StokKart: Identifiable, Codable, Hashable {
         self.stokKodu = stokKodu
         self.stokAdi = stokAdi
         self.barkod = barkod
-        self.grupAdi = (kategori != "Genel") ? (kategori ?? grupAdi) : grupAdi
+        self.grupAdi = grupAdi
         self.birim = birim
         self.alisFiyati = alisFiyati
         self.satisFiyati = satisFiyati
         self.kdvOrani = kdvOrani
-        self.mevcutMiktar = bakiye > 0 ? bakiye : mevcutMiktar
+        self.mevcutMiktar = mevcutMiktar
         self.kritikMiktar = kritikMiktar
         self.aciklama = aciklama
         self.aktif = aktif
@@ -87,63 +95,94 @@ public struct StokKart: Identifiable, Codable, Hashable {
         self.tenantId = tenantId
     }
     
-    // Convenience init accepting grupAdi and mevcutMiktar before barkod / kdvOrani
-    public init(
-        id: String = UUID().uuidString,
-        stokKodu: String? = nil,
-        stokAdi: String,
-        grupAdi: String? = "Genel",
-        birim: String? = "Adet",
-        alisFiyati: Double = 0.0,
-        satisFiyati: Double = 0.0,
-        mevcutMiktar: Double = 0.0,
-        kdvOrani: Double = 20.0,
-        barkod: String? = nil,
-        kritikMiktar: Double? = 5.0,
-        aciklama: String? = nil,
-        aktif: Bool? = true,
-        syncGuid: String? = UUID().uuidString,
-        tenantId: String? = nil
-    ) {
-        self.init(
-            id: id,
-            stokKodu: stokKodu,
-            stokAdi: stokAdi,
-            barkod: barkod,
-            grupAdi: grupAdi,
-            birim: birim,
-            alisFiyati: alisFiyati,
-            satisFiyati: satisFiyati,
-            kdvOrani: kdvOrani,
-            bakiye: mevcutMiktar,
-            kategori: grupAdi,
-            mevcutMiktar: mevcutMiktar,
-            kritikMiktar: kritikMiktar,
-            aciklama: aciklama,
-            aktif: aktif,
-            syncGuid: syncGuid,
-            tenantId: tenantId
-        )
-    }
-}
-
-public struct StokMiktarUpdate: Codable {
-    public var mevcut_miktar: Double
-    public init(mevcutMiktar: Double) {
-        self.mevcut_miktar = mevcutMiktar
+    // Robust decoding for Supabase
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        
+        if let intId = try? c.decode(Int.self, forKey: .id) {
+            self.id = String(intId)
+        } else if let strId = try? c.decode(String.self, forKey: .id) {
+            self.id = strId
+        } else {
+            self.id = UUID().uuidString
+        }
+        
+        self.stokKodu = (try? c.decode(String.self, forKey: .stokKodu)) ?? (try? c.decode(String.self, forKey: .kod))
+        self.stokAdi = (try? c.decode(String.self, forKey: .stokAdi)) ?? ""
+        self.barkod = try? c.decode(String.self, forKey: .barkod)
+        self.grupAdi = (try? c.decode(String.self, forKey: .grupAdi)) ?? (try? c.decode(String.self, forKey: .grup)) ?? (try? c.decode(String.self, forKey: .kategori))
+        self.birim = (try? c.decode(String.self, forKey: .birim)) ?? "Adet"
+        
+        if let dAlis = try? c.decode(Double.self, forKey: .alisFiyati) {
+            self.alisFiyati = dAlis
+        } else if let iAlis = try? c.decode(Int.self, forKey: .alisFiyati) {
+            self.alisFiyati = Double(iAlis)
+        } else {
+            self.alisFiyati = 0.0
+        }
+        
+        if let dSatis = try? c.decode(Double.self, forKey: .satisFiyati) {
+            self.satisFiyati = dSatis
+        } else if let iSatis = try? c.decode(Int.self, forKey: .satisFiyati) {
+            self.satisFiyati = Double(iSatis)
+        } else {
+            self.satisFiyati = 0.0
+        }
+        
+        if let dKdv = try? c.decode(Double.self, forKey: .kdvOrani) {
+            self.kdvOrani = dKdv
+        } else if let iKdv = try? c.decode(Int.self, forKey: .kdvOrani) {
+            self.kdvOrani = Double(iKdv)
+        } else if let dKdv2 = try? c.decode(Double.self, forKey: .kdv) {
+            self.kdvOrani = dKdv2
+        } else if let iKdv2 = try? c.decode(Int.self, forKey: .kdv) {
+            self.kdvOrani = Double(iKdv2)
+        } else {
+            self.kdvOrani = 20.0
+        }
+        
+        if let dMiktar = try? c.decode(Double.self, forKey: .mevcutMiktar) {
+            self.mevcutMiktar = dMiktar
+        } else if let iMiktar = try? c.decode(Int.self, forKey: .mevcutMiktar) {
+            self.mevcutMiktar = Double(iMiktar)
+        } else if let dMiktar2 = try? c.decode(Double.self, forKey: .miktar) {
+            self.mevcutMiktar = dMiktar2
+        } else if let iMiktar2 = try? c.decode(Int.self, forKey: .miktar) {
+            self.mevcutMiktar = Double(iMiktar2)
+        } else {
+            self.mevcutMiktar = 0.0
+        }
+        
+        if let dKritik = try? c.decode(Double.self, forKey: .kritikMiktar) {
+            self.kritikMiktar = dKritik
+        } else if let dKritik2 = try? c.decode(Double.self, forKey: .kritikStok) {
+            self.kritikMiktar = dKritik2
+        } else if let dKritik3 = try? c.decode(Double.self, forKey: .kritikSeviye) {
+            self.kritikMiktar = dKritik3
+        } else {
+            self.kritikMiktar = 0.0
+        }
+        
+        self.aciklama = try? c.decode(String.self, forKey: .aciklama)
+        self.aktif = (try? c.decode(Bool.self, forKey: .aktif)) ?? (try? c.decode(Bool.self, forKey: .isActive)) ?? true
+        self.syncGuid = (try? c.decode(String.self, forKey: .syncGuid)) ?? (try? c.decode(String.self, forKey: .uuid))
+        self.tenantId = try? c.decode(String.self, forKey: .tenantId)
     }
 }
 
 public struct StokHareket: Identifiable, Codable, Hashable {
     public var id: String
-    public var stokId: String?
+    public var stokId: String
     public var tarih: String?
-    public var islemTuru: String? // "Giriş", "Çıkış", "Sayım Fazlası", "Sayım Eksiği"
-    public var belgeNo: String?
+    public var islemTuru: String? // "GIRIS", "CIKIS", "DEVIR", "SAYIM_FAZLASI", "SAYIM_EKSIGI"
     public var miktar: Double
     public var birimFiyat: Double
-    public var toplamTutar: Double
+    public var kdvOrani: Double?
+    public var belgeNo: String?
     public var aciklama: String?
+    public var faturaId: String?
+    public var cariId: String?
+    public var cariUnvan: String?
     public var syncGuid: String?
     
     enum CodingKeys: String, CodingKey {
@@ -151,69 +190,104 @@ public struct StokHareket: Identifiable, Codable, Hashable {
         case stokId = "stok_id"
         case tarih
         case islemTuru = "islem_turu"
-        case belgeNo = "belge_no"
         case miktar
         case birimFiyat = "birim_fiyat"
-        case toplamTutar = "toplam_tutar"
+        case kdvOrani = "kdv_orani"
+        case belgeNo = "belge_no"
+        case evrakNo = "evrak_no"
         case aciklama
+        case faturaId = "fatura_id"
+        case cariId = "cari_id"
+        case cariUnvan = "cari_unvan"
         case syncGuid = "sync_guid"
+        case uuid
     }
     
     public init(
         id: String = UUID().uuidString,
-        stokId: String? = nil,
+        stokId: String,
         tarih: String? = nil,
-        belgeNo: String? = nil,
-        islemTuru: String? = nil,
+        islemTuru: String? = "GIRIS",
         miktar: Double = 0.0,
         birimFiyat: Double = 0.0,
-        toplamTutar: Double = 0.0,
+        kdvOrani: Double? = 20.0,
+        belgeNo: String? = nil,
         aciklama: String? = nil,
+        faturaId: String? = nil,
+        cariId: String? = nil,
+        cariUnvan: String? = nil,
         syncGuid: String? = UUID().uuidString
     ) {
         self.id = id
         self.stokId = stokId
         self.tarih = tarih
-        self.belgeNo = belgeNo
         self.islemTuru = islemTuru
         self.miktar = miktar
         self.birimFiyat = birimFiyat
-        self.toplamTutar = toplamTutar
+        self.kdvOrani = kdvOrani
+        self.belgeNo = belgeNo
         self.aciklama = aciklama
+        self.faturaId = faturaId
+        self.cariId = cariId
+        self.cariUnvan = cariUnvan
         self.syncGuid = syncGuid
     }
-
-    public init(
-        id: String = UUID().uuidString,
-        stokId: String? = nil,
-        tarih: String? = nil,
-        islemTuru: String? = nil,
-        belgeNo: String? = nil,
-        miktar: Double = 0.0,
-        birimFiyat: Double = 0.0,
-        toplamTutar: Double = 0.0,
-        aciklama: String? = nil,
-        syncGuid: String? = UUID().uuidString
-    ) {
-        self.init(id: id, stokId: stokId, tarih: tarih, belgeNo: belgeNo, islemTuru: islemTuru, miktar: miktar, birimFiyat: birimFiyat, toplamTutar: toplamTutar, aciklama: aciklama, syncGuid: syncGuid)
+    
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        
+        if let intId = try? c.decode(Int.self, forKey: .id) {
+            self.id = String(intId)
+        } else if let strId = try? c.decode(String.self, forKey: .id) {
+            self.id = strId
+        } else {
+            self.id = UUID().uuidString
+        }
+        
+        if let intStokId = try? c.decode(Int.self, forKey: .stokId) {
+            self.stokId = String(intStokId)
+        } else if let strStokId = try? c.decode(String.self, forKey: .stokId) {
+            self.stokId = strStokId
+        } else {
+            self.stokId = ""
+        }
+        
+        self.tarih = try? c.decode(String.self, forKey: .tarih)
+        self.islemTuru = try? c.decode(String.self, forKey: .islemTuru)
+        
+        if let dMiktar = try? c.decode(Double.self, forKey: .miktar) {
+            self.miktar = dMiktar
+        } else if let iMiktar = try? c.decode(Int.self, forKey: .miktar) {
+            self.miktar = Double(iMiktar)
+        } else {
+            self.miktar = 0.0
+        }
+        
+        if let dFiyat = try? c.decode(Double.self, forKey: .birimFiyat) {
+            self.birimFiyat = dFiyat
+        } else if let iFiyat = try? c.decode(Int.self, forKey: .birimFiyat) {
+            self.birimFiyat = Double(iFiyat)
+        } else {
+            self.birimFiyat = 0.0
+        }
+        
+        self.kdvOrani = try? c.decode(Double.self, forKey: .kdvOrani)
+        self.belgeNo = (try? c.decode(String.self, forKey: .belgeNo)) ?? (try? c.decode(String.self, forKey: .evrakNo))
+        self.aciklama = try? c.decode(String.self, forKey: .aciklama)
+        
+        if let intFId = try? c.decode(Int.self, forKey: .faturaId) {
+            self.faturaId = String(intFId)
+        } else {
+            self.faturaId = try? c.decode(String.self, forKey: .faturaId)
+        }
+        
+        if let intCId = try? c.decode(Int.self, forKey: .cariId) {
+            self.cariId = String(intCId)
+        } else {
+            self.cariId = try? c.decode(String.self, forKey: .cariId)
+        }
+        
+        self.cariUnvan = try? c.decode(String.self, forKey: .cariUnvan)
+        self.syncGuid = (try? c.decode(String.self, forKey: .syncGuid)) ?? (try? c.decode(String.self, forKey: .uuid))
     }
 }
-
-public struct StokGrup: Identifiable, Codable, Hashable {
-    public var id: String
-    public var grupAdi: String
-    public var aciklama: String?
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case grupAdi = "grup_adi"
-        case aciklama
-    }
-    
-    public init(id: String = UUID().uuidString, grupAdi: String, aciklama: String? = nil) {
-        self.id = id
-        self.grupAdi = grupAdi
-        self.aciklama = aciklama
-    }
-}
-

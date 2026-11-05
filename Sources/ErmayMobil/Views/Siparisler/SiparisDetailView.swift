@@ -4,6 +4,8 @@ public struct SiparisDetailView: View {
     @State public var siparis: Siparis
     @State private var showConvertAlert: Bool = false
     @State private var convertedSuccess: Bool = false
+    @State private var pdfData: Data? = nil
+    @State private var showShareSheet: Bool = false
     
     public init(siparis: Siparis) {
         self._siparis = State(initialValue: siparis)
@@ -94,13 +96,33 @@ public struct SiparisDetailView: View {
                     }
                     .padding(.horizontal)
                     
-                    // Faturaya Dönüştür Butonu
-                    ActionButton(
-                        title: "Faturaya Dönüştür",
-                        icon: "doc.badge.arrow.up.fill",
-                        color: AppTheme.success
-                    ) {
-                        showConvertAlert = true
+                    // Aksiyon Butonları
+                    VStack(spacing: 10) {
+                        ActionButton(
+                            title: "PDF Görüntüle & Paylaş",
+                            icon: "square.and.arrow.up.fill",
+                            color: AppTheme.primary
+                        ) {
+                            #if canImport(UIKit)
+                            Task { @MainActor in
+                                self.pdfData = await PDFService.shared.fetchOrGenerateSiparisPDF(
+                                    siparis: siparis,
+                                    kalemler: siparis.kalemler ?? [],
+                                    firma: .varsayilan
+                                )
+                                self.showShareSheet = true
+                            }
+                            #endif
+                        }
+                        
+                        // Faturaya Dönüştür Butonu
+                        ActionButton(
+                            title: "Faturaya Dönüştür",
+                            icon: "doc.badge.arrow.up.fill",
+                            color: AppTheme.success
+                        ) {
+                            showConvertAlert = true
+                        }
                     }
                     .padding(.horizontal)
                     
@@ -111,6 +133,13 @@ public struct SiparisDetailView: View {
         }
         .navigationTitle("Sipariş Detayı")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showShareSheet) {
+            #if canImport(UIKit)
+            if let data = pdfData {
+                ShareSheet(activityItems: [data])
+            }
+            #endif
+        }
         .alert("Faturaya Dönüştür", isPresented: $showConvertAlert) {
             Button("Evet, Fatura Oluştur") {
                 convertToFatura()

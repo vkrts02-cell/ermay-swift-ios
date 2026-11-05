@@ -501,6 +501,9 @@ public struct StoklarView: View {
             .alert("Stok Kartını Sil", isPresented: $showDeleteConfirm) {
                 Button("Sil", role: .destructive) {
                     if let sel = selectedStok {
+                        Task {
+                            try? await SupabaseService.shared.delete(table: "stoklar", id: sel.id)
+                        }
                         stoklar.removeAll { $0.id == sel.id }
                         handleCreateNew()
                     }
@@ -509,6 +512,24 @@ public struct StoklarView: View {
             } message: {
                 Text("\(selectedStok?.stokAdi ?? "") adlı stoğu silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")
             }
+            .onAppear {
+                Task {
+                    await loadLiveStoklar()
+                }
+            }
+        }
+    }
+    
+    private func loadLiveStoklar() async {
+        do {
+            let fetched = try await SupabaseService.shared.fetchStoklar()
+            await MainActor.run {
+                if !fetched.isEmpty {
+                    self.stoklar = fetched
+                }
+            }
+        } catch {
+            print("[StoklarView] Canlı stok çekme hatası: \(error)")
         }
     }
     

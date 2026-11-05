@@ -27,13 +27,9 @@ public struct CariDetailView: View {
     @State private var pdfTitle: String = ""
     @State private var isGeneratingPDF: Bool = false
     
-    // Sample Cari Hareketler
-    @State private var hareketler: [CariHareket] = [
-        CariHareket(id: "1", tarih: "03.11.2026", belgeNo: "FTR-2026-0042", islemTuru: "Satış Faturası", aciklama: "Rulman & Keçe Satışı", borc: 24500.0, alacak: 0.0),
-        CariHareket(id: "2", tarih: "28.10.2026", belgeNo: "THS-0089", islemTuru: "Tahsilat (Banka)", aciklama: "Garanti BBVA Havalesi", borc: 0.0, alacak: 35000.0),
-        CariHareket(id: "3", tarih: "15.10.2026", belgeNo: "FTR-2026-0038", islemTuru: "Alış Faturası", aciklama: "Hammadde Alımı", borc: 0.0, alacak: 18200.0),
-        CariHareket(id: "4", tarih: "01.10.2026", belgeNo: "TED-0044", islemTuru: "Ödeme (Kasa)", aciklama: "Nakit Kasa Ödemesi", borc: 6200.0, alacak: 0.0)
-    ]
+    // Canlı Cari Hareketler
+    @State private var hareketler: [CariHareket] = []
+    @State private var isLoadingHareketler: Bool = false
     
     public init(cari: CariKart, onUpdate: ((CariKart) -> Void)? = nil, onDelete: ((CariKart) -> Void)? = nil) {
         _currentCari = State(initialValue: cari)
@@ -59,6 +55,9 @@ public struct CariDetailView: View {
                 }
                 .padding(.horizontal, 16)
             }
+            .refreshable {
+                await loadLiveHareketler()
+            }
             
             // PDF Hazırlanıyor HUD
             if isGeneratingPDF {
@@ -79,6 +78,11 @@ public struct CariDetailView: View {
             }
         }
         .navigationBarHidden(true)
+        .onAppear {
+            Task {
+                await loadLiveHareketler()
+            }
+        }
         .sheet(isPresented: $showSatisForm) {
             FaturaFormView(initialTur: "Satış")
         }
@@ -263,11 +267,11 @@ public struct CariDetailView: View {
                     activeTransactionType = "Borç Dekontu"
                     showTransactionModal = true
                 }
-                // Ekstre (PDF)
+                // Ekstre (PDF - QuestPDF)
                 actionGridBtn(title: "Ekstre (PDF)", iconName: "doc.text.fill", color: Color(hex: "1E293B")) {
                     exportEkstre(detayli: false)
                 }
-                // Det. Ekstre (PDF)
+                // Det. Ekstre (PDF - QuestPDF)
                 actionGridBtn(title: "Det. Ekstre", iconName: "doc.text.magnifyingglass", color: Color(hex: "1E293B")) {
                     exportEkstre(detayli: true)
                 }
@@ -295,36 +299,48 @@ public struct CariDetailView: View {
                     .font(.system(size: 13, weight: .bold))
                     .foregroundColor(.white)
                 Spacer()
-                Text("\(hareketler.count) Kayıt")
-                    .font(.system(size: 11))
-                    .foregroundColor(Color(hex: "8E8E93"))
+                if isLoadingHareketler {
+                    ProgressView().tint(.white).scaleEffect(0.8)
+                } else {
+                    Text("\(hareketler.count) Kayıt")
+                        .font(.system(size: 11))
+                        .foregroundColor(Color(hex: "8E8E93"))
+                }
             }
             
             VStack(spacing: 0) {
-                ForEach(Array(hareketler.enumerated()), id: \.element.id) { idx, h in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("\(h.islemTuru ?? "İşlem") • \(h.aciklama ?? "")")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                            Text("\(h.tarih ?? "-") • \(h.belgeNo ?? "")")
-                                .font(.system(size: 10))
-                                .foregroundColor(Color(hex: "8E8E93"))
+                if hareketler.isEmpty && !isLoadingHareketler {
+                    Text("Henüz hareket kaydı bulunmuyor.")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color(hex: "64748B"))
+                        .padding(.vertical, 16)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                } else {
+                    ForEach(Array(hareketler.enumerated()), id: \.element.id) { idx, h in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(h.islemTuru ?? "İşlem") • \(h.aciklama ?? "")")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                Text("\(String((h.tarih ?? "-").prefix(10))) • \(h.belgeNo ?? "")")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(Color(hex: "8E8E93"))
+                            }
+                            
+                            Spacer()
+                            
+                            let isBorc = h.borc > 0
+                            let val = isBorc ? h.borc : h.alacak
+                            Text("\(isBorc ? "-" : "+")\(AppFormatters.money(val))")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(isBorc ? Color(hex: "EF4444") : Color(hex: "10B981"))
                         }
+                        .padding(.vertical, 10)
                         
-                        Spacer()
-                        
-                        let isBorc = h.borc > 0
-                        let val = isBorc ? h.borc : h.alacak
-                        Text("\(isBorc ? "-" : "+")\(AppFormatters.money(val))")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(isBorc ? Color(hex: "EF4444") : Color(hex: "10B981"))
-                    }
-                    .padding(.vertical, 10)
-                    
-                    if idx < hareketler.count - 1 {
-                        Divider().background(Color.white.opacity(0.06))
+                        if idx < hareketler.count - 1 {
+                            Divider().background(Color.white.opacity(0.06))
+                        }
                     }
                 }
             }
@@ -357,17 +373,20 @@ public struct CariDetailView: View {
     
     @ViewBuilder
     private func renderFinansal() -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Finansal & Vergi Bilgileri")
                 .font(.system(size: 13, weight: .bold))
                 .foregroundColor(.white)
             
-            infoRow(label: "T.C. Kimlik No:", val: currentCari.tcKimlikNo ?? "-")
-            infoRow(label: "Vergi Dairesi/No:", val: "\(currentCari.vergiDairesi ?? "-") / \(currentCari.vergiNo ?? "-")")
-            infoRow(label: "Ticaret Sicil No:", val: currentCari.ticaretSicilNo ?? "-")
-            infoRow(label: "IBAN:", val: currentCari.iban ?? "-")
-            infoRow(label: "Ödeme Planı / Vade:", val: "\(currentCari.odemePlani ?? "Peşin") / \(currentCari.vadeGunu ?? 0) Gün")
-            infoRow(label: "Risk Limiti:", val: AppFormatters.money(currentCari.riskLimiti ?? 0))
+            infoRow(label: "Vergi Dairesi", val: currentCari.vergiDairesi ?? "-")
+            infoRow(label: "Vergi No", val: currentCari.vergiNo ?? "-")
+            infoRow(label: "TC Kimlik No", val: currentCari.tcKimlikNo ?? "-")
+            infoRow(label: "Vade Günü", val: "\(currentCari.vadeGunu ?? 30) Gün")
+            infoRow(label: "Ödeme Planı", val: currentCari.odemePlani ?? "Peşin")
+            infoRow(label: "Ticaret Sicil No", val: currentCari.ticaretSicilNo ?? "-")
+            if let iban = currentCari.iban, !iban.isEmpty {
+                infoRow(label: "IBAN", val: iban)
+            }
         }
         .padding(16)
         .background(Color(hex: "121216"))
@@ -377,15 +396,47 @@ public struct CariDetailView: View {
     
     @ViewBuilder
     private func renderRiskDurum() -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Risk & Durum Seçenekleri")
+        let bakiyeVal = currentCari.bakiye
+        let limit = currentCari.riskLimiti ?? 50000.0
+        let pct = limit > 0 ? min(bakiyeVal / limit, 1.0) : 0.0
+        let isCritical = pct > 0.85
+        
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Risk ve Limit Durumu")
                 .font(.system(size: 13, weight: .bold))
                 .foregroundColor(.white)
             
-            infoRow(label: "Risk Takibi Aktif Mi:", val: "Evet")
-            infoRow(label: "Geçmiş Vadede Engelle:", val: "Hayır")
-            infoRow(label: "Faturada Risk Kontrolü:", val: "Evet")
-            infoRow(label: "Kart Durumu:", val: "Aktif", valColor: Color(hex: "10B981"))
+            HStack {
+                Text("Kullanılan Limit")
+                    .font(.system(size: 12))
+                    .foregroundColor(Color(hex: "8E8E93"))
+                Spacer()
+                Text("\(AppFormatters.money(bakiyeVal)) / \(AppFormatters.money(limit))")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.white.opacity(0.08))
+                        .frame(height: 8)
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(isCritical ? Color(hex: "EF4444") : Color(hex: "10B981"))
+                        .frame(width: max(geo.size.width * CGFloat(pct), 6), height: 8)
+                }
+            }
+            .frame(height: 8)
+            
+            HStack {
+                Text("Doluluk: %\(Int(pct * 100))")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(isCritical ? Color(hex: "EF4444") : Color(hex: "10B981"))
+                Spacer()
+                Text("Kalan: \(AppFormatters.money(max(0, limit - bakiyeVal)))")
+                    .font(.system(size: 11))
+                    .foregroundColor(Color(hex: "8E8E93"))
+            }
         }
         .padding(16)
         .background(Color(hex: "121216"))
@@ -472,6 +523,28 @@ public struct CariDetailView: View {
         }
     }
     
+    // MARK: - Live Supabase Hareketler Çekimi
+    private func loadLiveHareketler() async {
+        isLoadingHareketler = true
+        do {
+            let fetched = try await SupabaseService.shared.fetchCariHareketler(cariId: currentCari.id)
+            await MainActor.run {
+                if !fetched.isEmpty {
+                    self.hareketler = fetched
+                } else if self.hareketler.isEmpty {
+                    // Canlıda henüz kayıt yoksa temiz gösterim
+                    self.hareketler = []
+                }
+                self.isLoadingHareketler = false
+            }
+        } catch {
+            print("[CariDetail] Hareketler çekilemedi: \(error)")
+            await MainActor.run {
+                self.isLoadingHareketler = false
+            }
+        }
+    }
+    
     // MARK: - PDF Ekstre Üretimi & Önizleme (QuestPDF Destekli)
     private func exportEkstre(detayli: Bool) {
         #if canImport(UIKit)
@@ -527,9 +600,18 @@ public struct CariDetailView: View {
         #endif
     }
     
-    // MARK: - Silme İşlemi (Masaüstü Birebir Doğrulama)
+    // MARK: - Silme İşlemi (Canlı Supabase & UI)
     private func performDelete() {
-        onDelete?(currentCari)
-        presentationMode.wrappedValue.dismiss()
+        Task {
+            do {
+                try await SupabaseService.shared.delete(table: "cariler", id: currentCari.id)
+            } catch {
+                print("[CariDetail] Silme hatası: \(error)")
+            }
+            await MainActor.run {
+                onDelete?(currentCari)
+                presentationMode.wrappedValue.dismiss()
+            }
+        }
     }
 }
