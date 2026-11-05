@@ -381,7 +381,7 @@ public final class TransactionService: @unchecked Sendable {
                         net_tutar: it.netTutar
                     )
                 },
-                stok_hareketler: req.items.compactMap { it in
+                stok_hareketler: req.items.compactMap { (it: FaturaKalem) -> AtomicStokHareketData? in
                     guard let sId = it.stokId, let intStokId = Int(sId) else { return nil }
                     return AtomicStokHareketData(
                         stok_id: intStokId,
@@ -510,9 +510,9 @@ public final class TransactionService: @unchecked Sendable {
             evrak_no: req.faturaNo,
             belge_no: req.faturaNo,
             islem_turu: isSatis ? "Satış Faturası" : "Alış Faturası",
-            borc: isSatis ? grandTotal : 0,
-            alacak: !isSatis ? grandTotal : 0,
-            bakiye: req.cari.bakiye + (isSatis ? grandTotal : -grandTotal),
+            borc: isSatis ? Double(grandTotal) : 0,
+            alacak: !isSatis ? Double(grandTotal) : 0,
+            bakiye: req.cari.bakiye + (isSatis ? Double(grandTotal) : -Double(grandTotal)),
             fatura_id: currentId,
             aciklama: req.aciklama ?? "Fatura Kesildi",
             tenant_id: tenantId,

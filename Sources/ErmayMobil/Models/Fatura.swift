@@ -62,6 +62,7 @@ public struct Fatura: Identifiable, Codable, Hashable {
         genelToplam: Double = 0.0,
         tevkifatTutari: Double? = 0.0,
         odemeDurumu: String? = "BEKLIYOR",
+        durum: String? = nil,
         aciklama: String? = nil,
         kalemler: [FaturaKalem]? = nil,
         syncGuid: String? = nil,
@@ -79,7 +80,7 @@ public struct Fatura: Identifiable, Codable, Hashable {
         self.iskontoToplami = iskontoToplami
         self.genelToplam = genelToplam
         self.tevkifatTutari = tevkifatTutari
-        self.odemeDurumu = odemeDurumu
+        self.odemeDurumu = durum ?? odemeDurumu
         self.aciklama = aciklama
         self.kalemler = kalemler
         self.syncGuid = syncGuid
@@ -160,16 +161,24 @@ public struct Fatura: Identifiable, Codable, Hashable {
 public struct FaturaKalem: Identifiable, Codable, Hashable {
     public var id: String
     public var faturaId: String?
-    public var stokId: String
+    public var stokId: String?
     public var stokKodu: String?
     public var stokAdi: String
+    public var birim: String?
     public var miktar: Double
-    public var birim: String
     public var birimFiyat: Double
     public var kdvOrani: Double
-    public var iskontoOrani: Double
-    public var toplamTutar: Double
     public var kdvTutari: Double
+    public var iskontoOrani: Double
+    public var iskontoTutari: Double
+    public var netTutar: Double
+    public var aciklama: String?
+    public var syncGuid: String?
+    
+    public var toplamTutar: Double {
+        get { netTutar }
+        set { netTutar = newValue }
+    }
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -177,20 +186,61 @@ public struct FaturaKalem: Identifiable, Codable, Hashable {
         case stokId = "stok_id"
         case stokKodu = "stok_kodu"
         case stokAdi = "stok_adi"
-        case miktar
         case birim
+        case miktar
         case birimFiyat = "birim_fiyat"
         case kdvOrani = "kdv_orani"
+        case kdvTutari = "kdv_tutari"
         case iskontoOrani = "iskonto_orani"
+        case iskontoTutari = "iskonto_tutari"
+        case netTutar = "net_tutar"
         case toplamTutar = "toplam_tutar"
         case tutar
-        case kdvTutari = "kdv_tutari"
+        case aciklama
+        case syncGuid = "sync_guid"
     }
     
     public init(
         id: String = UUID().uuidString,
         faturaId: String? = nil,
-        stokId: String,
+        stokId: String? = nil,
+        stokKodu: String? = nil,
+        stokAdi: String = "",
+        birim: String? = "Adet",
+        miktar: Double = 1.0,
+        birimFiyat: Double = 0.0,
+        kdvOrani: Double = 20.0,
+        iskontoOrani: Double = 0.0,
+        aciklama: String? = nil
+    ) {
+        self.id = id
+        self.faturaId = faturaId
+        self.stokId = stokId
+        self.stokKodu = stokKodu
+        self.stokAdi = stokAdi
+        self.birim = birim
+        self.miktar = miktar
+        self.birimFiyat = birimFiyat
+        self.kdvOrani = kdvOrani
+        self.iskontoOrani = iskontoOrani
+        self.aciklama = aciklama
+        
+        let brüt = miktar * birimFiyat
+        let isk = brüt * (iskontoOrani / 100.0)
+        let matrah = brüt - isk
+        let kdv = matrah * (kdvOrani / 100.0)
+        
+        self.iskontoTutari = isk
+        self.kdvTutari = kdv
+        self.netTutar = matrah + kdv
+        self.syncGuid = UUID().uuidString
+    }
+    
+    // Convenience init with explicit toplamTutar
+    public init(
+        id: String = UUID().uuidString,
+        faturaId: String? = nil,
+        stokId: String? = nil,
         stokKodu: String? = nil,
         stokAdi: String,
         miktar: Double = 1.0,
@@ -199,7 +249,7 @@ public struct FaturaKalem: Identifiable, Codable, Hashable {
         kdvOrani: Double = 20.0,
         iskontoOrani: Double = 0.0,
         toplamTutar: Double = 0.0,
-        kdvTutari: Double = 0.0
+        kdvTutari: Double? = nil
     ) {
         self.id = id
         self.faturaId = faturaId
@@ -211,8 +261,16 @@ public struct FaturaKalem: Identifiable, Codable, Hashable {
         self.birimFiyat = birimFiyat
         self.kdvOrani = kdvOrani
         self.iskontoOrani = iskontoOrani
-        self.toplamTutar = toplamTutar
-        self.kdvTutari = kdvTutari
+        
+        let brüt = miktar * birimFiyat
+        let isk = brüt * (iskontoOrani / 100.0)
+        let matrah = brüt - isk
+        let calculatedKdv = matrah * (kdvOrani / 100.0)
+        
+        self.iskontoTutari = isk
+        self.kdvTutari = kdvTutari ?? calculatedKdv
+        self.netTutar = toplamTutar > 0 ? toplamTutar : (matrah + self.kdvTutari)
+        self.syncGuid = UUID().uuidString
     }
     
     public init(from decoder: Decoder) throws {
@@ -235,11 +293,12 @@ public struct FaturaKalem: Identifiable, Codable, Hashable {
         if let intSId = try? c.decode(Int.self, forKey: .stokId) {
             self.stokId = String(intSId)
         } else {
-            self.stokId = (try? c.decode(String.self, forKey: .stokId)) ?? ""
+            self.stokId = try? c.decode(String.self, forKey: .stokId)
         }
         
         self.stokKodu = try? c.decode(String.self, forKey: .stokKodu)
         self.stokAdi = (try? c.decode(String.self, forKey: .stokAdi)) ?? ""
+        self.birim = (try? c.decode(String.self, forKey: .birim)) ?? "Adet"
         
         if let dMiktar = try? c.decode(Double.self, forKey: .miktar) {
             self.miktar = dMiktar
@@ -248,8 +307,6 @@ public struct FaturaKalem: Identifiable, Codable, Hashable {
         } else {
             self.miktar = 1.0
         }
-        
-        self.birim = (try? c.decode(String.self, forKey: .birim)) ?? "Adet"
         
         if let dFiyat = try? c.decode(Double.self, forKey: .birimFiyat) {
             self.birimFiyat = dFiyat
@@ -268,15 +325,20 @@ public struct FaturaKalem: Identifiable, Codable, Hashable {
         }
         
         self.iskontoOrani = (try? c.decode(Double.self, forKey: .iskontoOrani)) ?? 0.0
+        self.iskontoTutari = (try? c.decode(Double.self, forKey: .iskontoTutari)) ?? ((self.miktar * self.birimFiyat) * (self.iskontoOrani / 100.0))
+        self.kdvTutari = (try? c.decode(Double.self, forKey: .kdvTutari)) ?? (((self.miktar * self.birimFiyat) - self.iskontoTutari) * (self.kdvOrani / 100.0))
         
-        if let dTop = try? c.decode(Double.self, forKey: .toplamTutar) {
-            self.toplamTutar = dTop
-        } else if let dTop2 = try? c.decode(Double.self, forKey: .tutar) {
-            self.toplamTutar = dTop2
+        if let dTop = try? c.decode(Double.self, forKey: .netTutar) {
+            self.netTutar = dTop
+        } else if let dTop2 = try? c.decode(Double.self, forKey: .toplamTutar) {
+            self.netTutar = dTop2
+        } else if let dTop3 = try? c.decode(Double.self, forKey: .tutar) {
+            self.netTutar = dTop3
         } else {
-            self.toplamTutar = self.miktar * self.birimFiyat
+            self.netTutar = (self.miktar * self.birimFiyat) - self.iskontoTutari + self.kdvTutari
         }
         
-        self.kdvTutari = (try? c.decode(Double.self, forKey: .kdvTutari)) ?? 0.0
+        self.aciklama = try? c.decode(String.self, forKey: .aciklama)
+        self.syncGuid = try? c.decode(String.self, forKey: .syncGuid)
     }
 }
