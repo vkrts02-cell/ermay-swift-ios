@@ -123,8 +123,9 @@ public final class AuthService: ObservableObject {
                 let icerik: String?
             }
             let notes: [SysNote] = try await SupabaseService.shared.fetch(
-                table: "notlar",
-                queryItems: [URLQueryItem(name: "baslik", value: "eq.__SYS_USERS__")]
+                from: "notlar",
+                filters: ["baslik": "eq.__SYS_USERS__"],
+                applyTenantFilter: false
             )
             
             if let note = notes.first, let jsonStr = note.icerik, let data = jsonStr.data(using: .utf8) {
