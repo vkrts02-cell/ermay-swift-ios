@@ -102,8 +102,6 @@ public struct Teklif: Identifiable, Codable, Hashable {
             self.kdvToplami = dKdv
         } else if let dKdv2 = try? c.decode(Double.self, forKey: .kdvToplam) {
             self.kdvToplami = dKdv2
-        } else if let iKdv = try? c.decode(Int.self, forKey: .kdvToplami) {
-            self.kdvToplami = Double(iKdv)
         } else {
             self.kdvToplami = 0.0
         }
@@ -127,14 +125,20 @@ public struct Teklif: Identifiable, Codable, Hashable {
 public struct TeklifKalem: Identifiable, Codable, Hashable {
     public var id: String
     public var teklifId: String?
-    public var stokId: String
+    public var stokId: String?
     public var stokKodu: String?
     public var stokAdi: String
     public var miktar: Double
-    public var birim: String
+    public var birim: String?
     public var birimFiyat: Double
     public var kdvOrani: Double
-    public var toplamTutar: Double
+    public var tutar: Double
+    public var aciklama: String?
+    
+    public var toplamTutar: Double {
+        get { tutar }
+        set { tutar = newValue }
+    }
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -146,21 +150,23 @@ public struct TeklifKalem: Identifiable, Codable, Hashable {
         case birim
         case birimFiyat = "birim_fiyat"
         case kdvOrani = "kdv_orani"
-        case toplamTutar = "toplam_tutar"
         case tutar
+        case toplamTutar = "toplam_tutar"
+        case aciklama
     }
     
     public init(
         id: String = UUID().uuidString,
         teklifId: String? = nil,
-        stokId: String,
+        stokId: String? = nil,
         stokKodu: String? = nil,
         stokAdi: String,
         miktar: Double = 1.0,
-        birim: String = "Adet",
+        birim: String? = "Adet",
         birimFiyat: Double = 0.0,
         kdvOrani: Double = 20.0,
-        toplamTutar: Double = 0.0
+        tutar: Double = 0.0,
+        aciklama: String? = nil
     ) {
         self.id = id
         self.teklifId = teklifId
@@ -168,10 +174,11 @@ public struct TeklifKalem: Identifiable, Codable, Hashable {
         self.stokKodu = stokKodu
         self.stokAdi = stokAdi
         self.miktar = miktar
-        self.birim = birim
+        self.birim = birim ?? "Adet"
         self.birimFiyat = birimFiyat
         self.kdvOrani = kdvOrani
-        self.toplamTutar = toplamTutar
+        self.tutar = tutar > 0 ? tutar : (miktar * birimFiyat)
+        self.aciklama = aciklama
     }
     
     public init(from decoder: Decoder) throws {
@@ -194,44 +201,16 @@ public struct TeklifKalem: Identifiable, Codable, Hashable {
         if let intStokId = try? c.decode(Int.self, forKey: .stokId) {
             self.stokId = String(intStokId)
         } else {
-            self.stokId = (try? c.decode(String.self, forKey: .stokId)) ?? ""
+            self.stokId = try? c.decode(String.self, forKey: .stokId)
         }
         
         self.stokKodu = try? c.decode(String.self, forKey: .stokKodu)
         self.stokAdi = (try? c.decode(String.self, forKey: .stokAdi)) ?? ""
-        
-        if let dMiktar = try? c.decode(Double.self, forKey: .miktar) {
-            self.miktar = dMiktar
-        } else if let iMiktar = try? c.decode(Int.self, forKey: .miktar) {
-            self.miktar = Double(iMiktar)
-        } else {
-            self.miktar = 1.0
-        }
-        
+        self.miktar = (try? c.decode(Double.self, forKey: .miktar)) ?? 1.0
         self.birim = (try? c.decode(String.self, forKey: .birim)) ?? "Adet"
-        
-        if let dFiyat = try? c.decode(Double.self, forKey: .birimFiyat) {
-            self.birimFiyat = dFiyat
-        } else if let iFiyat = try? c.decode(Int.self, forKey: .birimFiyat) {
-            self.birimFiyat = Double(iFiyat)
-        } else {
-            self.birimFiyat = 0.0
-        }
-        
-        if let dKdv = try? c.decode(Double.self, forKey: .kdvOrani) {
-            self.kdvOrani = dKdv
-        } else if let iKdv = try? c.decode(Int.self, forKey: .kdvOrani) {
-            self.kdvOrani = Double(iKdv)
-        } else {
-            self.kdvOrani = 20.0
-        }
-        
-        if let dTop = try? c.decode(Double.self, forKey: .toplamTutar) {
-            self.toplamTutar = dTop
-        } else if let dTop2 = try? c.decode(Double.self, forKey: .tutar) {
-            self.toplamTutar = dTop2
-        } else {
-            self.toplamTutar = self.miktar * self.birimFiyat
-        }
+        self.birimFiyat = (try? c.decode(Double.self, forKey: .birimFiyat)) ?? 0.0
+        self.kdvOrani = (try? c.decode(Double.self, forKey: .kdvOrani)) ?? 20.0
+        self.tutar = (try? c.decode(Double.self, forKey: .tutar)) ?? (try? c.decode(Double.self, forKey: .toplamTutar)) ?? (self.miktar * self.birimFiyat)
+        self.aciklama = try? c.decode(String.self, forKey: .aciklama)
     }
 }
