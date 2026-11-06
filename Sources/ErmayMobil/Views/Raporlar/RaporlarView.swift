@@ -754,7 +754,7 @@ public struct RaporDetayInteractiveView: View {
         return result
     }
     
-    @State private var days: [DailyFlow] = NakitAkisView.generateInitialDays()
+    @State private var days: [DailyFlow] = Self.generateInitialDays()
     
     @State private var selectedDay: DailyFlow? = nil
     
