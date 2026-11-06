@@ -48,13 +48,13 @@ public final class ReportCalculationService: @unchecked Sendable {
                 
                 let headers = ["Rapor Kalemi", "Tutar / Değer"]
                 let rows: [[String]] = [
-                    ["Toplam Alacaklar", AppFormatters.money(topAlacak > 0 ? topAlacak : 485250)],
-                    ["Toplam Borçlar", AppFormatters.money(topBorc > 0 ? topBorc : 192400)],
-                    ["Kasa ve Banka Mevcudu", AppFormatters.money((kasaTop + bankaTop) > 0 ? (kasaTop + bankaTop) : 215300)],
-                    ["Toplam Stok Miktarı", "\(Int(topStokAdet > 0 ? topStokAdet : 1420)) Adet"],
-                    ["Stok Maliyet Değeri", AppFormatters.money(topStokDeger > 0 ? topStokDeger : 380000)],
+                    ["Toplam Alacaklar", AppFormatters.money(topAlacak)],
+                    ["Toplam Borçlar", AppFormatters.money(topBorc)],
+                    ["Kasa ve Banka Mevcudu", AppFormatters.money(kasaTop + bankaTop)],
+                    ["Toplam Stok Miktarı", "\(Int(topStokAdet)) Adet"],
+                    ["Stok Maliyet Değeri", AppFormatters.money(topStokDeger)],
                     ["Net İşletme Sermayesi", AppFormatters.money(topAlacak - topBorc + kasaTop + bankaTop)],
-                    ["Aktif Cari Kart Sayısı", "\(cariler.count > 0 ? cariler.count : 31) Firma"]
+                    ["Aktif Cari Kart Sayısı", "\(cariler.count) Firma"]
                 ]
                 return (headers, rows)
                 

@@ -20,15 +20,15 @@ public struct AyarlarView: View {
     @State private var confirmAction: (() -> Void)? = nil
     
     // 1. Bulut ve API (Supabase / Firebase / QuestPDF)
-    @State private var dbUrl: String = "https://your-project.supabase.co"
+    @State private var dbUrl: String = "https://fqgbdymffknglqeqoogt.supabase.co"
     @State private var secretKey: String = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
     @State private var pdfServerUrl: String = "https://ermay-pdf-api-390930978984.europe-west1.run.app"
-    @State private var pingStatus: String = "Bağlantı Kuruldu (42ms)"
+    @State private var pingStatus: String = "Bulut Aktif • Canlı Senkronizasyon"
     @State private var isTestingPing: Bool = false
     
     // 2. Firma Profili & Logo
     @State private var firmaUnvan: String = "ERMAY MÜHENDİSLİK SAN. VE TİC. LTD. ŞTİ."
-    @State private var firmaYetkili: String = "Yönetici"
+    @State private var firmaYetkili: String = "vkrts"
     @State private var firmaTelefon: String = "+90 532 123 4567"
     @State private var firmaVergiDairesi: String = "Büyükçekmece"
     @State private var firmaVergiNo: String = "3620129845"

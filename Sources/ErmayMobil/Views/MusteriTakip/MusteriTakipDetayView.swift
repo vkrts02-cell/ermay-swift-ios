@@ -15,23 +15,11 @@ public struct MusteriTakipDetayView: View {
     @State private var isPdfGenerating: Bool = false
     
     // Detay Listeleri
-    @State private var gorusmeler: [MusteriTakipDetay] = [
-        MusteriTakipDetay(id: 1, klasorId: 1, cariId: 1, baslik: "Yıllık Bakım & Rulman Sözleşmesi", icerik: "Yıllık 500 adet rulman ve 200 adet keçe alımı için özel iskonto talep edildi. Satın alma müdürü ile mutabakata varıldı.", tip: "Gorusme", tarih: "03.11.2026 14:30"),
-        MusteriTakipDetay(id: 2, klasorId: 1, cariId: 1, baslik: "Fabrika Ziyareti ve Numune İnceleme", icerik: "Tuzla tesislerinde teknik ekip ile testler incelendi.", tip: "Gorusme", tarih: "20.10.2026 11:00")
-    ]
-    
-    @State private var fiyatlar: [MusteriTakipDetay] = [
-        MusteriTakipDetay(id: 3, klasorId: 1, cariId: 1, baslik: "Bilyalı Rulman 6204-2RS", icerik: "100 adet üzeri siparişte net peşin özel fiyat", tip: "Fiyat", fiyatBilgisi: 195.0, paraBirimi: "₺", tarih: "03.11.2026"),
-        MusteriTakipDetay(id: 4, klasorId: 1, cariId: 1, baslik: "Hidrolik Keçe 35x50", icerik: "Yıllık paket alım birim fiyatı", tip: "Fiyat", fiyatBilgisi: 72.0, paraBirimi: "₺", tarih: "20.10.2026")
-    ]
-    
-    @State private var gorseller: [MusteriTakipDetay] = [
-        MusteriTakipDetay(id: 5, klasorId: 1, cariId: 1, baslik: "Müşteri Kartviziti & Teknik Çizim", icerik: "Ön yüz çekildi", tip: "Gorsel", tarih: "03.11.2026")
-    ]
-    
-    @State private var notlar: [MusteriTakipDetay] = [
-        MusteriTakipDetay(id: 6, klasorId: 1, cariId: 1, baslik: "Özel Müşteri Notu", icerik: "Yetkili kişi Ahmet Bey her Çarşamba toplantıda oluyor. Teklifler doğrudan satın alma müdürü Mehmet Bey'e cc yapılmalı.", tip: "Not", tarih: "03.11.2026")
-    ]
+    @State private var gorusmeler: [MusteriTakipDetay] = []
+    @State private var fiyatlar: [MusteriTakipDetay] = []
+    @State private var gorseller: [MusteriTakipDetay] = []
+    @State private var notlar: [MusteriTakipDetay] = []
+    @State private var isLoading: Bool = false
     
     // Görüşme Formu State
     @State private var gorusmeBaslik: String = ""
@@ -210,6 +198,14 @@ public struct MusteriTakipDetayView: View {
         .sheet(isPresented: $isEtiketModalOpen) {
             etiketSheet()
         }
+        .task {
+            await loadDetaylar()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
+            Task {
+                await loadDetaylar()
+            }
+        }
     }
     
     private func tabItem(title: String, icon: String, count: Int, key: String, color: Color) -> some View {
@@ -247,6 +243,8 @@ public struct MusteriTakipDetayView: View {
                 
                 Button {
                     guard !gorusmeBaslik.isEmpty || !gorusmeIcerik.isEmpty else { return }
+                    let formatter = DateFormatter()
+                    formatter.dateFormat = "dd.MM.yyyy HH:mm"
                     let newD = MusteriTakipDetay(
                         id: Int.random(in: 1000...9999),
                         klasorId: klasor.id,
@@ -254,9 +252,12 @@ public struct MusteriTakipDetayView: View {
                         baslik: gorusmeBaslik.isEmpty ? "Müşteri Görüşmesi" : gorusmeBaslik,
                         icerik: gorusmeIcerik,
                         tip: "Gorusme",
-                        tarih: "03.11.2026 15:00"
+                        tarih: formatter.string(from: Date())
                     )
                     gorusmeler.insert(newD, at: 0)
+                    Task {
+                        _ = try? await SupabaseService.shared.insert(newD, into: "musteri_takip_detaylar")
+                    }
                     gorusmeBaslik = ""
                     gorusmeIcerik = ""
                 } label: {
@@ -277,6 +278,9 @@ public struct MusteriTakipDetayView: View {
             ForEach(gorusmeler) { g in
                 itemCard(title: g.baslik, subtitle: g.icerik ?? "", date: g.tarih, color: Color(hex: "0A84FF")) {
                     gorusmeler.removeAll { $0.id == g.id }
+                    Task {
+                        _ = try? await SupabaseService.shared.delete(from: "musteri_takip_detaylar", id: String(g.id))
+                    }
                 }
             }
         }
@@ -305,6 +309,8 @@ public struct MusteriTakipDetayView: View {
                 
                 Button {
                     guard !fiyatBaslik.isEmpty else { return }
+                    let formatter = DateFormatter()
+                    formatter.dateFormat = "dd.MM.yyyy"
                     let newF = MusteriTakipDetay(
                         id: Int.random(in: 1000...9999),
                         klasorId: klasor.id,
@@ -314,9 +320,12 @@ public struct MusteriTakipDetayView: View {
                         tip: "Fiyat",
                         fiyatBilgisi: Double(fiyatTutar) ?? 0,
                         paraBirimi: fiyatParaBirimi,
-                        tarih: "03.11.2026"
+                        tarih: formatter.string(from: Date())
                     )
                     fiyatlar.insert(newF, at: 0)
+                    Task {
+                        _ = try? await SupabaseService.shared.insert(newF, into: "musteri_takip_detaylar")
+                    }
                     fiyatBaslik = ""
                     fiyatTutar = ""
                     fiyatAciklama = ""
@@ -351,6 +360,9 @@ public struct MusteriTakipDetayView: View {
                         Spacer()
                         Button {
                             fiyatlar.removeAll { $0.id == f.id }
+                            Task {
+                                _ = try? await SupabaseService.shared.delete(from: "musteri_takip_detaylar", id: String(f.id))
+                            }
                         } label: {
                             Image(systemName: "trash").font(.system(size: 11)).foregroundColor(Color(hex: "EF4444"))
                         }
@@ -373,6 +385,8 @@ public struct MusteriTakipDetayView: View {
                 
                 Button {
                     guard !gorselBaslik.isEmpty else { return }
+                    let formatter = DateFormatter()
+                    formatter.dateFormat = "dd.MM.yyyy"
                     let newG = MusteriTakipDetay(
                         id: Int.random(in: 1000...9999),
                         klasorId: klasor.id,
@@ -380,9 +394,12 @@ public struct MusteriTakipDetayView: View {
                         baslik: gorselBaslik,
                         icerik: "Fotoğraf / Belge Eklendi",
                         tip: "Gorsel",
-                        tarih: "03.11.2026"
+                        tarih: formatter.string(from: Date())
                     )
                     gorseller.insert(newG, at: 0)
+                    Task {
+                        _ = try? await SupabaseService.shared.insert(newG, into: "musteri_takip_detaylar")
+                    }
                     gorselBaslik = ""
                 } label: {
                     HStack(spacing: 6) {
@@ -401,6 +418,9 @@ public struct MusteriTakipDetayView: View {
             ForEach(gorseller) { g in
                 itemCard(title: g.baslik, subtitle: g.icerik ?? "", date: g.tarih, color: Color(hex: "BF5AF2")) {
                     gorseller.removeAll { $0.id == g.id }
+                    Task {
+                        _ = try? await SupabaseService.shared.delete(from: "musteri_takip_detaylar", id: String(g.id))
+                    }
                 }
             }
         }
@@ -416,6 +436,8 @@ public struct MusteriTakipDetayView: View {
                 
                 Button {
                     guard !notBaslik.isEmpty || !notIcerik.isEmpty else { return }
+                    let formatter = DateFormatter()
+                    formatter.dateFormat = "dd.MM.yyyy"
                     let newN = MusteriTakipDetay(
                         id: Int.random(in: 1000...9999),
                         klasorId: klasor.id,
@@ -423,9 +445,12 @@ public struct MusteriTakipDetayView: View {
                         baslik: notBaslik.isEmpty ? "Genel Not" : notBaslik,
                         icerik: notIcerik,
                         tip: "Not",
-                        tarih: "03.11.2026"
+                        tarih: formatter.string(from: Date())
                     )
                     notlar.insert(newN, at: 0)
+                    Task {
+                        _ = try? await SupabaseService.shared.insert(newN, into: "musteri_takip_detaylar")
+                    }
                     notBaslik = ""
                     notIcerik = ""
                 } label: {
@@ -444,6 +469,12 @@ public struct MusteriTakipDetayView: View {
             
             ForEach(notlar) { n in
                 itemCard(title: n.baslik, subtitle: n.icerik ?? "", date: n.tarih, color: Color(hex: "FF9F0A")) {
+                    notlar.removeAll { $0.id == n.id }
+                    Task {
+                        _ = try? await SupabaseService.shared.delete(from: "musteri_takip_detaylar", id: String(n.id))
+                    }
+                }
+            }
                     notlar.removeAll { $0.id == n.id }
                 }
             }
@@ -666,5 +697,21 @@ public struct MusteriTakipDetayView: View {
         #else
         isPdfGenerating = false
         #endif
+    }
+    
+    private func loadDetaylar() async {
+        isLoading = true
+        do {
+            let items: [MusteriTakipDetay] = try await SupabaseService.shared.fetch(from: "musteri_takip_detaylar", queryParams: ["klasor_id": "eq.\(klasor.id)"])
+            await MainActor.run {
+                self.gorusmeler = items.filter { $0.tip == "Gorusme" }
+                self.fiyatlar = items.filter { $0.tip == "Fiyat" }
+                self.gorseller = items.filter { $0.tip == "Gorsel" }
+                self.notlar = items.filter { $0.tip == "Not" }
+            }
+        } catch {
+            print("MusteriTakipDetay fetch error: \(error)")
+        }
+        isLoading = false
     }
 }

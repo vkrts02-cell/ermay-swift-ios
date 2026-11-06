@@ -5,11 +5,18 @@ import UIKit
 
 public struct FaturaDetailView: View {
     public let fatura: Fatura
+    @State private var liveKalemler: [FaturaKalem] = []
+    @State private var isLoadingKalemler: Bool = false
     @State private var pdfData: Data? = nil
-    @State private var showShareSheet: Bool = false
+    @State private var showPDFModal: Bool = false
+    @State private var isGeneratingPDF: Bool = false
     
     public init(fatura: Fatura) {
         self.fatura = fatura
+    }
+    
+    public var displayedKalemler: [FaturaKalem] {
+        !liveKalemler.isEmpty ? liveKalemler : (fatura.kalemler ?? [])
     }
     
     public var body: some View {
@@ -74,14 +81,20 @@ public struct FaturaDetailView: View {
                     
                     // Kalemler Tablosu
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Fatura Kalemleri")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(AppTheme.textPrimary)
-                            .padding(.horizontal)
+                        HStack {
+                            Text("Fatura Kalemleri (\(displayedKalemler.count))")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(AppTheme.textPrimary)
+                            Spacer()
+                            if isLoadingKalemler {
+                                ProgressView().tint(AppTheme.primary)
+                            }
+                        }
+                        .padding(.horizontal)
                         
-                        if let kalemler = fatura.kalemler, !kalemler.isEmpty {
+                        if !displayedKalemler.isEmpty {
                             VStack(spacing: 8) {
-                                ForEach(kalemler) { k in
+                                ForEach(displayedKalemler) { k in
                                     GlassCard(cornerRadius: 12, padding: 12) {
                                         HStack {
                                             VStack(alignment: .leading, spacing: 3) {
@@ -95,7 +108,7 @@ public struct FaturaDetailView: View {
                                             
                                             Spacer()
                                             
-                                            Text(AppFormatters.money(k.netTutar))
+                                            Text(AppFormatters.money(k.toplamTutar > 0 ? k.toplamTutar : k.netTutar))
                                                 .font(.system(size: 14, weight: .bold))
                                                 .foregroundColor(AppTheme.textPrimary)
                                         }
@@ -141,22 +154,27 @@ public struct FaturaDetailView: View {
                     
                     // PDF Oluştur ve Paylaş Butonu (QuestPDF Destekli)
                     ActionButton(
-                        title: "PDF Görüntüle & Paylaş",
-                        icon: "square.and.arrow.up.fill",
+                        title: isGeneratingPDF ? "PDF Hazırlanıyor..." : "QuestPDF Resmi Fatura Aç",
+                        icon: "doc.text.fill",
                         color: AppTheme.primary
                     ) {
                         #if canImport(UIKit)
                         Task { @MainActor in
+                            self.isGeneratingPDF = true
                             self.pdfData = await PDFService.shared.fetchOrGenerateFaturaPDF(
                                 fatura: fatura,
-                                kalemler: fatura.kalemler ?? [],
+                                kalemler: displayedKalemler,
                                 firma: .varsayilan
                             )
-                            self.showShareSheet = true
+                            self.isGeneratingPDF = false
+                            if self.pdfData != nil {
+                                self.showPDFModal = true
+                            }
                         }
                         #endif
                     }
                     .padding(.horizontal)
+                    .disabled(isGeneratingPDF)
                     
                     Spacer().frame(height: 20)
                 }
@@ -165,14 +183,44 @@ public struct FaturaDetailView: View {
         }
         .navigationTitle("Fatura Detayı")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showShareSheet) {
+        .task {
+            await loadKalemler()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
+            Task {
+                await loadKalemler()
+            }
+        }
+        .sheet(isPresented: $showPDFModal) {
             #if canImport(UIKit)
             if let data = pdfData {
-                ShareSheet(activityItems: [data])
+                PDFViewerModal(
+                    title: "Fatura - \(fatura.faturaNo)",
+                    pdfData: data,
+                    fileName: "Fatura_\(fatura.faturaNo).pdf"
+                )
             }
             #endif
         }
     }
+    
+    private func loadKalemler() async {
+        isLoadingKalemler = true
+        do {
+            let items: [FaturaKalem] = try await SupabaseService.shared.fetch(
+                from: "fatura_detaylar",
+                filters: ["fatura_id": "eq.\(fatura.id)"],
+                applyTenantFilter: false
+            )
+            await MainActor.run {
+                self.liveKalemler = items
+            }
+        } catch {
+            print("Kalemler load error: \(error)")
+        }
+        isLoadingKalemler = false
+    }
+}
 }
 
 struct DetailSummaryRow: View {

@@ -10,17 +10,17 @@ public struct DashboardView: View {
     @State private var isSyncing: Bool = false
     @State private var lastSyncTime: String = "Şimdi"
     
-    // Live calculated stats (Masaüstü Birebir)
-    @State private var gunlukCiro: Double = 42850.0
-    @State private var toplamAlacak: Double = 184500.0
-    @State private var toplamBorc: Double = 72300.0
-    @State private var kasaBankaMevcut: Double = 112200.0
+    // Live calculated stats (Masaüstü Birebir Gerçek Veriler)
+    @State private var gunlukCiro: Double = 0.0
+    @State private var toplamAlacak: Double = 0.0
+    @State private var toplamBorc: Double = 0.0
+    @State private var kasaBankaMevcut: Double = 0.0
     
     // Satış Hedefleri (Haftalık & Aylık)
-    @State private var haftalikHedef: Double = 62500.0
-    @State private var haftalikGerceklesen: Double = 78400.0
-    @State private var aylikHedef: Double = 250000.0
-    @State private var aylikGerceklesen: Double = 312500.0
+    @State private var haftalikHedef: Double = 0.0
+    @State private var haftalikGerceklesen: Double = 0.0
+    @State private var aylikHedef: Double = 0.0
+    @State private var aylikGerceklesen: Double = 0.0
     
     // Weekly Chart Data
     struct BarChartPoint: Identifiable {
@@ -30,13 +30,7 @@ public struct DashboardView: View {
         let actual: Double
     }
     
-    @State private var weeklyData: [BarChartPoint] = [
-        BarChartPoint(label: "41.H", target: 62500, actual: 54000),
-        BarChartPoint(label: "42.H", target: 62500, actual: 68500),
-        BarChartPoint(label: "43.H", target: 62500, actual: 61200),
-        BarChartPoint(label: "44.H", target: 62500, actual: 74800),
-        BarChartPoint(label: "45.H", target: 62500, actual: 78400)
-    ]
+    @State private var weeklyData: [BarChartPoint] = []
     
     // Tab list data items
     struct DashboardListItem: Identifiable {
@@ -49,28 +43,9 @@ public struct DashboardView: View {
         let type: String // "In" | "Out"
     }
     
-    @State private var sonIslemler: [DashboardListItem] = [
-        DashboardListItem(title: "ERMAY MAKİNE VE TEKSTİL SAN. TİC. LTD. ŞTİ.", description: "Satış Faturası", amount: 24500, date: "Bugün", vade: nil, type: "In"),
-        DashboardListItem(title: "KAYA METAL SANAYİ VE TİCARET A.Ş.", description: "Kasa: Tahsilat", amount: 35000, date: "Dün", vade: nil, type: "In"),
-        DashboardListItem(title: "AKINCILAR LOJİSTİK VE DEPOLAMA LTD.", description: "Banka: Ödeme", amount: 6200, date: "02.11.2026", vade: nil, type: "Out"),
-        DashboardListItem(title: "TEKNO HAMMADDE VE KİMYA A.Ş.", description: "Alış Faturası", amount: 22800, date: "01.11.2026", vade: nil, type: "Out"),
-        DashboardListItem(title: "ÖZDEMİR RULMAN SANAYİ", description: "Banka: Tahsilat", amount: 14200, date: "31.10.2026", vade: nil, type: "In")
-    ]
-    
-    @State private var alacakTakibi: [DashboardListItem] = [
-        DashboardListItem(title: "ERMAY BİLİŞİM VE DIŞ TİC. LTD. ŞTİ.", description: "Müşteri", amount: 38400, date: "Alacak", vade: 12, type: "In"),
-        DashboardListItem(title: "MEGA PLASTİK AMBALAJ SAN. A.Ş.", description: "Müşteri", amount: 29500, date: "Alacak", vade: -4, type: "In"),
-        DashboardListItem(title: "YILDIZ TEKNİK CIVATA MAKİNA", description: "Müşteri", amount: 21800, date: "Alacak", vade: 8, type: "In"),
-        DashboardListItem(title: "BİRLİK OTOMOTİV YEDEK PARÇA", description: "Müşteri", amount: 18200, date: "Alacak", vade: 0, type: "In"),
-        DashboardListItem(title: "GÜVEN KALIP VE PRES SANAYİ", description: "Müşteri", amount: 14600, date: "Alacak", vade: -15, type: "In")
-    ]
-    
-    @State private var borcTakibi: [DashboardListItem] = [
-        DashboardListItem(title: "AKINCILAR ÇELİK DÖKÜM VE SANAYİ A.Ş.", description: "Tedarikçi", amount: 32000, date: "Borç", vade: 5, type: "Out"),
-        DashboardListItem(title: "DOĞUŞ HAMMADDE SANAYİ TİCARET", description: "Tedarikçi", amount: 19400, date: "Borç", vade: -2, type: "Out"),
-        DashboardListItem(title: "ÖZKAN NAKLİYAT VE LOJİSTİK A.Ş.", description: "Tedarikçi", amount: 11200, date: "Borç", vade: 14, type: "Out"),
-        DashboardListItem(title: "AS KİMYA SANAYİ VE TİC. LTD.", description: "Tedarikçi", amount: 9700, date: "Borç", vade: 20, type: "Out")
-    ]
+    @State private var sonIslemler: [DashboardListItem] = []
+    @State private var alacakTakibi: [DashboardListItem] = []
+    @State private var borcTakibi: [DashboardListItem] = []
     
     // Sheets
     @State private var showAlisFatura: Bool = false
@@ -152,6 +127,11 @@ public struct DashboardView: View {
             }
             .task {
                 await syncWithCloud()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
+                Task {
+                    await syncWithCloud()
+                }
             }
         }
     }
@@ -745,77 +725,87 @@ public struct DashboardView: View {
             if !cariler.isEmpty {
                 var topAlacak: Double = 0
                 var topBorc: Double = 0
+                var alacakList: [DashboardListItem] = []
+                var borcList: [DashboardListItem] = []
                 var recentList: [DashboardListItem] = []
                 
                 for c in cariler {
                     if c.bakiyeTuru == "A" {
                         topAlacak += c.bakiye
+                        if c.bakiye > 0 {
+                            alacakList.append(DashboardListItem(
+                                title: c.unvan,
+                                description: "Müşteri",
+                                amount: c.bakiye,
+                                date: "Alacak",
+                                vade: c.vadeGunu,
+                                type: "In"
+                            ))
+                        }
                     } else {
                         topBorc += c.bakiye
+                        if c.bakiye > 0 {
+                            borcList.append(DashboardListItem(
+                                title: c.unvan,
+                                description: "Tedarikçi",
+                                amount: c.bakiye,
+                                date: "Borç",
+                                vade: c.vadeGunu,
+                                type: "Out"
+                            ))
+                        }
+                    }
+                    
+                    if recentList.count < 5 {
+                        let isAlacakli = (c.bakiyeTuru == "A")
+                        recentList.append(DashboardListItem(
+                            title: c.unvan,
+                            description: isAlacakli ? "Alacak Bakiyesi" : "Borç Bakiyesi",
+                            amount: c.bakiye,
+                            date: "Güncel",
+                            vade: c.vadeGunu,
+                            type: isAlacakli ? "In" : "Out"
+                        ))
                     }
                 }
-                
-                // İlk 5 cari kartı hareket listesine ekle
-                for c in cariler.prefix(5) {
-                    let isAlacakli = (c.bakiyeTuru == "A")
-                    let b = c.bakiye > 0 ? c.bakiye : 15400.0
-                    recentList.append(DashboardListItem(
-                        title: c.unvan,
-                        description: isAlacakli ? "Alacak Bakiyesi" : "Borç Bakiyesi",
-                        amount: b,
-                        date: "Güncel",
-                        vade: c.vadeGunu ?? 30,
-                        type: isAlacakli ? "In" : "Out"
-                    ))
-                }
-                
-                let finalAlacak = topAlacak > 0 ? topAlacak : self.toplamAlacak
-                let finalBorc = topBorc > 0 ? topBorc : self.toplamBorc
-                let finalRecent = recentList
                 
                 await MainActor.run {
-                    self.toplamAlacak = finalAlacak
-                    self.toplamBorc = finalBorc
-                    if !finalRecent.isEmpty {
-                        self.sonIslemler = finalRecent
-                    }
+                    self.toplamAlacak = topAlacak
+                    self.toplamBorc = topBorc
+                    self.alacakTakibi = alacakList
+                    self.borcTakibi = borcList
+                    self.sonIslemler = recentList
                 }
             }
             
             // 2. Kasa ve Banka Mevcutlarını Çek
             do {
-                let kasalar: [KasaBanka] = try await SupabaseService.shared.fetch(from: "kasalar")
+                let kasalar: [KasaBanka] = (try? await SupabaseService.shared.fetch(from: "kasalar")) ?? []
                 let kasaTop = kasalar.reduce(0.0) { $0 + $1.bakiye }
-                let bankalar: [BankaKart] = try await SupabaseService.shared.fetch(from: "bankalar")
+                let bankalar: [BankaKart] = (try? await SupabaseService.shared.fetch(from: "bankalar")) ?? []
                 let bankaTop = bankalar.reduce(0.0) { $0 + $1.bakiye }
                 let totalNakit = kasaTop + bankaTop
-                if totalNakit > 0 {
-                    await MainActor.run {
-                        self.kasaBankaMevcut = totalNakit
-                    }
+                await MainActor.run {
+                    self.kasaBankaMevcut = totalNakit
                 }
             } catch { }
             
             // 3. Faturalar tablosundan canlı ciroyu ve gerçekleşen satışları çek
             do {
-                let faturalar: [Fatura] = try await SupabaseService.shared.fetch(from: "faturalar")
-                if !faturalar.isEmpty {
-                    let today = AppFormatters.isoDate.string(from: Date())
-                    let bugunSatis = faturalar
-                        .filter { $0.tarih.hasPrefix(today) && $0.faturaTuru.localizedCaseInsensitiveContains("satış") }
-                        .reduce(0.0) { $0 + $1.genelToplam }
-                    
-                    let toplamSatis = faturalar
-                        .filter { $0.faturaTuru.localizedCaseInsensitiveContains("satış") }
-                        .reduce(0.0) { $0 + $1.genelToplam }
-                    
-                    await MainActor.run {
-                        if bugunSatis > 0 { self.gunlukCiro = bugunSatis }
-                        if toplamSatis > 0 {
-                            self.haftalikGerceklesen = min(toplamSatis, 85000.0)
-                            self.aylikGerceklesen = toplamSatis
-                        }
-                    }
+                let faturalar: [Fatura] = (try? await SupabaseService.shared.fetch(from: "faturalar")) ?? []
+                let today = AppFormatters.isoDate.string(from: Date())
+                let bugunSatis = faturalar
+                    .filter { $0.tarih.hasPrefix(today) && $0.faturaTuru.localizedCaseInsensitiveContains("satış") }
+                    .reduce(0.0) { $0 + $1.genelToplam }
+                
+                let toplamSatis = faturalar
+                    .filter { $0.faturaTuru.localizedCaseInsensitiveContains("satış") }
+                    .reduce(0.0) { $0 + $1.genelToplam }
+                
+                await MainActor.run {
+                    self.gunlukCiro = bugunSatis
+                    self.haftalikGerceklesen = min(toplamSatis, 85000.0)
+                    self.aylikGerceklesen = toplamSatis
                 }
             } catch { }
             

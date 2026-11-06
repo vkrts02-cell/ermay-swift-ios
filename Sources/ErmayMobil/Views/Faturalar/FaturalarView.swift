@@ -210,6 +210,11 @@ public struct FaturalarView: View {
             .task {
                 await loadFaturalar()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
+                Task {
+                    await loadFaturalar()
+                }
+            }
         }
     }
     
@@ -221,14 +226,9 @@ public struct FaturalarView: View {
                 self.faturalar = items
             }
         } catch {
+            print("[FaturalarView] Supabase fetch error: \(error)")
             await MainActor.run {
-                self.faturalar = [
-                    Fatura(id: "1", faturaNo: "FTR-2026-00124", faturaTuru: "SATIS", cariId: "1", cariUnvan: "Ermay Bilişim San. Ltd.", tarih: "02.11.2026", vadeTarihi: "17.11.2026", genelToplam: 14500.0, durum: "Kapalı"),
-                    Fatura(id: "2", faturaNo: "FTR-2026-00123", faturaTuru: "ALIS", cariId: "2", cariUnvan: "Mega Plastik Ambalaj A.Ş.", tarih: "30.10.2026", vadeTarihi: "21.11.2026", genelToplam: 22800.0, durum: "Açık"),
-                    Fatura(id: "3", faturaNo: "FTR-2026-00122", faturaTuru: "SATIS", cariId: "3", cariUnvan: "Akıncılar Çelik Döküm", tarih: "28.10.2026", vadeTarihi: "12.11.2026", genelToplam: 58000.0, durum: "Kapalı"),
-                    Fatura(id: "4", faturaNo: "FTR-2026-00121", faturaTuru: "SATIS", cariId: "4", cariUnvan: "Kaya Metal Kalıp Ltd.", tarih: "25.10.2026", vadeTarihi: "10.11.2026", genelToplam: 31200.0, durum: "Açık"),
-                    Fatura(id: "5", faturaNo: "FTR-2026-00120", faturaTuru: "ALIS", cariId: "5", cariUnvan: "Özkanlar Ambalaj Sanayi", tarih: "22.10.2026", vadeTarihi: "06.11.2026", genelToplam: 8400.0, durum: "Kapalı")
-                ]
+                self.faturalar = []
             }
         }
         isLoading = false

@@ -156,40 +156,43 @@ public struct BorcHatirlaticiView: View {
             .task {
                 await loadReminders()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
+                Task {
+                    await loadReminders()
+                }
+            }
         }
     }
     
     private func loadReminders() async {
         isLoading = true
         do {
-            let cariler: [CariKart] = try await SupabaseService.shared.fetch(from: "cariler")
-            let list = cariler.filter { $0.bakiye > 0 && $0.bakiyeTuru == "A" }.map { c in
+            let cariler: [CariKart] = try await SupabaseService.shared.fetchCariler()
+            let list = cariler.filter { $0.bakiye > 0 }.map { c in
                 HatirlaticiItem(
                     id: c.id,
                     cariUnvan: c.unvan,
                     telefon: c.gsm ?? c.telefon,
-                    belgeNo: "FTR-2026-\(Int.random(in: 100...999))",
-                    vadeTarihi: "28.10.2026",
+                    belgeNo: "CARİ-\(c.id)",
+                    vadeTarihi: "Cari Hesap",
                     tutar: c.bakiye,
-                    gecikmeGunu: 5,
+                    gecikmeGunu: 1,
                     tur: "ALACAK"
                 )
             }
             await MainActor.run {
-                self.hatirlaticilar = list.isEmpty ? sampleReminders : list
+                self.hatirlaticilar = list
             }
         } catch {
-            hatirlaticilar = sampleReminders
+            await MainActor.run {
+                self.hatirlaticilar = []
+            }
         }
         isLoading = false
     }
     
     private var sampleReminders: [HatirlaticiItem] {
-        [
-            HatirlaticiItem(id: "1", cariUnvan: "Ermay Bilişim San. Ltd.", telefon: "05321112233", belgeNo: "FTR-089", vadeTarihi: "20.10.2026", tutar: 45200.0, gecikmeGunu: 13, tur: "ALACAK"),
-            HatirlaticiItem(id: "2", cariUnvan: "Kaya Metal Döküm A.Ş.", telefon: "05423334455", belgeNo: "FTR-094", vadeTarihi: "27.10.2026", tutar: 28500.0, gecikmeGunu: 6, tur: "ALACAK"),
-            HatirlaticiItem(id: "3", cariUnvan: "Mega Plastik İthalat", telefon: "05556667788", belgeNo: "FTR-102", vadeTarihi: "05.11.2026", tutar: 14000.0, gecikmeGunu: -3, tur: "ALACAK")
-        ]
+        []
     }
     
     private func sendWhatsAppReminder(_ item: HatirlaticiItem) {

@@ -1,66 +1,9 @@
 import SwiftUI
 
 public struct MusteriTakipView: View {
-    @State private var klasorler: [MusteriTakipKlasor] = [
-        MusteriTakipKlasor(
-            id: 1,
-            cariId: 1,
-            cariUnvan: "Ermay Makine ve Tekstil San. Tic. Ltd. Şti.",
-            cariKod: "CARI-001",
-            telefon: "0212 555 1234",
-            yetkili: "Ahmet Yılmaz",
-            etiket: "Sıcak Müşteri",
-            renk: "#0A84FF",
-            olusturmaTarihi: "01.11.2026",
-            sonIslemTarihi: "03.11.2026"
-        ),
-        MusteriTakipKlasor(
-            id: 2,
-            cariId: 2,
-            cariUnvan: "Akıncılar Çelik Döküm ve Sanayi A.Ş.",
-            cariKod: "CARI-002",
-            telefon: "0216 444 5678",
-            yetkili: "Mehmet Akıncı",
-            etiket: "Teklif Aşamasında",
-            renk: "#30D158",
-            olusturmaTarihi: "25.10.2026",
-            sonIslemTarihi: "02.11.2026"
-        ),
-        MusteriTakipKlasor(
-            id: 3,
-            cariId: 3,
-            cariUnvan: "Kaya Metal Sanayi ve Ticaret A.Ş.",
-            cariKod: "CARI-003",
-            telefon: "0212 666 7890",
-            yetkili: "Kemal Kaya",
-            etiket: "Önemli",
-            renk: "#BF5AF2",
-            olusturmaTarihi: "20.10.2026",
-            sonIslemTarihi: "28.10.2026"
-        ),
-        MusteriTakipKlasor(
-            id: 4,
-            cariId: 4,
-            cariUnvan: "Birlik Otomotiv Yedek Parça Ltd.",
-            cariKod: "CARI-005",
-            telefon: "0224 222 3344",
-            yetkili: "Hasan Çetin",
-            etiket: "Takipte",
-            renk: "#FF9F0A",
-            olusturmaTarihi: "15.10.2026",
-            sonIslemTarihi: "22.10.2026"
-        )
-    ]
-    
-    // Sample details to compute counts
-    @State private var detaylar: [MusteriTakipDetay] = [
-        MusteriTakipDetay(id: 1, klasorId: 1, cariId: 1, baslik: "Yıllık Bakım Görüşmesi", icerik: "Rulman alımı için fiyat onaylandı.", tip: "Gorusme"),
-        MusteriTakipDetay(id: 2, klasorId: 1, cariId: 1, baslik: "Rulman 6204", icerik: "100 adet için net fiyat", tip: "Fiyat", fiyatBilgisi: 195.0),
-        MusteriTakipDetay(id: 3, klasorId: 1, cariId: 1, baslik: "Kartvizit & Numune", icerik: "Fotoğraf eklendi", tip: "Gorsel"),
-        MusteriTakipDetay(id: 4, klasorId: 1, cariId: 1, baslik: "Müdür Toplantısı", icerik: "Çarşamba günleri müsait", tip: "Not"),
-        MusteriTakipDetay(id: 5, klasorId: 2, cariId: 2, baslik: "Döküm Hammadde Teklifi", icerik: "20 ton pik döküm", tip: "Fiyat", fiyatBilgisi: 450000.0),
-        MusteriTakipDetay(id: 6, klasorId: 2, cariId: 2, baslik: "Fabrika Ziyareti", icerik: "Gebze tesisi gezildi.", tip: "Gorusme")
-    ]
+    @State private var klasorler: [MusteriTakipKlasor] = []
+    @State private var detaylar: [MusteriTakipDetay] = []
+    @State private var isLoading: Bool = false
     
     @State private var searchString: String = ""
     @State private var selectedEtiket: String = "Tümü"
@@ -210,6 +153,14 @@ public struct MusteriTakipView: View {
             .sheet(isPresented: $showNewFolderModal) {
                 newFolderSheet()
             }
+            .task {
+                await loadData()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
+                Task {
+                    await loadData()
+                }
+            }
         }
     }
     
@@ -355,6 +306,9 @@ public struct MusteriTakipView: View {
                     renk: newRenk
                 )
                 klasorler.insert(newFolder, at: 0)
+                Task {
+                    _ = try? await SupabaseService.shared.insert(newFolder, into: "musteri_takip_klasorler")
+                }
                 newCariUnvan = ""
                 newYetkili = ""
                 newTelefon = ""
@@ -374,5 +328,20 @@ public struct MusteriTakipView: View {
             Spacer()
         }
         .presentationDetents([.medium])
+    }
+    
+    private func loadData() async {
+        isLoading = true
+        do {
+            let kList: [MusteriTakipKlasor] = try await SupabaseService.shared.fetch(from: "musteri_takip_klasorler")
+            let dList: [MusteriTakipDetay] = try await SupabaseService.shared.fetch(from: "musteri_takip_detaylar")
+            await MainActor.run {
+                self.klasorler = kList
+                self.detaylar = dList
+            }
+        } catch {
+            print("MusteriTakip fetch error: \(error)")
+        }
+        isLoading = false
     }
 }

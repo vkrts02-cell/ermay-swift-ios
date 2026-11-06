@@ -17,6 +17,9 @@ public struct RootView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onAppear {
+            SupabaseService.shared.startRealtimeListener()
+        }
     }
 }
 

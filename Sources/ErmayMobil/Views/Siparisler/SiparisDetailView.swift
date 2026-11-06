@@ -5,10 +5,16 @@ public struct SiparisDetailView: View {
     @State private var showConvertAlert: Bool = false
     @State private var convertedSuccess: Bool = false
     @State private var pdfData: Data? = nil
-    @State private var showShareSheet: Bool = false
+    @State private var showPDFModal: Bool = false
+    @State private var liveKalemler: [SiparisKalem] = []
+    @State private var isLoadingKalemler: Bool = false
     
     public init(siparis: Siparis) {
         self._siparis = State(initialValue: siparis)
+    }
+    
+    public var displayedKalemler: [SiparisKalem] {
+        !liveKalemler.isEmpty ? liveKalemler : (siparis.kalemler ?? [])
     }
     
     public var body: some View {
@@ -99,18 +105,20 @@ public struct SiparisDetailView: View {
                     // Aksiyon Butonları
                     VStack(spacing: 10) {
                         ActionButton(
-                            title: "PDF Görüntüle & Paylaş",
-                            icon: "square.and.arrow.up.fill",
+                            title: "QuestPDF Resmi Sipariş Aç",
+                            icon: "doc.text.fill",
                             color: AppTheme.primary
                         ) {
                             #if canImport(UIKit)
                             Task { @MainActor in
                                 self.pdfData = await PDFService.shared.fetchOrGenerateSiparisPDF(
                                     siparis: siparis,
-                                    kalemler: siparis.kalemler ?? [],
+                                    kalemler: displayedKalemler,
                                     firma: .varsayilan
                                 )
-                                self.showShareSheet = true
+                                if self.pdfData != nil {
+                                    self.showPDFModal = true
+                                }
                             }
                             #endif
                         }
@@ -133,10 +141,17 @@ public struct SiparisDetailView: View {
         }
         .navigationTitle("Sipariş Detayı")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showShareSheet) {
+        .task {
+            await loadKalemler()
+        }
+        .sheet(isPresented: $showPDFModal) {
             #if canImport(UIKit)
             if let data = pdfData {
-                ShareSheet(activityItems: [data])
+                PDFViewerModal(
+                    title: "Sipariş - \(siparis.siparisNo)",
+                    pdfData: data,
+                    fileName: "Siparis_\(siparis.siparisNo).pdf"
+                )
             }
             #endif
         }
@@ -181,6 +196,23 @@ public struct SiparisDetailView: View {
                 convertedSuccess = true
             }
         }
+    }
+    
+    private func loadKalemler() async {
+        isLoadingKalemler = true
+        do {
+            let items: [SiparisKalem] = try await SupabaseService.shared.fetch(
+                from: "siparis_detaylar",
+                filters: ["siparis_id": "eq.\(siparis.id)"],
+                applyTenantFilter: false
+            )
+            await MainActor.run {
+                self.liveKalemler = items
+            }
+        } catch {
+            print("Siparis Kalemler load error: \(error)")
+        }
+        isLoadingKalemler = false
     }
 }
 

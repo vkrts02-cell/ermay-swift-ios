@@ -286,13 +286,6 @@ public struct CarilerView: View {
             print("[CarilerView] Supabase cariler çekme hatası: \(error)")
             await MainActor.run {
                 self.isLoading = false
-                // Çevrimdışı / fallback cariler
-                if self.cariler.isEmpty {
-                    self.cariler = [
-                        CariKart(id: "1", cariKodu: "CARI-001", unvan: "Ermay Makine ve Tekstil San. Tic. Ltd. Şti.", cariTuru: "Müşteri", yetkili: "Ahmet Yılmaz", vergiDairesi: "İkitelli", vergiNo: "3829104921", telefon: "0212 555 1234", gsm: "0532 111 2233", sehir: "İstanbul", ilce: "Başakşehir", bakiye: 45200.0, bakiyeTuru: "A"),
-                        CariKart(id: "2", cariKodu: "CARI-002", unvan: "Akıncılar Çelik Döküm ve Sanayi A.Ş.", cariTuru: "Tedarikçi", yetkili: "Mehmet Akıncı", vergiDairesi: "Uluçınar", vergiNo: "1122334455", telefon: "0216 444 5678", gsm: "0533 222 3344", sehir: "Kocaeli", ilce: "Gebze", bakiye: 32000.0, bakiyeTuru: "B")
-                    ]
-                }
             }
         }
     }

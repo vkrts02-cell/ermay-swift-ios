@@ -162,6 +162,8 @@ private struct CariHareketStrictPayload: Encodable {
     let aciklama: String?
     let tenant_id: String
     let uuid: String
+    var device_id: String = "iPhone-App"
+    var mali_yil: Int = Calendar.current.component(.year, from: Date())
 }
 
 // MARK: - Models for save_invoice_atomic RPC

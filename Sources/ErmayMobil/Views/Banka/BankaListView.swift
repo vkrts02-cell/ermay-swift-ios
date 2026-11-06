@@ -136,6 +136,11 @@ public struct BankaListView: View {
             .task {
                 await loadBankaData()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
+                Task {
+                    await loadBankaData()
+                }
+            }
         }
     }
     
@@ -143,24 +148,13 @@ public struct BankaListView: View {
         isLoading = true
         do {
             let items: [BankaKart] = try await SupabaseService.shared.fetch(from: "bankalar")
-            let hItems: [BankaHareket] = try await SupabaseService.shared.fetch(from: "banka_hareketleri", orderBy: "tarih.desc", limit: 30)
+            let hItems: [BankaHareket] = try await SupabaseService.shared.fetch(from: "banka_hareketler", orderBy: "tarih.desc", limit: 30)
             await MainActor.run {
                 self.bankalar = items
                 self.hareketler = hItems
             }
         } catch {
             print("Banka fetch error: \(error)")
-            if bankalar.isEmpty {
-                bankalar = [
-                    BankaKart(id: "1", bankaAdi: "Garanti BBVA", subeAdi: "İkitelli Ticari Şb.", iban: "TR12 0006 2000 1234 5678 9012 34", dovizTuru: "TL", yetkili: "Canan Demir", bakiye: 154000.0),
-                    BankaKart(id: "2", bankaAdi: "Türkiye İş Bankası", subeAdi: "Marmara Şb.", iban: "TR64 0006 4000 0012 3456 7890 12", dovizTuru: "TL", yetkili: "Burak Taş", bakiye: 46000.0),
-                    BankaKart(id: "3", bankaAdi: "QNB Finansbank (USD)", subeAdi: "Serbest Bölge", iban: "TR88 0011 1000 0000 9876 5432 10", dovizTuru: "USD", bakiye: 12500.0)
-                ]
-                hareketler = [
-                    BankaHareket(id: "1", bankaAdi: "Garanti BBVA", tarih: "02.11.2026", islemTuru: "GELEN_HAVALE", aciklama: "Ermay Ltd. Fatura Tahsilatı", cariUnvan: "Ermay Ltd.", tutar: 35000.0, girisCikis: "GIRIS"),
-                    BankaHareket(id: "2", bankaAdi: "Türkiye İş Bankası", tarih: "01.11.2026", islemTuru: "GONDERILEN_EFT", aciklama: "Kaya Metal Hammadde Avansı", cariUnvan: "Kaya Metal", tutar: 18500.0, girisCikis: "CIKIS")
-                ]
-            }
         }
         isLoading = false
     }

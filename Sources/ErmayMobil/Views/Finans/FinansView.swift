@@ -4,10 +4,10 @@ public struct FinansView: View {
     @State private var activeTab: String = "dashboard" // "dashboard" | "nakit" | "cek" | "kk" | "eft"
     
     // KPI Data
-    @State private var kasaBakiye: Double = 54200.0
-    @State private var bankaBakiye: Double = 276900.0
-    @State private var posBakiye: Double = 18450.0
-    @State private var portfoyCekBakiye: Double = 125000.0
+    @State private var kasaBakiye: Double = 0.0
+    @State private var bankaBakiye: Double = 0.0
+    @State private var posBakiye: Double = 0.0
+    @State private var portfoyCekBakiye: Double = 0.0
     
     // Modals
     @State private var showYeniIslem: Bool = false
@@ -17,11 +17,11 @@ public struct FinansView: View {
     // Yeni İşlem Form State
     @State private var islemTuru: String = "Tahsilat" // "Tahsilat" | "Ödeme" | "Virman" | "Gider"
     @State private var odemeYontemi: String = "Nakit" // "Nakit" | "Kredi Kartı" | "Havale/EFT"
-    @State private var cariUnvan: String = "Ermay Tekstil Ltd. Şti."
+    @State private var cariUnvan: String = ""
     @State private var seciliHesap: String = "Merkez Kasa (TL)"
     @State private var islemTutar: String = ""
     @State private var islemAciklama: String = ""
-    @State private var islemEvrakNo: String = "EVR-2026-089"
+    @State private var islemEvrakNo: String = ""
     
     // Çek Modülü Toggle
     @State private var cekTuru: String = "ALINAN" // "ALINAN" | "VERILEN"
@@ -37,13 +37,7 @@ public struct FinansView: View {
         let method: String
     }
     
-    @State private var hareketler: [FinansListItem] = [
-        FinansListItem(title: "Ermay Makine ve Tekstil", description: "Satış Tahsilatı", amount: 35000, date: "03.11.2026", type: "In", method: "Banka Havale"),
-        FinansListItem(title: "Akıncılar Lojistik Depolama", description: "Sevkiyat Navlun Ödemesi", amount: 6200, date: "02.11.2026", type: "Out", method: "Nakit Kasa"),
-        FinansListItem(title: "Kaya Metal Sanayi", description: "Cari Tahsilat", amount: 28500, date: "01.11.2026", type: "In", method: "Kredi Kartı / POS"),
-        FinansListItem(title: "Yönetim Ofis Kirası", description: "Kasım Ayı Kira Gideri", amount: 18000, date: "01.11.2026", type: "Out", method: "Banka Havale"),
-        FinansListItem(title: "Tekno Hammadde A.Ş.", description: "Hammadde Avans Ödemesi", amount: 22800, date: "31.10.2026", type: "Out", method: "Nakit Kasa")
-    ]
+    @State private var hareketler: [FinansListItem] = []
     
     // Çek Kayıtları
     struct CekItem: Identifiable {
@@ -57,12 +51,7 @@ public struct FinansView: View {
         let tip: String
     }
     
-    @State private var cekler: [CekItem] = [
-        CekItem(portfoyNo: "ÇEK-2026-01", kesideci: "Ermay Makine Ltd.", banka: "Garanti BBVA", vade: "15.11.2026", tutar: 45000, durum: "Portföyde", tip: "ALINAN"),
-        CekItem(portfoyNo: "ÇEK-2026-02", kesideci: "Mega Plastik A.Ş.", banka: "İş Bankası", vade: "28.11.2026", tutar: 80000, durum: "Portföyde", tip: "ALINAN"),
-        CekItem(portfoyNo: "ÇEK-2026-03", kesideci: "Akıncılar Çelik", banka: "Akbank", vade: "10.12.2026", tutar: 32000, durum: "Ciro Edildi", tip: "ALINAN"),
-        CekItem(portfoyNo: "ÇEK-2026-04", kesideci: "Ermay Muhasebe (Biz)", banka: "Yapı Kredi", vade: "20.11.2026", tutar: 65000, durum: "Verildi", tip: "VERILEN")
-    ]
+    @State private var cekler: [CekItem] = []
     
     private var toplamLikidite: Double {
         kasaBakiye + bankaBakiye + posBakiye
@@ -171,6 +160,14 @@ public struct FinansView: View {
             }
             .sheet(isPresented: $showKasaSayimi) {
                 kasaSayimiSheet()
+            }
+            .task {
+                await loadFinansData()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
+                Task {
+                    await loadFinansData()
+                }
             }
         }
     }
@@ -509,5 +506,45 @@ public struct FinansView: View {
     
     private func kasaSayimiSheet() -> some View {
         KasaSayimView(sistemBakiye: kasaBakiye)
+    }
+    
+    private func loadFinansData() async {
+        do {
+            let bankaList: [BankaKart] = (try? await SupabaseService.shared.fetch(from: "bankalar")) ?? []
+            let cekList: [Cek] = (try? await SupabaseService.shared.fetch(from: "cekler")) ?? []
+            let chList: [CariHareket] = (try? await SupabaseService.shared.fetch(from: "cari_hareketler", orderBy: "tarih.desc", limit: 30)) ?? []
+            
+            await MainActor.run {
+                self.bankaBakiye = bankaList.reduce(0.0) { $0 + $1.bakiye }
+                self.portfoyCekBakiye = cekList.filter { $0.durum != "TAHSIL_EDILDI" }.reduce(0.0) { $0 + $1.tutar }
+                self.posBakiye = 0.0
+                self.kasaBakiye = 0.0
+                
+                self.hareketler = chList.map { ch in
+                    let isGiris = ch.alacak > 0
+                    let tutar = isGiris ? ch.alacak : ch.borc
+                    return FinansListItem(
+                        title: ch.cariUnvan ?? "Cari İşlem",
+                        description: ch.aciklama ?? ch.islemTuru ?? "Hareket",
+                        amount: tutar,
+                        date: String(ch.tarih.prefix(10)),
+                        type: isGiris ? "In" : "Out",
+                        method: ch.islemTuru ?? "İşlem"
+                    )
+                }
+                
+                self.cekler = cekList.map { c in
+                    CekItem(
+                        portfoyNo: c.cekNo ?? "ÇEK",
+                        kesideci: c.cariUnvan ?? (c.borclu ?? "-"),
+                        banka: c.banka ?? "-",
+                        vade: c.vadeTarihi,
+                        tutar: c.tutar,
+                        durum: c.durum,
+                        tip: c.cekTuru ?? "ALINAN"
+                    )
+                }
+            }
+        }
     }
 }

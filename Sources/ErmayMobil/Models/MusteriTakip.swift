@@ -15,6 +15,22 @@ public struct MusteriTakipKlasor: Identifiable, Codable, Hashable {
     public var aciklama: String?
     public var isDeleted: Bool?
     
+    enum CodingKeys: String, CodingKey {
+        case id
+        case tenantId = "tenant_id"
+        case cariId = "cari_id"
+        case cariUnvan = "cari_unvan"
+        case cariKod = "cari_kod"
+        case telefon
+        case yetkili
+        case etiket
+        case renk
+        case olusturmaTarihi = "olusturma_tarihi"
+        case sonIslemTarihi = "son_islem_tarihi"
+        case aciklama
+        case isDeleted = "is_deleted"
+    }
+    
     public init(
         id: Int,
         tenantId: String? = nil,
@@ -60,6 +76,22 @@ public struct MusteriTakipDetay: Identifiable, Codable, Hashable {
     public var gorselBase64: String?
     public var tarih: String
     public var isDeleted: Bool?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case tenantId = "tenant_id"
+        case klasorId = "klasor_id"
+        case cariId = "cari_id"
+        case baslik
+        case icerik
+        case tip
+        case fiyatBilgisi = "fiyat_bilgisi"
+        case paraBirimi = "para_birimi"
+        case dosyaYolu = "dosya_yolu"
+        case gorselBase64 = "gorsel_base64"
+        case tarih
+        case isDeleted = "is_deleted"
+    }
     
     public init(
         id: Int,

@@ -1,44 +1,8 @@
 import SwiftUI
 
 public struct KanbanView: View {
-    @State private var gorevler: [KanbanGorev] = [
-        KanbanGorev(
-            id: "1",
-            baslik: "Ekim Ayı KDV Beyannamesi",
-            aciklama: "Muhasebeci ile kontrol edilip onaylanacak.",
-            atananPersonelId: 1,
-            atananPersonelAd: "Ahmet Yılmaz",
-            durum: "Yapılacak",
-            oncelik: "Acil",
-            sonTarih: "2026-11-10",
-            bitisTarihi: nil,
-            olusturmaTarihi: "2026-11-01"
-        ),
-        KanbanGorev(
-            id: "2",
-            baslik: "Akıncılar Çelik Sevkiyatı",
-            aciklama: "İrsaliye kesilip depodan çıkışı sağlanacak.",
-            atananPersonelId: 2,
-            atananPersonelAd: "Mehmet Kaya",
-            durum: "Yapılıyor",
-            oncelik: "Normal",
-            sonTarih: "2026-11-06",
-            bitisTarihi: nil,
-            olusturmaTarihi: "2026-11-02"
-        ),
-        KanbanGorev(
-            id: "3",
-            baslik: "Haftalık Kasa Mutabakatı",
-            aciklama: "Banka ekstreleri ile kasa bakiyeleri eşitlendi.",
-            atananPersonelId: 1,
-            atananPersonelAd: "Yönetici",
-            durum: "Bitti",
-            oncelik: "Düşük",
-            sonTarih: "2026-11-03",
-            bitisTarihi: "2026-11-03",
-            olusturmaTarihi: "2026-11-01"
-        )
-    ]
+    @State private var gorevler: [KanbanGorev] = []
+    @State private var isLoading: Bool = false
     
     @State private var searchQuery: String = ""
     @State private var activeTab: String = "Yapılacak" // 'Yapılacak' | 'Yapılıyor' | 'Bitti'
@@ -95,6 +59,9 @@ public struct KanbanView: View {
             .sheet(isPresented: $isFormOpen) {
                 YeniGorevModalView { yeni in
                     gorevler.append(yeni)
+                    Task {
+                        _ = try? await SupabaseService.shared.insert(yeni, into: "gorevler")
+                    }
                 }
             }
             .sheet(isPresented: $isDetailOpen) {
@@ -108,6 +75,14 @@ public struct KanbanView: View {
                             deleteGorev(id: g.id)
                         }
                     )
+                }
+            }
+            .task {
+                await loadGorevler()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
+                Task {
+                    await loadGorevler()
                 }
             }
         }
@@ -288,19 +263,44 @@ public struct KanbanView: View {
         }
     }
     
+    private func loadGorevler() async {
+        isLoading = true
+        do {
+            let items: [KanbanGorev] = try await SupabaseService.shared.fetch(from: "gorevler")
+            await MainActor.run {
+                self.gorevler = items
+            }
+        } catch {
+            print("Kanban gorevler fetch error: \(error)")
+            await MainActor.run {
+                self.gorevler = []
+            }
+        }
+        isLoading = false
+    }
+    
     private func updateStatus(id: String, newStatus: String) {
         if let idx = gorevler.firstIndex(where: { $0.id == id }) {
             gorevler[idx].durum = newStatus
             if newStatus == "Bitti" && (gorevler[idx].bitisTarihi == nil || gorevler[idx].bitisTarihi?.isEmpty == true) {
-                gorevler[idx].bitisTarihi = "2026-11-04"
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd"
+                gorevler[idx].bitisTarihi = formatter.string(from: Date())
             }
-            selectedGorev = gorevler[idx]
+            let updated = gorevler[idx]
+            selectedGorev = updated
+            Task {
+                _ = try? await SupabaseService.shared.update(updated, in: "gorevler", id: id)
+            }
         }
     }
     
     private func deleteGorev(id: String) {
         gorevler.removeAll { $0.id == id }
         isDetailOpen = false
+        Task {
+            _ = try? await SupabaseService.shared.delete(from: "gorevler", id: id)
+        }
     }
 }
 

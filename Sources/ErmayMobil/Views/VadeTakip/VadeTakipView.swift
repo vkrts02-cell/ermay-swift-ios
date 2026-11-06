@@ -5,13 +5,7 @@ public struct VadeTakipView: View {
     @State private var selectedTimeFilter: String = "Tümü"
     
     // Veriler
-    @State private var vadeListesi: [VadeItem] = [
-        VadeItem(cariUnvan: "Ermay Ltd. Şti.", faturaNo: "FTR-2026-0012", vadeTarihi: "25.10.2026", tutar: 24500, kalanTutar: 24500, tip: "ALACAK", gecikmeGun: 9),
-        VadeItem(cariUnvan: "Akıncılar Çelik Döküm", faturaNo: "FTR-2026-0008", vadeTarihi: "28.10.2026", tutar: 18000, kalanTutar: 18000, tip: "BORC", gecikmeGun: 6),
-        VadeItem(cariUnvan: "Mega Plastik San.", faturaNo: "FTR-2026-0015", vadeTarihi: "05.11.2026", tutar: 12000, kalanTutar: 12000, tip: "ALACAK", gecikmeGun: 0),
-        VadeItem(cariUnvan: "Yıldız Lojistik", faturaNo: "FTR-2026-0019", vadeTarihi: "15.11.2026", tutar: 6500, kalanTutar: 6500, tip: "BORC", gecikmeGun: 0),
-        VadeItem(cariUnvan: "Kaya Metal A.Ş.", faturaNo: "FTR-2026-0022", vadeTarihi: "20.11.2026", tutar: 34000, kalanTutar: 34000, tip: "ALACAK", gecikmeGun: 0)
-    ]
+    @State private var vadeListesi: [VadeItem] = []
     
     // Modals & Actions
     @State private var selectedItemForAction: VadeItem? = nil
@@ -191,6 +185,92 @@ public struct VadeTakipView: View {
                 renderPostponeModal()
             }
             .navigationBarHidden(true)
+            .task {
+                await loadVadeData()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
+                Task {
+                    await loadVadeData()
+                }
+            }
+        }
+    }
+    
+    private func loadVadeData() async {
+        do {
+            let faturalar: [Fatura] = (try? await SupabaseService.shared.fetchFaturalar()) ?? []
+            let cekler: [Cek] = (try? await SupabaseService.shared.fetch(from: "cekler")) ?? []
+            let senetler: [Senet] = (try? await SupabaseService.shared.fetch(from: "senetler")) ?? []
+            
+            var items: [VadeItem] = []
+            let now = Date()
+            
+            // Faturalardan vadeler
+            for f in faturalar {
+                let vStr = f.vadeTarihi ?? f.tarih
+                let isSatis = f.faturaTuru.localizedCaseInsensitiveContains("satış")
+                var gecikme = 0
+                if let d = AppFormatters.parseDate(vStr) {
+                    let diff = Calendar.current.dateComponents([.day], from: d, to: now).day ?? 0
+                    if diff > 0 { gecikme = diff }
+                }
+                items.append(VadeItem(
+                    id: f.id,
+                    cariId: f.cariId,
+                    cariUnvan: f.cariUnvan ?? "Cari",
+                    faturaId: f.id,
+                    faturaNo: f.faturaNo,
+                    vadeTarihi: String(vStr.prefix(10)),
+                    tutar: f.genelToplam,
+                    kalanTutar: f.genelToplam,
+                    tip: isSatis ? "ALACAK" : "BORC",
+                    gecikmeGun: gecikme
+                ))
+            }
+            
+            // Çeklerden vadeler
+            for c in cekler where c.durum != "TAHSIL_EDILDI" {
+                var gecikme = 0
+                if let d = AppFormatters.parseDate(c.vadeTarihi) {
+                    let diff = Calendar.current.dateComponents([.day], from: d, to: now).day ?? 0
+                    if diff > 0 { gecikme = diff }
+                }
+                items.append(VadeItem(
+                    id: c.id,
+                    cariId: c.cariId != nil ? String(c.cariId!) : nil,
+                    cariUnvan: c.cariUnvan ?? (c.borclu ?? "Çek"),
+                    faturaNo: c.cekNo,
+                    vadeTarihi: String(c.vadeTarihi.prefix(10)),
+                    tutar: c.tutar,
+                    kalanTutar: c.tutar,
+                    tip: (c.cekTuru ?? "ALINAN") == "ALINAN" ? "ALACAK" : "BORC",
+                    gecikmeGun: gecikme
+                ))
+            }
+            
+            // Senetlerden vadeler
+            for s in senetler where s.durum != "TAHSIL_EDILDI" {
+                var gecikme = 0
+                if let d = AppFormatters.parseDate(s.vadeTarihi) {
+                    let diff = Calendar.current.dateComponents([.day], from: d, to: now).day ?? 0
+                    if diff > 0 { gecikme = diff }
+                }
+                items.append(VadeItem(
+                    id: s.id,
+                    cariId: s.cariId != nil ? String(s.cariId!) : nil,
+                    cariUnvan: s.cariUnvan ?? (s.borclu ?? "Senet"),
+                    faturaNo: s.senetNo,
+                    vadeTarihi: String(s.vadeTarihi.prefix(10)),
+                    tutar: s.tutar,
+                    kalanTutar: s.tutar,
+                    tip: "ALACAK",
+                    gecikmeGun: gecikme
+                ))
+            }
+            
+            await MainActor.run {
+                self.vadeListesi = items
+            }
         }
     }
     

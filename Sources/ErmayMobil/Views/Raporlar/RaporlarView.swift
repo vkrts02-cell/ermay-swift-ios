@@ -756,7 +756,7 @@ public struct RaporDetayInteractiveView: View {
     @State private var selectedDay: DailyFlow? = nil
     
     public var activeRows: [[String]] {
-        liveRows.isEmpty ? report.defaultRows : liveRows
+        liveRows
     }
     
     public var body: some View {
@@ -851,6 +851,11 @@ public struct RaporDetayInteractiveView: View {
         .navigationBarHidden(true)
         .task {
             await loadLiveReportData()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
+            Task {
+                await loadLiveReportData()
+            }
         }
         .sheet(isPresented: $showPDFModal) {
             if let data = generatedPDFData {

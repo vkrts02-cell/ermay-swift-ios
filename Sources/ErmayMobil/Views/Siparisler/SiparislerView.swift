@@ -123,6 +123,11 @@ public struct SiparislerView: View {
             .task {
                 await loadSiparisler()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
+                Task {
+                    await loadSiparisler()
+                }
+            }
         }
     }
     
@@ -135,11 +140,7 @@ public struct SiparislerView: View {
             }
         } catch {
             await MainActor.run {
-                self.siparisler = [
-                    Siparis(siparisNo: "SIP-842910", siparisTuru: "ALINAN", cariId: "1", cariUnvan: "Ermay Bilişim Ltd. Şti.", tarih: "2026-11-01", teslimTarihi: "2026-11-08", genelToplam: 48500.0, durum: "Bekliyor"),
-                    Siparis(siparisNo: "SIP-529104", siparisTuru: "ALINAN", cariId: "2", cariUnvan: "Akıncılar Çelik Döküm", tarih: "2026-10-28", teslimTarihi: "2026-11-04", genelToplam: 112000.0, durum: "Faturalandı"),
-                    Siparis(siparisNo: "SIP-194025", siparisTuru: "VERILEN", cariId: "3", cariUnvan: "Mega Plastik San.", tarih: "2026-10-25", teslimTarihi: "2026-10-30", genelToplam: 16400.0, durum: "İptal")
-                ]
+                self.siparisler = []
             }
         }
         isLoading = false

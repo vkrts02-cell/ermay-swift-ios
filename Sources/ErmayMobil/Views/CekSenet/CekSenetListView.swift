@@ -26,9 +26,26 @@ public struct CekSenetListView: View {
             return true
         }
     }
+
+    public var filteredSenetler: [Senet] {
+        senetler.filter { s in
+            let matchSearch = searchText.isEmpty ||
+                (s.senetNo?.localizedCaseInsensitiveContains(searchText) ?? false) ||
+                (s.cariUnvan?.localizedCaseInsensitiveContains(searchText) ?? false)
+            if !matchSearch { return false }
+            if filterDurum != "Tümü" {
+                return s.durum == filterDurum
+            }
+            return true
+        }
+    }
     
     public var toplamCekTutari: Double {
-        cekler.filter { $0.durum != "TAHSIL_EDILDI" }.reduce(0.0) { $0 + $1.tutar }
+        if selectedTab == 0 {
+            return cekler.filter { $0.durum != "TAHSIL_EDILDI" }.reduce(0.0) { $0 + $1.tutar }
+        } else {
+            return senetler.filter { $0.durum != "TAHSIL_EDILDI" }.reduce(0.0) { $0 + $1.tutar }
+        }
     }
     
     public var body: some View {
@@ -111,30 +128,40 @@ public struct CekSenetListView: View {
                     }
                     
                     // Liste
-                    if isLoading && cekler.isEmpty {
+                    let isEmptyList = (selectedTab == 0 ? filteredCekler.isEmpty : filteredSenetler.isEmpty)
+                    if isLoading && (cekler.isEmpty && senetler.isEmpty) {
                         Spacer()
                         ProgressView().tint(AppTheme.primary)
                         Spacer()
-                    } else if filteredCekler.isEmpty {
+                    } else if isEmptyList {
                         Spacer()
                         VStack(spacing: 8) {
                             Image(systemName: "tray")
                                 .font(.system(size: 36))
                                 .foregroundColor(AppTheme.textMuted)
-                            Text("Kayıtlı çek veya senet bulunamadı")
+                            Text(selectedTab == 0 ? "Kayıtlı çek bulunamadı" : "Kayıtlı senet bulunamadı")
                                 .font(.system(size: 13))
                                 .foregroundColor(AppTheme.textSecondary)
                         }
                         Spacer()
                     } else {
                         List {
-                            ForEach(filteredCekler) { c in
-                                CekRowItem(cek: c) { newDurum in
-                                    updateDurum(cekId: c.id, durum: newDurum)
+                            if selectedTab == 0 {
+                                ForEach(filteredCekler) { c in
+                                    CekRowItem(cek: c) { newDurum in
+                                        updateDurum(cekId: c.id, durum: newDurum)
+                                    }
+                                    .listRowBackground(Color.clear)
+                                    .listRowSeparator(.hidden)
+                                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                                 }
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
-                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                            } else {
+                                ForEach(filteredSenetler) { s in
+                                    SenetRowItem(senet: s)
+                                        .listRowBackground(Color.clear)
+                                        .listRowSeparator(.hidden)
+                                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                                }
                             }
                         }
                         .listStyle(.plain)
@@ -153,26 +180,25 @@ public struct CekSenetListView: View {
             .task {
                 await loadData()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
+                Task {
+                    await loadData()
+                }
+            }
         }
     }
     
     private func loadData() async {
         isLoading = true
         do {
-            let items: [Cek] = try await SupabaseService.shared.fetch(from: "cekler", orderBy: "vade_tarihi.asc")
+            let cItems: [Cek] = try await SupabaseService.shared.fetch(from: "cekler", orderBy: "vade_tarihi.asc")
+            let sItems: [Senet] = try await SupabaseService.shared.fetch(from: "senetler", orderBy: "vade_tarihi.asc")
             await MainActor.run {
-                self.cekler = items
+                self.cekler = cItems
+                self.senetler = sItems
             }
         } catch {
-            print("Cek fetch error: \(error)")
-            // Fallback veri
-            if cekler.isEmpty {
-                cekler = [
-                    Cek(id: "1", cekNo: "CK-88912", cariUnvan: "Ermay Bilişim Ltd.", vadeTarihi: "15.11.2026", tutar: 45000.0, borclu: "Ahmet Yılmaz", banka: "Garanti BBVA", durum: "PORTFOYDE"),
-                    Cek(id: "2", cekNo: "CK-88913", cariUnvan: "Kaya Metal A.Ş.", vadeTarihi: "28.11.2026", tutar: 28500.0, borclu: "Mehmet Kaya", banka: "İş Bankası", durum: "BANKADA"),
-                    Cek(id: "3", cekNo: "CK-88914", cariUnvan: "Akıncılar Çelik", vadeTarihi: "05.12.2026", tutar: 62000.0, borclu: "Ali Akıncı", banka: "Yapı Kredi", durum: "PORTFOYDE")
-                ]
-            }
+            print("Cek/Senet fetch error: \(error)")
         }
         isLoading = false
     }
@@ -254,6 +280,70 @@ struct CekRowItem: View {
                             .background(durumColor.opacity(0.15))
                             .cornerRadius(6)
                     }
+                }
+            }
+        }
+    }
+}
+
+struct SenetRowItem: View {
+    let senet: Senet
+    
+    var durumColor: Color {
+        switch senet.durum {
+        case "PORTFOYDE": return AppTheme.warning
+        case "TAHSIL_EDILDI": return AppTheme.success
+        case "PROTESTOLU": return AppTheme.danger
+        default: return AppTheme.textMuted
+        }
+    }
+    
+    var body: some View {
+        GlassCard(cornerRadius: 14, padding: 14) {
+            VStack(spacing: 10) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(senet.senetNo ?? "SENET")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(AppTheme.textPrimary)
+                        Text(senet.cariUnvan ?? "-")
+                            .font(.system(size: 12))
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(AppFormatters.money(senet.tutar))
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundColor(AppTheme.textPrimary)
+                        Text("Vade: \(senet.vadeTarihi)")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(AppTheme.textMuted)
+                    }
+                }
+                
+                Divider().background(AppTheme.border)
+                
+                HStack {
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.text.rectangle")
+                            .font(.system(size: 11))
+                            .foregroundColor(AppTheme.textMuted)
+                        Text(senet.borclu ?? "Borçlu Belirtilmedi")
+                            .font(.system(size: 11))
+                            .foregroundColor(AppTheme.textSecondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Text(senet.durum.replacingOccurrences(of: "_", with: " "))
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(durumColor)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(durumColor.opacity(0.15))
+                        .cornerRadius(6)
                 }
             }
         }

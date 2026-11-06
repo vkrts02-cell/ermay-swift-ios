@@ -85,12 +85,7 @@ public struct AraclarView: View {
     ]
     
     // 8. Risk Puanlayıcı
-    @State private var riskList: [CariRiskItem] = [
-        CariRiskItem(unvan: "Akıncılar Çelik Ltd.", puan: 85, durum: "Düşük Risk (Güvenilir)"),
-        CariRiskItem(unvan: "Özdemir Makine San.", puan: 72, durum: "Normal Risk"),
-        CariRiskItem(unvan: "Doruk İnşaat A.Ş.", puan: 48, durum: "Yüksek Risk (Gecikmeli)"),
-        CariRiskItem(unvan: "Tekin Metal Sanayi", puan: 92, durum: "Düşük Risk (VIP)")
-    ]
+    @State private var riskList: [CariRiskItem] = []
     
     // 9. Portföy CRM
     @State private var portfoyler: [PortfoyCRMItem] = [
@@ -173,6 +168,14 @@ public struct AraclarView: View {
             }
         }
         .navigationBarHidden(true)
+        .task {
+            await loadRealCarilerRisk()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
+            Task {
+                await loadRealCarilerRisk()
+            }
+        }
     }
     
     // MARK: - Header
@@ -795,6 +798,37 @@ public struct AraclarView: View {
                 .navigationTitle("Yeni Fırsat Ekle")
                 .navigationBarTitleDisplayMode(.inline)
             }
+        }
+    }
+    
+    private func loadRealCarilerRisk() async {
+        do {
+            let cariler: [Cari] = try await SupabaseService.shared.fetch(from: "cariler")
+            let items = cariler.prefix(15).map { c in
+                let bakiye = c.bakiye ?? 0
+                let limit = c.riskLimiti ?? 100000
+                let oran = limit > 0 ? (bakiye / limit) : 0
+                let puan: Int
+                let durum: String
+                if oran > 0.8 {
+                    puan = 45
+                    durum = "Yüksek Risk (Limit Dolumu)"
+                } else if oran > 0.4 {
+                    puan = 75
+                    durum = "Normal Risk"
+                } else {
+                    puan = 92
+                    durum = "Düşük Risk (Güvenilir)"
+                }
+                return CariRiskItem(unvan: c.unvan, puan: puan, durum: durum)
+            }
+            await MainActor.run {
+                if !items.isEmpty {
+                    self.riskList = items
+                }
+            }
+        } catch {
+            print("Cariler risk fetch error: \(error)")
         }
     }
     

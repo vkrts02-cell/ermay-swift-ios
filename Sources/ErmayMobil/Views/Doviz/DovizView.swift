@@ -154,7 +154,55 @@ public struct DovizView: View {
                 }
             }
             .navigationBarHidden(true)
+            .task {
+                await loadKurlar()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
+                Task {
+                    await loadKurlar()
+                }
+            }
         }
+    }
+    
+    private func loadKurlar() async {
+        do {
+            let fetched: [DovizKuru] = try await SupabaseService.shared.fetch(from: "doviz_kurlari")
+            if !fetched.isEmpty {
+                await MainActor.run {
+                    self.kurlar = fetched
+                }
+                return
+            }
+        } catch {}
+        
+        // Canlı kur servisi üzerinden TCMB oranlarını çek
+        guard let url = URL(string: "https://hasanadiguzel.com.tr/api/kurgetir") else { return }
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let tcmbList = json["TCMB_AnlikKurBilgileri"] as? [[String: Any]] {
+                var newKurlar: [DovizKuru] = []
+                for item in tcmbList {
+                    let kod = (item["Isim"] as? String) ?? (item["CurrencyCode"] as? String) ?? ""
+                    let ad = (item["CurrencyName"] as? String) ?? kod
+                    let alis = Double("\(item["ForexBuying"] ?? 0)") ?? 0.0
+                    let satis = Double("\(item["ForexSelling"] ?? 0)") ?? 0.0
+                    if kod == "US DOLLAR" || item["CurrencyCode"] as? String == "USD" {
+                        newKurlar.append(DovizKuru(kod: "USD", ad: "Amerikan Doları", alis: alis, satis: satis, degisim: 0.12, tarih: "Bugün"))
+                    } else if kod == "EURO" || item["CurrencyCode"] as? String == "EUR" {
+                        newKurlar.append(DovizKuru(kod: "EUR", ad: "Euro", alis: alis, satis: satis, degisim: -0.05, tarih: "Bugün"))
+                    } else if kod == "POUND STERLING" || item["CurrencyCode"] as? String == "GBP" {
+                        newKurlar.append(DovizKuru(kod: "GBP", ad: "İngiliz Sterlini", alis: alis, satis: satis, degisim: 0.20, tarih: "Bugün"))
+                    }
+                }
+                if !newKurlar.isEmpty {
+                    await MainActor.run {
+                        self.kurlar = newKurlar
+                    }
+                }
+            }
+        } catch {}
     }
 }
 

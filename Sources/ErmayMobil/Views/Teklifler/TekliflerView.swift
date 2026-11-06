@@ -123,6 +123,11 @@ public struct TekliflerView: View {
             .task {
                 await loadTeklifler()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
+                Task {
+                    await loadTeklifler()
+                }
+            }
         }
     }
     
@@ -134,12 +139,9 @@ public struct TekliflerView: View {
                 self.teklifler = items
             }
         } catch {
+            print("Teklifler fetch error: \(error)")
             await MainActor.run {
-                self.teklifler = [
-                    Teklif(teklifNo: "TKF-102948", cariId: "1", cariUnvan: "Ermay Bilişim Ltd. Şti.", tarih: "2026-11-02", gecerlilikTarihi: "2026-11-17", genelToplam: 64200.0, durum: "Bekliyor"),
-                    Teklif(teklifNo: "TKF-849201", cariId: "2", cariUnvan: "Akıncılar Çelik Döküm", tarih: "2026-10-29", gecerlilikTarihi: "2026-11-13", genelToplam: 89000.0, durum: "Siparişleşti"),
-                    Teklif(teklifNo: "TKF-391024", cariId: "3", cariUnvan: "Kaya Metal A.Ş.", tarih: "2026-10-22", gecerlilikTarihi: "2026-11-05", genelToplam: 21500.0, durum: "Reddedildi")
-                ]
+                self.teklifler = []
             }
         }
         isLoading = false

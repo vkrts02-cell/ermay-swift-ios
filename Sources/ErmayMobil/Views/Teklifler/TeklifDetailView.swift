@@ -5,10 +5,16 @@ public struct TeklifDetailView: View {
     @State private var showConvertAlert: Bool = false
     @State private var convertedNotice: String? = nil
     @State private var pdfData: Data? = nil
-    @State private var showShareSheet: Bool = false
+    @State private var showPDFModal: Bool = false
+    @State private var liveKalemler: [TeklifKalem] = []
+    @State private var isLoadingKalemler: Bool = false
     
     public init(teklif: Teklif) {
         self._teklif = State(initialValue: teklif)
+    }
+    
+    public var displayedKalemler: [TeklifKalem] {
+        !liveKalemler.isEmpty ? liveKalemler : (teklif.kalemler ?? [])
     }
     
     public var body: some View {
@@ -110,18 +116,20 @@ public struct TeklifDetailView: View {
                     // Aksiyon Butonları
                     VStack(spacing: 10) {
                         ActionButton(
-                            title: "PDF Görüntüle & Paylaş",
-                            icon: "square.and.arrow.up.fill",
+                            title: "QuestPDF Resmi Teklif Aç",
+                            icon: "doc.text.fill",
                             color: AppTheme.primary
                         ) {
                             #if canImport(UIKit)
                             Task { @MainActor in
                                 self.pdfData = await PDFService.shared.fetchOrGenerateTeklifPDF(
                                     teklif: teklif,
-                                    kalemler: teklif.kalemler ?? [],
+                                    kalemler: displayedKalemler,
                                     firma: .varsayilan
                                 )
-                                self.showShareSheet = true
+                                if self.pdfData != nil {
+                                    self.showPDFModal = true
+                                }
                             }
                             #endif
                         }
@@ -153,10 +161,17 @@ public struct TeklifDetailView: View {
         }
         .navigationTitle("Teklif Detayı")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showShareSheet) {
+        .task {
+            await loadKalemler()
+        }
+        .sheet(isPresented: $showPDFModal) {
             #if canImport(UIKit)
             if let data = pdfData {
-                ShareSheet(activityItems: [data])
+                PDFViewerModal(
+                    title: "Teklif - \(teklif.teklifNo)",
+                    pdfData: data,
+                    fileName: "Teklif_\(teklif.teklifNo).pdf"
+                )
             }
             #endif
         }
@@ -211,5 +226,22 @@ public struct TeklifDetailView: View {
                 convertedNotice = "Teklif başarıyla '\(siparisNo)' nolu siparişe dönüştürüldü."
             }
         }
+    }
+    
+    private func loadKalemler() async {
+        isLoadingKalemler = true
+        do {
+            let items: [TeklifKalem] = try await SupabaseService.shared.fetch(
+                from: "teklif_detaylar",
+                filters: ["teklif_id": "eq.\(teklif.id)"],
+                applyTenantFilter: false
+            )
+            await MainActor.run {
+                self.liveKalemler = items
+            }
+        } catch {
+            print("Teklif Kalemler load error: \(error)")
+        }
+        isLoadingKalemler = false
     }
 }
