@@ -523,11 +523,12 @@ public struct FinansView: View {
                 self.hareketler = chList.map { ch in
                     let isGiris = ch.alacak > 0
                     let tutar = isGiris ? ch.alacak : ch.borc
+                    let dateStr = ch.tarih != nil ? String(ch.tarih!.prefix(10)) : "Bugün"
                     return FinansListItem(
-                        title: ch.cariUnvan ?? "Cari İşlem",
-                        description: ch.aciklama ?? ch.islemTuru ?? "Hareket",
+                        title: ch.aciklama ?? ch.islemTuru ?? "Cari İşlem",
+                        description: ch.islemTuru ?? "Hareket",
                         amount: tutar,
-                        date: String(ch.tarih.prefix(10)),
+                        date: dateStr,
                         type: isGiris ? "In" : "Out",
                         method: ch.islemTuru ?? "İşlem"
                     )

@@ -742,16 +742,19 @@ public struct RaporDetayInteractiveView: View {
         var net: Double { (satis + kasaIn) - (alis + kasaOut) }
     }
     
-    @State private var days: [DailyFlow] = (1...30).map { i in
-        DailyFlow(
-            day: "\(i)",
-            date: "\(String(format: "%02d", i)).10.2026",
-            satis: Double(15000 + (i * 1234) % 30000),
-            alis: Double(8000 + (i * 987) % 25000),
-            kasaIn: Double(3000 + (i * 456) % 10000),
-            kasaOut: Double(2000 + (i * 321) % 8000)
-        )
+    private static func generateInitialDays() -> [DailyFlow] {
+        var result: [DailyFlow] = []
+        for i in 1...30 {
+            let s: Double = Double(15000 + (i * 1234) % 30000)
+            let a: Double = Double(8000 + (i * 987) % 25000)
+            let ki: Double = Double(3000 + (i * 456) % 10000)
+            let ko: Double = Double(2000 + (i * 321) % 8000)
+            result.append(DailyFlow(day: "\(i)", date: "\(String(format: "%02d", i)).10.2026", satis: s, alis: a, kasaIn: ki, kasaOut: ko))
+        }
+        return result
     }
+    
+    @State private var days: [DailyFlow] = NakitAkisView.generateInitialDays()
     
     @State private var selectedDay: DailyFlow? = nil
     

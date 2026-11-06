@@ -307,7 +307,7 @@ public struct MusteriTakipView: View {
                 )
                 klasorler.insert(newFolder, at: 0)
                 Task {
-                    _ = try? await SupabaseService.shared.insert(newFolder, into: "musteri_takip_klasorler")
+                    _ = try? await SupabaseService.shared.insert(into: "musteri_takip_klasorler", item: newFolder)
                 }
                 newCariUnvan = ""
                 newYetkili = ""

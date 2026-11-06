@@ -256,7 +256,7 @@ public struct MusteriTakipDetayView: View {
                     )
                     gorusmeler.insert(newD, at: 0)
                     Task {
-                        _ = try? await SupabaseService.shared.insert(newD, into: "musteri_takip_detaylar")
+                        _ = try? await SupabaseService.shared.insert(into: "musteri_takip_detaylar", item: newD)
                     }
                     gorusmeBaslik = ""
                     gorusmeIcerik = ""
@@ -279,7 +279,7 @@ public struct MusteriTakipDetayView: View {
                 itemCard(title: g.baslik, subtitle: g.icerik ?? "", date: g.tarih, color: Color(hex: "0A84FF")) {
                     gorusmeler.removeAll { $0.id == g.id }
                     Task {
-                        _ = try? await SupabaseService.shared.delete(from: "musteri_takip_detaylar", id: String(g.id))
+                        _ = try? await SupabaseService.shared.delete(table: "musteri_takip_detaylar", id: String(g.id))
                     }
                 }
             }
@@ -324,7 +324,7 @@ public struct MusteriTakipDetayView: View {
                     )
                     fiyatlar.insert(newF, at: 0)
                     Task {
-                        _ = try? await SupabaseService.shared.insert(newF, into: "musteri_takip_detaylar")
+                        _ = try? await SupabaseService.shared.insert(into: "musteri_takip_detaylar", item: newF)
                     }
                     fiyatBaslik = ""
                     fiyatTutar = ""
@@ -361,7 +361,7 @@ public struct MusteriTakipDetayView: View {
                         Button {
                             fiyatlar.removeAll { $0.id == f.id }
                             Task {
-                                _ = try? await SupabaseService.shared.delete(from: "musteri_takip_detaylar", id: String(f.id))
+                                _ = try? await SupabaseService.shared.delete(table: "musteri_takip_detaylar", id: String(f.id))
                             }
                         } label: {
                             Image(systemName: "trash").font(.system(size: 11)).foregroundColor(Color(hex: "EF4444"))
@@ -398,7 +398,7 @@ public struct MusteriTakipDetayView: View {
                     )
                     gorseller.insert(newG, at: 0)
                     Task {
-                        _ = try? await SupabaseService.shared.insert(newG, into: "musteri_takip_detaylar")
+                        _ = try? await SupabaseService.shared.insert(into: "musteri_takip_detaylar", item: newG)
                     }
                     gorselBaslik = ""
                 } label: {
@@ -419,7 +419,7 @@ public struct MusteriTakipDetayView: View {
                 itemCard(title: g.baslik, subtitle: g.icerik ?? "", date: g.tarih, color: Color(hex: "BF5AF2")) {
                     gorseller.removeAll { $0.id == g.id }
                     Task {
-                        _ = try? await SupabaseService.shared.delete(from: "musteri_takip_detaylar", id: String(g.id))
+                        _ = try? await SupabaseService.shared.delete(table: "musteri_takip_detaylar", id: String(g.id))
                     }
                 }
             }
@@ -449,7 +449,7 @@ public struct MusteriTakipDetayView: View {
                     )
                     notlar.insert(newN, at: 0)
                     Task {
-                        _ = try? await SupabaseService.shared.insert(newN, into: "musteri_takip_detaylar")
+                        _ = try? await SupabaseService.shared.insert(into: "musteri_takip_detaylar", item: newN)
                     }
                     notBaslik = ""
                     notIcerik = ""
@@ -471,7 +471,7 @@ public struct MusteriTakipDetayView: View {
                 itemCard(title: n.baslik, subtitle: n.icerik ?? "", date: n.tarih, color: Color(hex: "FF9F0A")) {
                     notlar.removeAll { $0.id == n.id }
                     Task {
-                        _ = try? await SupabaseService.shared.delete(from: "musteri_takip_detaylar", id: String(n.id))
+                        _ = try? await SupabaseService.shared.delete(table: "musteri_takip_detaylar", id: String(n.id))
                     }
                 }
             }
@@ -699,7 +699,7 @@ public struct MusteriTakipDetayView: View {
     private func loadDetaylar() async {
         isLoading = true
         do {
-            let items: [MusteriTakipDetay] = try await SupabaseService.shared.fetch(from: "musteri_takip_detaylar", queryParams: ["klasor_id": "eq.\(klasor.id)"])
+            let items: [MusteriTakipDetay] = try await SupabaseService.shared.fetch(from: "musteri_takip_detaylar", filters: ["klasor_id": "eq.\(klasor.id)"])
             await MainActor.run {
                 self.gorusmeler = items.filter { $0.tip == "Gorusme" }
                 self.fiyatlar = items.filter { $0.tip == "Fiyat" }

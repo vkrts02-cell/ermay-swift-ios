@@ -803,11 +803,11 @@ public struct AraclarView: View {
     
     private func loadRealCarilerRisk() async {
         do {
-            let cariler: [Cari] = try await SupabaseService.shared.fetch(from: "cariler")
+            let cariler: [CariKart] = try await SupabaseService.shared.fetchCariler()
             let items = cariler.prefix(15).map { c in
-                let bakiye = c.bakiye ?? 0
-                let limit = c.riskLimiti ?? 100000
-                let oran = limit > 0 ? (bakiye / limit) : 0
+                let bakiye = c.bakiye
+                let limit = c.riskLimiti ?? 100000.0
+                let oran: Double = limit > 0 ? (bakiye / limit) : 0.0
                 let puan: Int
                 let durum: String
                 if oran > 0.8 {

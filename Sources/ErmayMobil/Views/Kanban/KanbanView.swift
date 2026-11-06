@@ -60,7 +60,7 @@ public struct KanbanView: View {
                 YeniGorevModalView { yeni in
                     gorevler.append(yeni)
                     Task {
-                        _ = try? await SupabaseService.shared.insert(yeni, into: "gorevler")
+                        _ = try? await SupabaseService.shared.insert(into: "gorevler", item: yeni)
                     }
                 }
             }
@@ -290,7 +290,7 @@ public struct KanbanView: View {
             let updated = gorevler[idx]
             selectedGorev = updated
             Task {
-                _ = try? await SupabaseService.shared.update(updated, in: "gorevler", id: id)
+                _ = try? await SupabaseService.shared.update(table: "gorevler", id: id, item: updated)
             }
         }
     }
@@ -299,7 +299,7 @@ public struct KanbanView: View {
         gorevler.removeAll { $0.id == id }
         isDetailOpen = false
         Task {
-            _ = try? await SupabaseService.shared.delete(from: "gorevler", id: id)
+            _ = try? await SupabaseService.shared.delete(table: "gorevler", id: id)
         }
     }
 }
