@@ -221,7 +221,6 @@ public struct FaturaDetailView: View {
         isLoadingKalemler = false
     }
 }
-}
 
 struct DetailSummaryRow: View {
     let label: String

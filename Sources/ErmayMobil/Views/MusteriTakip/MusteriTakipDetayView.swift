@@ -475,9 +475,6 @@ public struct MusteriTakipDetayView: View {
                     }
                 }
             }
-                    notlar.removeAll { $0.id == n.id }
-                }
-            }
         }
     }
     
