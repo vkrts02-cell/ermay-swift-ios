@@ -1,6 +1,6 @@
 import SwiftUI
 
-public struct TahsilatKasaItem: Identifiable, Codable, Hashable {
+public struct TahsilatKasaItem: Identifiable, Decodable, Hashable {
     public let id: String
     public let name: String
     public let bakiye: Double

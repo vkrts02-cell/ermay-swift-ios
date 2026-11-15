@@ -147,10 +147,10 @@ public struct StokFormView: View {
         isSaving = true
         errorMessage = nil
         
-        let generatedStokId = IdGenerator.generateMobileRecordId()
+        let generatedStokInt = IdGenerator.generateMobileRecordId()
         let newStok = StokKart(
-            id: generatedStokId,
-            stokKodu: stokKodu.isEmpty ? "STK-\(generatedStokId % 100000)" : stokKodu,
+            id: String(generatedStokInt),
+            stokKodu: stokKodu.isEmpty ? "STK-\(generatedStokInt % 100000)" : stokKodu,
             stokAdi: stokAdi,
             barkod: barkod.isEmpty ? nil : barkod,
             grupAdi: grupAdi.isEmpty ? "Genel" : grupAdi,
@@ -165,9 +165,9 @@ public struct StokFormView: View {
         Task {
             do {
                 var itemToSave = newStok
-                if (itemToSave.id ?? 0) <= 0 {
+                if (Int(itemToSave.id) ?? 0) <= 0 {
                     let nextId = await SupabaseService.shared.getNextId(for: "stoklar")
-                    itemToSave.id = nextId
+                    itemToSave.id = String(nextId)
                 }
                 try await SupabaseService.shared.insert(into: "stoklar", item: itemToSave)
                 await MainActor.run {

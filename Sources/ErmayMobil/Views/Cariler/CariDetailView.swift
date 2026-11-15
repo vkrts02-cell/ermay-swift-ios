@@ -606,7 +606,8 @@ public struct CariDetailView: View {
             deleteErrorMessage = "Bakiyesi sıfır olmayan (\(AppFormatters.money(abs(currentCari.bakiye)))) cari kart silinemez."
             return
         }
-        guard let cariId = currentCari.id else {
+        let cariId = currentCari.id
+        guard !cariId.isEmpty else {
             deleteErrorMessage = "Cari kimliği doğrulanamadı."
             return
         }

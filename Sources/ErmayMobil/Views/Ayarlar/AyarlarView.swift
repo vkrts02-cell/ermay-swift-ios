@@ -745,7 +745,7 @@ public struct AyarlarView: View {
                 
                 Button {
                     Task {
-                        await SupabaseService.shared.processOfflineQueue()
+                        await OfflineQueueService.shared.processQueue()
                         await MainActor.run {
                             alertMessage = "Çevrimdışı kuyruk eşitlendi. Bulut veritabanındaki silinmiş (soft-deleted) kayıtların kalıcı temizliği veri güvenliği için Masaüstü Ana Sunucu üzerinden gerçekleştirilmelidir."
                             showAlert = true

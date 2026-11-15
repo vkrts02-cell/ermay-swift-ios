@@ -249,10 +249,11 @@ public struct CariFormView: View {
         isSaving = true
         errorMessage = nil
         
-        let generatedCariId = cariToEdit?.id ?? IdGenerator.generateMobileRecordId()
+        let generatedCariInt = IdGenerator.generateMobileRecordId()
+        let generatedCariId = cariToEdit?.id ?? String(generatedCariInt)
         let saved = CariKart(
             id: generatedCariId,
-            cariKodu: cariKod.isEmpty ? "CARI-\(generatedCariId % 100000)" : cariKod,
+            cariKodu: cariKod.isEmpty ? "CARI-\(generatedCariInt % 100000)" : cariKod,
             unvan: unvan,
             cariTuru: grup,
             yetkili: yetkili,
@@ -282,12 +283,13 @@ public struct CariFormView: View {
         Task {
             var itemToSave = saved
             do {
-                if let editItem = cariToEdit, let intId = editItem.id, intId > 0 {
+                if let editItem = cariToEdit, let intId = Int(editItem.id), intId > 0 {
                     try await SupabaseService.shared.update(table: "cariler", id: "\(intId)", item: saved)
                 } else {
-                    if (itemToSave.id ?? 0) <= 0 {
+                    if (Int(itemToSave.id) ?? 0) <= 0 {
                         let nextId = await SupabaseService.shared.getNextId(for: "cariler")
-                        itemToSave.id = nextId
+                        itemToSave.id = String(nextId)
+                    }
                     }
                     try await SupabaseService.shared.insert(into: "cariler", item: itemToSave)
                 }

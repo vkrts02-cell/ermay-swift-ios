@@ -216,7 +216,8 @@ public struct KasaSayimView: View {
             }
             if let kasalar: [KasaBanka] = try? await SupabaseService.shared.fetch(from: "kasalar"),
                var targetKasa = kasalar.first,
-               let kasaId = targetKasa.id {
+               !targetKasa.id.isEmpty {
+                let kasaId = targetKasa.id
                 targetKasa.bakiye = fizikiToplam
                 try? await SupabaseService.shared.update(table: "kasalar", id: "\(kasaId)", item: targetKasa)
             }

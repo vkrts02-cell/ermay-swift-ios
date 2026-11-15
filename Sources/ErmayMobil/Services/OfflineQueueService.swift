@@ -229,10 +229,12 @@ public final class OfflineQueueService: @unchecked Sendable {
         
         switch item.method.uppercased() {
         case "RPC":
-            let res: [String: Any]? = try await SupabaseService.shared.rpcRaw(function: item.endpoint, data: payloadData)
-            if let success = res?["success"] as? Bool, !success {
-                let msg = (res?["message"] as? String) ?? "Atomic RPC failed"
-                throw NSError(domain: "SupabaseRPC", code: 500, userInfo: [NSLocalizedDescriptionKey: msg])
+            if let dict = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any] {
+                let res = try await SupabaseService.shared.rpc(function: item.endpoint, params: dict)
+                if let success = res["success"] as? Bool, !success {
+                    let msg = (res["message"] as? String) ?? "Atomic RPC failed"
+                    throw NSError(domain: "SupabaseRPC", code: 500, userInfo: [NSLocalizedDescriptionKey: msg])
+                }
             }
         case "POST":
             try await SupabaseService.shared.insertRaw(into: item.endpoint, data: payloadData)
@@ -283,11 +285,14 @@ public final class OfflineQueueService: @unchecked Sendable {
         if let cid = json["cari_id"] as? Int,
            let bakiye = json["yeni_cari_bakiye"] as? Double,
            let bakiyeTuru = json["yeni_cari_bakiye_turu"] as? String {
-            try await SupabaseService.shared.update(
-                table: "cariler",
-                id: "\(cid)",
-                item: ["bakiye": bakiye, "bakiye_turu": bakiyeTuru]
-            )
+            let updateDict: [String: Any] = ["bakiye": bakiye, "bakiye_turu": bakiyeTuru]
+            if let updateData = try? JSONSerialization.data(withJSONObject: updateDict) {
+                try await SupabaseService.shared.updateRaw(
+                    table: "cariler",
+                    id: "\(cid)",
+                    data: updateData
+                )
+            }
         }
     }
     

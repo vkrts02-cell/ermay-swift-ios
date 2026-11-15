@@ -20,6 +20,8 @@ public struct Cek: Identifiable, Codable, Sendable {
     public var aciklama: String?
     
     public var idInt: Int? { Int(id) }
+    public var cekSenetNo: String { cekNo ?? portfoyNo ?? seriNo ?? "-" }
+    public var bankaAdi: String? { banka }
     
     public init(
         id: String = UUID().uuidString,
@@ -192,6 +194,8 @@ public struct Senet: Identifiable, Codable, Sendable {
     public var aciklama: String?
     
     public var idInt: Int? { Int(id) }
+    public var cekSenetNo: String { senetNo ?? portfoyNo ?? "-" }
+    public var bankaAdi: String? { nil }
     
     public init(
         id: String = UUID().uuidString,

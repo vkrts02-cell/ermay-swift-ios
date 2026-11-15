@@ -1,6 +1,6 @@
 import SwiftUI
 
-public struct DialogAccountItem: Identifiable, Codable, Hashable {
+public struct DialogAccountItem: Identifiable, Decodable, Hashable {
     public let id: String
     public let name: String
     public let bakiye: Double
@@ -229,9 +229,9 @@ public struct CariTransactionDialogView: View {
                     Button {
                         method = m
                         if m == "Nakit" {
-                            selectedKasaBanka = availableKasalar.first ?? "Merkez TL Kasası"
+                            selectedKasaBanka = kasalar.first?.name ?? "Merkez TL Kasası"
                         } else if m == "Havale / EFT" || m == "Kredi Kartı" {
-                            selectedKasaBanka = availableBankalar.first ?? "Garanti BBVA Ticari"
+                            selectedKasaBanka = bankalar.first?.name ?? "Garanti BBVA Ticari"
                         }
                     } label: {
                         Text(m)

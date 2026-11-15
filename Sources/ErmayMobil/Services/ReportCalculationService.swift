@@ -254,7 +254,8 @@ public final class ReportCalculationService: @unchecked Sendable {
             let headers = ["Ünvan", "Grup", "Telefon", "Son İşlem", "Bakiye"]
             let activeCariIds = Set(cariHareketler.compactMap { $0.cariId })
             let rows: [[String]] = cariler.filter { c in
-                guard let cid = c.id else { return true }
+                let cid = c.id
+                guard !cid.isEmpty else { return true }
                 return !activeCariIds.contains(cid)
             }.map { c in
                 [
@@ -295,7 +296,7 @@ public final class ReportCalculationService: @unchecked Sendable {
             let headers = ["Stok Kodu", "Stok Adı", "Kategori", "Miktar", "Alış F.", "Satış F.", "Stok Değeri"]
             let rows: [[String]] = stoklar.map { s in
                 [
-                    s.stokKodu ?? "STK-\(s.id ?? 0)",
+                    s.stokKodu ?? "STK-\(s.id)",
                     s.stokAdi,
                     s.kategori ?? "Genel",
                     "\(String(format: "%.1f", s.mevcutMiktar)) \(s.birim ?? "Adet")",
@@ -323,11 +324,11 @@ public final class ReportCalculationService: @unchecked Sendable {
             
         case "Kritik Stok Seviyesi":
             let headers = ["Stok Kodu", "Stok Adı", "Mevcut", "Min. Seviye", "Durum", "Satış Fiyatı"]
-            let rows: [[String]] = stoklar.compactMap { s in
+            let rows: [[String]] = stoklar.compactMap { (s: StokKart) -> [String]? in
                 let minSev = s.kritikMiktar ?? 10.0
                 guard s.mevcutMiktar <= minSev else { return nil }
                 return [
-                    s.stokKodu ?? "STK-\(s.id ?? 0)",
+                    s.stokKodu ?? "STK-\(s.id)",
                     s.stokAdi,
                     "\(String(format: "%.1f", s.mevcutMiktar)) \(s.birim ?? "Adet")",
                     "\(String(format: "%.1f", minSev))",
@@ -343,7 +344,7 @@ public final class ReportCalculationService: @unchecked Sendable {
                 [
                     s.stokAdi,
                     s.barkod ?? "-",
-                    s.stokKodu ?? "STK-\(s.id ?? 0)",
+                    s.stokKodu ?? "STK-\(s.id)",
                     "\(String(format: "%.1f", s.mevcutMiktar)) \(s.birim ?? "Adet")",
                     AppFormatters.money(s.mevcutMiktar * s.alisFiyati)
                 ]

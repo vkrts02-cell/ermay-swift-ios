@@ -162,6 +162,7 @@ public struct TeklifKalem: Identifiable, Codable, Hashable {
     public var kdvOrani: Double
     public var tutar: Double
     public var aciklama: String?
+    public var syncGuid: String?
     
     public var toplamTutar: Double {
         get { tutar }

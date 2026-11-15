@@ -36,6 +36,10 @@ public struct CariKart: Identifiable, Codable, Hashable {
         set { grup = newValue }
     }
     
+    public var cariTipi: String {
+        cariTuru ?? grup ?? "Müşteri"
+    }
+    
     enum CodingKeys: String, CodingKey {
         case id
         case cariKodu = "cari_kodu"
@@ -252,6 +256,7 @@ public struct CariBakiyeUpdate: Codable {
 public struct CariHareket: Identifiable, Codable, Hashable {
     public var id: String
     public var cariId: String?
+    public var cariUnvan: String?
     public var tarih: String?
     public var belgeNo: String?
     public var islemTuru: String? // "Fatura", "Tahsilat", "Tediye", "Devir"
