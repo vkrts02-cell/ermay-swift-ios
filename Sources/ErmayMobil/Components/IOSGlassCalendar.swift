@@ -126,7 +126,7 @@ public struct IOSGlassCalendar: View {
         
         var days: [Date?] = Array(repeating: nil, count: offset)
         
-        let range = calendar.range(of: .day, in: .month, for: date)!
+        guard let range = calendar.range(of: .day, in: .month, for: date) else { return days }
         for day in range {
             if let d = calendar.date(byAdding: .day, value: day - 1, to: startOfMonth) {
                 days.append(d)

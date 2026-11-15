@@ -2,6 +2,7 @@ import SwiftUI
 
 public struct MainTabView: View {
     @State private var selectedTab: MainTab = .dashboard
+    @State private var visitedTabs: Set<MainTab> = [.dashboard]
     
     public init() {}
     
@@ -9,23 +10,39 @@ public struct MainTabView: View {
         ZStack(alignment: .bottom) {
             AppTheme.background.ignoresSafeArea()
             
-            Group {
-                switch selectedTab {
-                case .dashboard:
+            ZStack {
+                if visitedTabs.contains(.dashboard) {
                     DashboardView()
-                case .cariler:
+                        .opacity(selectedTab == .dashboard ? 1 : 0)
+                        .allowsHitTesting(selectedTab == .dashboard)
+                }
+                if visitedTabs.contains(.cariler) {
                     CarilerView()
-                case .siparisler:
+                        .opacity(selectedTab == .cariler ? 1 : 0)
+                        .allowsHitTesting(selectedTab == .cariler)
+                }
+                if visitedTabs.contains(.siparisler) {
                     SiparislerView()
-                case .teklifler:
+                        .opacity(selectedTab == .siparisler ? 1 : 0)
+                        .allowsHitTesting(selectedTab == .siparisler)
+                }
+                if visitedTabs.contains(.teklifler) {
                     TekliflerView()
-                case .dahaFazla:
+                        .opacity(selectedTab == .teklifler ? 1 : 0)
+                        .allowsHitTesting(selectedTab == .teklifler)
+                }
+                if visitedTabs.contains(.dahaFazla) {
                     MoreStackView()
+                        .opacity(selectedTab == .dahaFazla ? 1 : 0)
+                        .allowsHitTesting(selectedTab == .dahaFazla)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             
             FloatingTabBar(selectedTab: $selectedTab)
+        }
+        .onChange(of: selectedTab) { newTab in
+            visitedTabs.insert(newTab)
         }
         .ignoresSafeArea(.keyboard)
     }

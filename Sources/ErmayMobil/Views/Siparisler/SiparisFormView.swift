@@ -688,9 +688,52 @@ public struct SiparisFormView: View {
                     dismiss()
                 }
             } catch {
+                // Offline fallback: enqueue order + line items to offline queue
+                if let sipData = try? JSONEncoder().encode(sipPayload),
+                   let sipJson = String(data: sipData, encoding: .utf8) {
+                    OfflineQueueService.shared.enqueue(
+                        endpoint: "siparisler",
+                        method: "POST",
+                        payload: sipJson
+                    )
+                }
+                for it in kalemler {
+                    let dId = IdGenerator.generateMobileRecordId()
+                    let intStok = it.stokId != nil ? Int(it.stokId!) : nil
+                    let dPayload = SiparisDetayStrictInsertPayload(
+                        id: dId,
+                        siparis_id: sipId,
+                        stok_id: intStok,
+                        stok_adi: it.stokAdi,
+                        miktar: it.miktar,
+                        birim: it.birim ?? "Adet",
+                        birim_fiyat: it.birimFiyat,
+                        kdv_orani: it.kdvOrani,
+                        toplam_tutar: it.tutar,
+                        tenant_id: tenantId,
+                        uuid: UUID().uuidString,
+                        version: 1
+                    )
+                    if let dData = try? JSONEncoder().encode(dPayload),
+                       let dJson = String(data: dData, encoding: .utf8) {
+                        OfflineQueueService.shared.enqueue(
+                            endpoint: "siparis_detaylar",
+                            method: "POST",
+                            payload: dJson
+                        )
+                    }
+                }
+                
                 await MainActor.run {
-                    self.errorMessage = "Sipariş kaydedilemedi: " + error.localizedDescription
-                    self.isSaving = false
+                    HardwareService.shared.hapticSuccess()
+                    NotificationCenter.default.post(
+                        name: .userToastNotification,
+                        object: nil,
+                        userInfo: ["message": "Sipariş çevrimdışı kaydedildi. Bağlantı sağlandığında eşitlenecek."]
+                    )
+                    onSave?(newSip)
+                    isSaving = false
+                    dismiss()
                 }
             }
         }

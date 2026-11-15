@@ -16,6 +16,12 @@ public struct Teklif: Identifiable, Codable, Hashable {
     public var syncGuid: String?
     public var tenantId: String?
     
+    public var idInt: Int? { Int(id) }
+    public var uuid: String {
+        get { syncGuid ?? (Int(id) == nil ? id : "") }
+        set { syncGuid = newValue }
+    }
+    
     enum CodingKeys: String, CodingKey {
         case id
         case teklifNo = "teklif_no"
@@ -123,7 +129,11 @@ public struct Teklif: Identifiable, Codable, Hashable {
     
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
+        if let intId = Int(id), intId > 0 {
+            try container.encode(intId, forKey: .id)
+        }
+        let finalUuid = syncGuid ?? (Int(id) == nil ? id : UUID().uuidString)
+        try container.encode(finalUuid, forKey: .uuid)
         try container.encode(teklifNo, forKey: .teklifNo)
         try container.encodeIfPresent(cariId, forKey: .cariId)
         try container.encodeIfPresent(cariUnvan, forKey: .cariUnvan)
@@ -158,8 +168,15 @@ public struct TeklifKalem: Identifiable, Codable, Hashable {
         set { tutar = newValue }
     }
     
+    public var idInt: Int? { Int(id) }
+    public var uuid: String {
+        get { syncGuid ?? (Int(id) == nil ? id : "") }
+        set { syncGuid = newValue }
+    }
+    
     enum CodingKeys: String, CodingKey {
         case id
+        case uuid
         case teklifId = "teklif_id"
         case stokId = "stok_id"
         case stokKodu = "stok_kodu"
@@ -234,7 +251,11 @@ public struct TeklifKalem: Identifiable, Codable, Hashable {
     
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
+        if let intId = Int(id), intId > 0 {
+            try container.encode(intId, forKey: .id)
+        }
+        let finalUuid = syncGuid ?? (Int(id) == nil ? id : UUID().uuidString)
+        try container.encode(finalUuid, forKey: .uuid)
         try container.encodeIfPresent(teklifId, forKey: .teklifId)
         try container.encodeIfPresent(stokId, forKey: .stokId)
         try container.encodeIfPresent(stokKodu, forKey: .stokKodu)

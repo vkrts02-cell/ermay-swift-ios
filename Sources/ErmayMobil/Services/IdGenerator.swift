@@ -8,7 +8,8 @@ public final class IdGenerator: @unchecked Sendable {
     private static var lastGeneratedId: Int = 1_000_000_000
     private static let lock = NSLock()
     
-    /// Signed 32-bit integer güvenli pozitif mobil kayıt ID üreticisi
+    /// Signed 32-bit integer güvenli pozitif mobil kayıt ID üreticisi (Eski yöntem - PostgreSQL sequence ve UUID tercih edilmelidir)
+    @available(*, deprecated, message: "Standardize on PostgreSQL sequences and UUIDv4")
     public static func generateMobileRecordId() -> Int {
         lock.lock()
         defer { lock.unlock() }
@@ -27,6 +28,11 @@ public final class IdGenerator: @unchecked Sendable {
         
         lastGeneratedId = newId
         return newId
+    }
+
+    /// Çakışmasız dağıtık kayıt tanımlayıcısı üretir (UUIDv4)
+    public static func generateRecordUuid() -> String {
+        return UUID().uuidString
     }
 }
 

@@ -1,5 +1,52 @@
 import SwiftUI
 
+public struct TahsilatKasaItem: Identifiable, Codable, Hashable {
+    public let id: String
+    public let name: String
+    public let bakiye: Double
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case kasaAdi = "kasa_adi"
+        case hesapAdi = "hesap_adi"
+        case bakiye
+        case guncelBakiye = "guncel_bakiye"
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let intId = try? c.decode(Int.self, forKey: .id) {
+            self.id = String(intId)
+        } else if let strId = try? c.decode(String.self, forKey: .id) {
+            self.id = strId
+        } else {
+            self.id = "1"
+        }
+        
+        if let ka = try? c.decode(String.self, forKey: .kasaAdi), !ka.isEmpty {
+            self.name = ka
+        } else if let ha = try? c.decode(String.self, forKey: .hesapAdi), !ha.isEmpty {
+            self.name = ha
+        } else {
+            self.name = "Kasa"
+        }
+        
+        if let b = try? c.decode(Double.self, forKey: .bakiye) {
+            self.bakiye = b
+        } else if let gb = try? c.decode(Double.self, forKey: .guncelBakiye) {
+            self.bakiye = gb
+        } else {
+            self.bakiye = 0.0
+        }
+    }
+    
+    public init(id: String, name: String, bakiye: Double) {
+        self.id = id
+        self.name = name
+        self.bakiye = bakiye
+    }
+}
+
 public struct TahsilatFormView: View {
     public let isTahsilat: Bool
     public var onSave: ((KasaHareket) -> Void)?
@@ -13,6 +60,8 @@ public struct TahsilatFormView: View {
     @State private var tarih: Date = Date()
     @State private var showCariPicker: Bool = false
     @State private var isSaving: Bool = false
+    @State private var kasalar: [TahsilatKasaItem] = []
+    @State private var errorMessage: String? = nil
     
     public init(isTahsilat: Bool = true, initialCari: CariKart? = nil, onSave: ((KasaHareket) -> Void)? = nil) {
         self.isTahsilat = isTahsilat
@@ -34,6 +83,21 @@ public struct TahsilatFormView: View {
                 
                 ScrollView {
                     VStack(spacing: 16) {
+                        if let err = errorMessage {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.red)
+                                Text(err)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.white)
+                                Spacer()
+                            }
+                            .padding(10)
+                            .background(Color.red.opacity(0.18))
+                            .cornerRadius(8)
+                            .padding(.horizontal)
+                        }
+                        
                         HStack {
                             Text(isTahsilat ? "Hızlı Tahsilat Ekle" : "Hızlı Ödeme Ekle")
                                 .font(.system(size: 20, weight: .bold))
@@ -84,6 +148,35 @@ public struct TahsilatFormView: View {
                                     .background(Color(hex: "121216"))
                                     .cornerRadius(10)
                                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                                }
+                                
+                                // Kasa Hesabı Seçimi
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Kasa Hesabı *")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundColor(AppTheme.textSecondary)
+                                    
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 8) {
+                                            ForEach(kasalar) { k in
+                                                Button {
+                                                    hesapId = k.id
+                                                } label: {
+                                                    HStack(spacing: 6) {
+                                                        Image(systemName: "banknote.fill")
+                                                            .font(.system(size: 12))
+                                                        Text(k.name)
+                                                            .font(.system(size: 12, weight: hesapId == k.id ? .bold : .regular))
+                                                    }
+                                                    .foregroundColor(hesapId == k.id ? .white : AppTheme.textMuted)
+                                                    .padding(.horizontal, 10)
+                                                    .padding(.vertical, 8)
+                                                    .background(hesapId == k.id ? AppTheme.primary : Color.white.opacity(0.05))
+                                                    .cornerRadius(8)
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                                 
                                 VStack(alignment: .leading, spacing: 6) {
@@ -139,6 +232,9 @@ public struct TahsilatFormView: View {
                 }
             }
             .navigationBarHidden(true)
+            .task {
+                await loadKasalar()
+            }
             .sheet(isPresented: $showCariPicker) {
                 CariPickerSheet { c in
                     self.cariId = c.id
@@ -168,51 +264,60 @@ public struct TahsilatFormView: View {
         )
         
         Task {
-            do {
-                // 1. Kasa Hareketi Ekle
-                var kasaPayload: [String: Any] = [
+            // 1. Kasa Hareketi Payload Hazırla (do-catch dışarısında tanımlanır)
+            var kasaPayload: [String: Any] = [
+                "uuid": UUID().uuidString,
+                "tenant_id": SupabaseService.shared.tenantId,
+                "tarih": dateStr,
+                "islem_turu": isTahsilat ? "Tahsilat" : "Ödeme",
+                "hareket_turu": isTahsilat ? "Tahsilat" : "Ödeme",
+                "giren": isTahsilat ? tutar : 0.0,
+                "cikan": isTahsilat ? 0.0 : tutar,
+                "gelir": isTahsilat ? tutar : 0.0,
+                "gider": isTahsilat ? 0.0 : tutar,
+                "evrak_no": docNo,
+                "tutar": tutar,
+                "aciklama": desc,
+                "is_deleted": false
+            ]
+            if let intKasaId = Int(hesapId) {
+                kasaPayload["kasa_id"] = intKasaId
+            }
+            if let cid = cariId, let intCid = Int(cid) {
+                kasaPayload["cari_id"] = intCid
+            }
+            if !cariUnvan.isEmpty {
+                kasaPayload["cari_unvan"] = cariUnvan
+            }
+
+            var cariPayloadForBundle: [String: Any]? = nil
+            if let cid = cariId, !cid.isEmpty {
+                var cariPayload: [String: Any] = [
                     "uuid": UUID().uuidString,
                     "tenant_id": SupabaseService.shared.tenantId,
-                    "tarih": dateStr,
+                    "cari_unvan": cariUnvan,
+                    "evrak_no": docNo,
                     "islem_turu": isTahsilat ? "Tahsilat" : "Ödeme",
                     "hareket_turu": isTahsilat ? "Tahsilat" : "Ödeme",
-                    "giren": isTahsilat ? tutar : 0.0,
-                    "cikan": isTahsilat ? 0.0 : tutar,
-                    "gelir": isTahsilat ? tutar : 0.0,
-                    "gider": isTahsilat ? 0.0 : tutar,
-                    "evrak_no": docNo,
-                    "tutar": tutar,
+                    "odeme_sekli": "Nakit",
                     "aciklama": desc,
+                    "borc": isTahsilat ? 0.0 : tutar,
+                    "alacak": isTahsilat ? tutar : 0.0,
+                    "tarih": dateStr,
                     "is_deleted": false
                 ]
-                if let cid = cariId, let intCid = Int(cid) {
-                    kasaPayload["cari_id"] = intCid
+                if let intCid = Int(cid) {
+                    cariPayload["cari_id"] = intCid
                 }
-                if !cariUnvan.isEmpty {
-                    kasaPayload["cari_unvan"] = cariUnvan
-                }
+                cariPayloadForBundle = cariPayload
+            }
+
+            do {
                 let kData = try JSONSerialization.data(withJSONObject: kasaPayload)
                 try await SupabaseService.shared.insertRaw(into: "kasa_hareketler", data: kData)
                 
                 // 2. Eğer Cari seçildiyse Cari Hareketi de ekle
-                if let cid = cariId, !cid.isEmpty {
-                    var cariPayload: [String: Any] = [
-                        "uuid": UUID().uuidString,
-                        "tenant_id": SupabaseService.shared.tenantId,
-                        "cari_unvan": cariUnvan,
-                        "evrak_no": docNo,
-                        "islem_turu": isTahsilat ? "Tahsilat" : "Ödeme",
-                        "hareket_turu": isTahsilat ? "Tahsilat" : "Ödeme",
-                        "odeme_sekli": "Nakit",
-                        "aciklama": desc,
-                        "borc": isTahsilat ? 0.0 : tutar,
-                        "alacak": isTahsilat ? tutar : 0.0,
-                        "tarih": dateStr,
-                        "is_deleted": false
-                    ]
-                    if let intCid = Int(cid) {
-                        cariPayload["cari_id"] = intCid
-                    }
+                if let cariPayload = cariPayloadForBundle {
                     let cData = try JSONSerialization.data(withJSONObject: cariPayload)
                     try await SupabaseService.shared.insertRaw(into: "cari_hareketler", data: cData)
                 }
@@ -225,11 +330,41 @@ public struct TahsilatFormView: View {
                 }
             } catch {
                 await MainActor.run {
+                    var bundle: [String: Any] = [
+                        "kasa_hareket": kasaPayload
+                    ]
+                    if let cp = cariPayloadForBundle {
+                        bundle["cari_hareket"] = cp
+                    }
+                    OfflineQueueService.shared.enqueueBundle(payload: bundle)
+                    
                     HardwareService.shared.hapticSuccess()
+                    NotificationCenter.default.post(
+                        name: .userToastNotification,
+                        object: nil,
+                        userInfo: ["message": "İşlem çevrimdışı kaydedildi. Bağlantı kurulduğunda senkronize edilecek."]
+                    )
                     onSave?(h)
                     isSaving = false
                     dismiss()
                 }
+            }
+        }
+    }
+    
+    // MARK: - Load Real Kasalar
+    private func loadKasalar() async {
+        let fetched: [TahsilatKasaItem] = (try? await SupabaseService.shared.fetch(from: "kasalar", orderBy: "id.asc")) ?? []
+        await MainActor.run {
+            if !fetched.isEmpty {
+                self.kasalar = fetched
+                if self.hesapId == "1" || self.hesapId.isEmpty {
+                    self.hesapId = fetched.first?.id ?? "1"
+                }
+            } else {
+                let defaultKasa = TahsilatKasaItem(id: "1", name: "Merkez Kasa", bakiye: 0.0)
+                self.kasalar = [defaultKasa]
+                self.hesapId = defaultKasa.id
             }
         }
     }

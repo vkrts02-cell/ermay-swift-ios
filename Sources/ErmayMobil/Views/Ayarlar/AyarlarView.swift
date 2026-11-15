@@ -104,10 +104,10 @@ public struct AyarlarView: View {
                 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 16) {
-                        if currentCategory == nil {
-                            renderCategoriesGrid()
+                        if let selectedCatId = currentCategory {
+                            renderCategoryDetail(categoryId: selectedCatId)
                         } else {
-                            renderCategoryDetail(categoryId: currentCategory!)
+                            renderCategoriesGrid()
                         }
                         
                         Spacer().frame(height: 100)
@@ -324,9 +324,14 @@ public struct AyarlarView: View {
                     Spacer()
                     Button {
                         isTestingPing = true
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                            isTestingPing = false
-                            pingStatus = "Bağlantı Kuruldu (38ms)"
+                        let startTime = Date()
+                        Task {
+                            await SupabaseService.shared.fetchFiscalYears()
+                            let elapsedMs = Int(Date().timeIntervalSince(startTime) * 1000)
+                            await MainActor.run {
+                                isTestingPing = false
+                                pingStatus = "Bağlantı Kuruldu (\(max(1, elapsedMs))ms)"
+                            }
                         }
                     } label: {
                         Text(isTestingPing ? "Test Ediliyor..." : "Bağlantıyı Sına")
@@ -540,15 +545,18 @@ public struct AyarlarView: View {
                     .foregroundColor(Color(hex: "94A3B8"))
                 
                 Button {
+                    let cachedCariler = LocalDatabaseService.shared.getCachedCariler()
+                    let cachedStoklar = LocalDatabaseService.shared.getCachedStoklar()
+                    let cachedFaturalar = LocalDatabaseService.shared.getCachedFaturalar()
                     backupShareContent = """
                     {
                       "app": "Ermay Muhasebe",
-                      "exportDate": "\(ISO8601DateFormatter().string(from: Date()))",
+                      "exportDate": "\(AppFormatters.formatUtcIso8601())",
                       "activeYear": "\(activeYear)",
                       "firma": "\(firmaUnvan)",
-                      "carilerCount": 142,
-                      "stoklarCount": 58,
-                      "faturalarCount": 312
+                      "carilerCount": \(cachedCariler.count),
+                      "stoklarCount": \(cachedStoklar.count),
+                      "faturalarCount": \(cachedFaturalar.count)
                     }
                     """
                     showShareSheet = true
@@ -582,12 +590,15 @@ public struct AyarlarView: View {
                 }
                 
                 Button {
-                    guard !backupJsonInput.isEmpty else {
-                        alertMessage = "Lütfen geçerli bir JSON yedek verisi yapıştırın."
+                    let trimmed = backupJsonInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty,
+                          let data = trimmed.data(using: .utf8),
+                          (try? JSONSerialization.jsonObject(with: data)) != nil else {
+                        alertMessage = "Lütfen geçerli formatta bir JSON yedek verisi yapıştırın."
                         showAlert = true
                         return
                     }
-                    alertMessage = "Yedek veri tabanına başarıyla geri yüklendi."
+                    alertMessage = "JSON yedek paketi doğrulandı. Tam veritabanı geri yükleme işlemi veri bütünlüğü güvenliği için Masaüstü Ana Sunucu üzerinden gerçekleştirilmelidir."
                     showAlert = true
                     backupJsonInput = ""
                 } label: {
@@ -697,10 +708,18 @@ public struct AyarlarView: View {
                 
                 Button {
                     devirYukleniyor = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                        devirYukleniyor = false
-                        alertMessage = "\(devirKaynakYil) yılından \(devirHedefYil) yılına devir başarıyla tamamlandı (Cari, Kasa, Banka ve Stok devir fişleri oluşturuldu)."
-                        showAlert = true
+                    Task {
+                        let targetYr = devirHedefYil.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if targetYr.count == 4, Int(targetYr) != nil {
+                            await SupabaseService.shared.createFiscalYear(targetYr)
+                        }
+                        await MainActor.run {
+                            devirYukleniyor = false
+                            self.availableYears = SupabaseService.shared.availableFiscalYears
+                            self.activeYear = SupabaseService.shared.activeFiscalYear
+                            alertMessage = "Hedef mali yıl (\(devirHedefYil)) bulutta hazırlandı. Açılış/Kapanış devir fişlerinin tam muhasebe mutabakatıyla oluşturulması veri güvenliği için Masaüstü Ana Sunucu üzerinden tamamlanmalıdır."
+                            showAlert = true
+                        }
                     }
                 } label: {
                     Text(devirYukleniyor ? "Devir Yapılıyor..." : "Yıl Devir İşlemini Başlat")
@@ -725,8 +744,13 @@ public struct AyarlarView: View {
                     .foregroundColor(Color(hex: "94A3B8"))
                 
                 Button {
-                    alertMessage = "Silinmiş kayıtlar kalıcı olarak temizlendi (34 çöp kayıt kaldırıldı)."
-                    showAlert = true
+                    Task {
+                        await SupabaseService.shared.processOfflineQueue()
+                        await MainActor.run {
+                            alertMessage = "Çevrimdışı kuyruk eşitlendi. Bulut veritabanındaki silinmiş (soft-deleted) kayıtların kalıcı temizliği veri güvenliği için Masaüstü Ana Sunucu üzerinden gerçekleştirilmelidir."
+                            showAlert = true
+                        }
+                    }
                 } label: {
                     Text("Silinen Kayıtları Kalıcı Sil")
                         .font(.system(size: 13, weight: .bold))
@@ -744,8 +768,13 @@ public struct AyarlarView: View {
                     .foregroundColor(Color(hex: "94A3B8"))
                 
                 Button {
-                    alertMessage = "Cihaz önbelleği başarıyla temizlendi."
-                    showAlert = true
+                    Task {
+                        await DataStore.shared.refreshAll(force: true)
+                        await MainActor.run {
+                            alertMessage = "Cihaz yerel önbelleği bulut verileriyle yeniden eşitlendi ve temizlendi."
+                            showAlert = true
+                        }
+                    }
                 } label: {
                     Text("Cihaz Önbelleğini Sıfırla")
                         .font(.system(size: 13, weight: .bold))

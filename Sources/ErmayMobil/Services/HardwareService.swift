@@ -157,7 +157,7 @@ public struct ContactPickerBridge: UIViewControllerRepresentable {
             let phone = contact.phoneNumbers.first?.value.stringValue
             let email = contact.emailAddresses.first?.value as String?
             let postal = contact.postalAddresses.first?.value
-            let address = postal != nil ? "\(postal!.street), \(postal!.city)" : nil
+            let address = postal.map { "\($0.street), \($0.city)" }
             
             let result = ContactPickResult(unvan: fullName, telefon: phone, email: email, adres: address)
             parent.onSelect(result)

@@ -55,7 +55,8 @@ public struct KasaBanka: Identifiable, Codable, Hashable {
 }
 
 public struct KasaHareket: Identifiable, Codable, Hashable {
-    public var id: String
+    public var id: Int?
+    public var uuid: String
     public var hesapId: String?
     public var tarih: String
     public var islemTuru: String // "TAHSILAT", "TEDIYE", "VIRMAN"
@@ -69,6 +70,7 @@ public struct KasaHareket: Identifiable, Codable, Hashable {
     
     enum CodingKeys: String, CodingKey {
         case id
+        case uuid
         case hesapId = "hesap_id"
         case tarih
         case islemTuru = "islem_turu"
@@ -82,7 +84,8 @@ public struct KasaHareket: Identifiable, Codable, Hashable {
     }
     
     public init(
-        id: String = UUID().uuidString,
+        id: Int? = nil,
+        uuid: String = UUID().uuidString,
         hesapId: String? = nil,
         tarih: String = AppFormatters.isoDate.string(from: Date()),
         islemTuru: String = "TAHSILAT",
@@ -91,10 +94,11 @@ public struct KasaHareket: Identifiable, Codable, Hashable {
         belgeNo: String? = nil,
         tutar: Double = 0.0,
         aciklama: String? = nil,
-        syncGuid: String? = UUID().uuidString,
+        syncGuid: String? = nil,
         tenantId: String? = nil
     ) {
         self.id = id
+        self.uuid = uuid
         self.hesapId = hesapId
         self.tarih = tarih
         self.islemTuru = islemTuru
@@ -103,8 +107,75 @@ public struct KasaHareket: Identifiable, Codable, Hashable {
         self.belgeNo = belgeNo
         self.tutar = tutar
         self.aciklama = aciklama
-        self.syncGuid = syncGuid
+        self.syncGuid = syncGuid ?? uuid
         self.tenantId = tenantId
+    }
+
+    public init(
+        id: String,
+        hesapId: String? = nil,
+        tarih: String = AppFormatters.isoDate.string(from: Date()),
+        islemTuru: String = "TAHSILAT",
+        cariId: String? = nil,
+        cariUnvan: String? = nil,
+        belgeNo: String? = nil,
+        tutar: Double = 0.0,
+        aciklama: String? = nil,
+        syncGuid: String? = nil,
+        tenantId: String? = nil
+    ) {
+        self.id = Int(id)
+        self.uuid = Int(id) == nil ? id : (syncGuid ?? UUID().uuidString)
+        self.hesapId = hesapId
+        self.tarih = tarih
+        self.islemTuru = islemTuru
+        self.cariId = cariId
+        self.cariUnvan = cariUnvan
+        self.belgeNo = belgeNo
+        self.tutar = tutar
+        self.aciklama = aciklama
+        self.syncGuid = syncGuid ?? self.uuid
+        self.tenantId = tenantId
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let intId = try? c.decode(Int.self, forKey: .id) {
+            self.id = intId
+        } else if let strId = try? c.decode(String.self, forKey: .id), let intVal = Int(strId) {
+            self.id = intVal
+        } else {
+            self.id = nil
+        }
+        self.uuid = (try? c.decode(String.self, forKey: .uuid)) ?? (try? c.decode(String.self, forKey: .syncGuid)) ?? UUID().uuidString
+        self.hesapId = try? c.decode(String.self, forKey: .hesapId)
+        self.tarih = (try? c.decode(String.self, forKey: .tarih)) ?? AppFormatters.isoDate.string(from: Date())
+        self.islemTuru = (try? c.decode(String.self, forKey: .islemTuru)) ?? "TAHSILAT"
+        self.cariId = try? c.decode(String.self, forKey: .cariId)
+        self.cariUnvan = try? c.decode(String.self, forKey: .cariUnvan)
+        self.belgeNo = try? c.decode(String.self, forKey: .belgeNo)
+        self.tutar = (try? c.decode(Double.self, forKey: .tutar)) ?? 0.0
+        self.aciklama = try? c.decode(String.self, forKey: .aciklama)
+        self.syncGuid = (try? c.decode(String.self, forKey: .syncGuid)) ?? self.uuid
+        self.tenantId = try? c.decode(String.self, forKey: .tenantId)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        if let intId = self.id, intId > 0 {
+            try c.encode(intId, forKey: .id)
+        }
+        try c.encode(uuid, forKey: .uuid)
+        try c.encodeIfPresent(hesapId, forKey: .hesapId)
+        try c.encode(tarih, forKey: .tarih)
+        try c.encode(islemTuru, forKey: .islemTuru)
+        try c.encodeIfPresent(cariId, forKey: .cariId)
+        try c.encodeIfPresent(cariUnvan, forKey: .cariUnvan)
+        try c.encodeIfPresent(belgeNo, forKey: .belgeNo)
+        try c.encode(tutar, forKey: .tutar)
+        try c.encodeIfPresent(aciklama, forKey: .aciklama)
+        try c.encode(syncGuid ?? uuid, forKey: .syncGuid)
+        try c.encodeIfPresent(tenantId, forKey: .tenantId)
     }
 }
 

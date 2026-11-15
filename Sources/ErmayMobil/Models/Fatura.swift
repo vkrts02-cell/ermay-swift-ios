@@ -19,6 +19,12 @@ public struct Fatura: Identifiable, Codable, Hashable {
     public var syncGuid: String?
     public var tenantId: String?
     
+    public var idInt: Int? { Int(id) }
+    public var uuid: String {
+        get { syncGuid ?? (Int(id) == nil ? id : "") }
+        set { syncGuid = newValue }
+    }
+
     public var durum: String {
         get { odemeDurumu ?? "Açık" }
         set { odemeDurumu = newValue }
@@ -159,7 +165,11 @@ public struct Fatura: Identifiable, Codable, Hashable {
     
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
+        if let intId = Int(id), intId > 0 {
+            try container.encode(intId, forKey: .id)
+        }
+        let finalUuid = syncGuid ?? (Int(id) == nil ? id : UUID().uuidString)
+        try container.encode(finalUuid, forKey: .uuid)
         try container.encode(faturaNo, forKey: .faturaNo)
         try container.encode(faturaTuru, forKey: .faturaTuru)
         try container.encodeIfPresent(cariId, forKey: .cariId)
@@ -219,6 +229,7 @@ public struct FaturaKalem: Identifiable, Codable, Hashable {
         case tutar
         case aciklama
         case syncGuid = "sync_guid"
+        case uuid
     }
     
     public init(
@@ -365,7 +376,11 @@ public struct FaturaKalem: Identifiable, Codable, Hashable {
     
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
+        if let intId = Int(id), intId > 0 {
+            try container.encode(intId, forKey: .id)
+        }
+        let finalUuid = syncGuid ?? (Int(id) == nil ? id : UUID().uuidString)
+        try container.encode(finalUuid, forKey: .uuid)
         try container.encodeIfPresent(faturaId, forKey: .faturaId)
         try container.encodeIfPresent(stokId, forKey: .stokId)
         try container.encodeIfPresent(stokKodu, forKey: .stokKodu)
@@ -378,6 +393,7 @@ public struct FaturaKalem: Identifiable, Codable, Hashable {
         try container.encode(iskontoOrani, forKey: .iskontoOrani)
         try container.encode(iskontoTutari, forKey: .iskontoTutari)
         try container.encode(netTutar, forKey: .netTutar)
+        try container.encode(netTutar, forKey: .toplamTutar)
         try container.encodeIfPresent(aciklama, forKey: .aciklama)
         try container.encodeIfPresent(syncGuid, forKey: .syncGuid)
     }

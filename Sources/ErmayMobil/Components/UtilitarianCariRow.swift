@@ -76,8 +76,18 @@ public struct UtilitarianCariRow: View {
                     // WhatsApp
                     if let gsm = cari.gsm ?? cari.telefon, !gsm.isEmpty {
                         Button {
-                            let clean = gsm.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "-", with: "")
-                            if let url = URL(string: "https://wa.me/90\(clean)") {
+                            let digits = gsm.filter { $0.isNumber }
+                            let normalizedPhone: String
+                            if digits.hasPrefix("90") && digits.count == 12 {
+                                normalizedPhone = digits
+                            } else if digits.hasPrefix("0") && digits.count == 11 {
+                                normalizedPhone = "90" + String(digits.dropFirst())
+                            } else if digits.count == 10 {
+                                normalizedPhone = "90" + digits
+                            } else {
+                                normalizedPhone = digits
+                            }
+                            if !normalizedPhone.isEmpty, let url = URL(string: "https://wa.me/\(normalizedPhone)") {
                                 #if canImport(UIKit)
                                 UIApplication.shared.open(url)
                                 #endif

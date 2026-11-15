@@ -69,7 +69,8 @@ public struct TeklifDetailView: View {
                             .foregroundColor(AppTheme.textPrimary)
                             .padding(.horizontal)
                         
-                        if let kalemler = teklif.kalemler, !kalemler.isEmpty {
+                        let kalemler = displayedKalemler
+                        if !kalemler.isEmpty {
                             VStack(spacing: 8) {
                                 ForEach(kalemler) { k in
                                     GlassCard(cornerRadius: 12, padding: 12) {
@@ -91,6 +92,16 @@ public struct TeklifDetailView: View {
                                 }
                             }
                             .padding(.horizontal)
+                        } else if isLoadingKalemler {
+                            ProgressView()
+                                .tint(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                        } else {
+                            Text("Kalem bulunamadı.")
+                                .font(.system(size: 13))
+                                .foregroundColor(AppTheme.textMuted)
+                                .padding(.horizontal)
                         }
                     }
                     
@@ -196,11 +207,13 @@ public struct TeklifDetailView: View {
     
     private func convertToSiparis() {
         let siparisNo = "SIP-\(Int.random(in: 1000...9999))"
-        let sKalemler: [SiparisKalem] = (teklif.kalemler ?? []).map { k in
+        let sKalemler: [SiparisKalem] = displayedKalemler.map { k in
             SiparisKalem(
+                stokId: k.stokId,
+                stokKodu: k.stokKodu,
                 stokAdi: k.stokAdi,
                 miktar: k.miktar,
-                birim: k.birim,
+                birim: k.birim ?? "Adet",
                 birimFiyat: k.birimFiyat,
                 kdvOrani: k.kdvOrani,
                 tutar: k.tutar
@@ -210,20 +223,63 @@ public struct TeklifDetailView: View {
         let yeniSiparis = Siparis(
             siparisNo: siparisNo,
             siparisTuru: "ALINAN",
+            cariId: teklif.cariId,
             cariUnvan: teklif.cariUnvan,
             tarih: AppFormatters.isoDate.string(from: Date()),
             araToplam: teklif.araToplam,
             kdvToplami: teklif.kdvToplami,
             genelToplam: teklif.genelToplam,
+            durum: "BEKLIYOR",
             kalemler: sKalemler
         )
         
         Task {
-            try? await SupabaseService.shared.insert(into: "siparisler", item: yeniSiparis)
-            try? await SupabaseService.shared.update(table: "teklifler", id: teklif.id, item: ["durum": "ONAYLANDI"])
-            await MainActor.run {
-                teklif.durum = "ONAYLANDI"
-                convertedNotice = "Teklif başarıyla '\(siparisNo)' nolu siparişe dönüştürüldü."
+            do {
+                var siparisToInsert = yeniSiparis
+                if siparisToInsert.id.isEmpty || Int(siparisToInsert.id) == nil || Int(siparisToInsert.id)! <= 0 {
+                    let nextId = await SupabaseService.shared.getNextId(for: "siparisler")
+                    siparisToInsert.id = String(nextId)
+                }
+                try await SupabaseService.shared.insert(into: "siparisler", item: siparisToInsert)
+                
+                // Copy line items to siparis_detaylar
+                for k in displayedKalemler {
+                    var detPayload: [String: Any] = [
+                        "uuid": UUID().uuidString,
+                        "tenant_id": SupabaseService.shared.tenantId,
+                        "siparis_no": siparisNo,
+                        "stok_adi": k.stokAdi,
+                        "miktar": k.miktar,
+                        "birim": k.birim ?? "Adet",
+                        "birim_fiyat": k.birimFiyat,
+                        "kdv_orani": k.kdvOrani,
+                        "tutar": k.tutar,
+                        "is_deleted": false
+                    ]
+                    if let sIdInt = Int(siparisToInsert.id) {
+                        detPayload["siparis_id"] = sIdInt
+                    }
+                    if let sUuid = siparisToInsert.syncGuid, !sUuid.isEmpty {
+                        detPayload["siparis_uuid"] = sUuid
+                    }
+                    if let stokIdStr = k.stokId, let stokIdInt = Int(stokIdStr) {
+                        detPayload["stok_id"] = stokIdInt
+                    }
+                    if let sKodu = k.stokKodu, !sKodu.isEmpty {
+                        detPayload["stok_kodu"] = sKodu
+                    }
+                    if let d = try? JSONSerialization.data(withJSONObject: detPayload) {
+                        try? await SupabaseService.shared.insertRaw(into: "siparis_detaylar", data: d)
+                    }
+                }
+                
+                try await SupabaseService.shared.update(table: "teklifler", id: teklif.id, item: ["durum": "ONAYLANDI"])
+                await MainActor.run {
+                    teklif.durum = "ONAYLANDI"
+                    convertedNotice = "Teklif başarıyla '\(siparisNo)' nolu siparişe dönüştürüldü."
+                }
+            } catch {
+                print("Siparişe dönüştürme hatası: \(error)")
             }
         }
     }

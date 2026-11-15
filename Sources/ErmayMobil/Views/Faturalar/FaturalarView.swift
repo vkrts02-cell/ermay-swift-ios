@@ -1,6 +1,7 @@
 import SwiftUI
 
 public struct FaturalarView: View {
+    @ObservedObject private var dataStore = DataStore.shared
     @State private var faturalar: [Fatura] = []
     @State private var searchText: String = ""
     @State private var startDateStr: String = "01.01.2026"
@@ -14,7 +15,8 @@ public struct FaturalarView: View {
     public init() {}
     
     public var filteredFaturalar: [Fatura] {
-        faturalar.filter { f in
+        let sourceList = !dataStore.faturalar.isEmpty ? dataStore.faturalar : faturalar
+        return sourceList.filter { f in
             searchText.isEmpty ||
                 f.faturaNo.localizedCaseInsensitiveContains(searchText) ||
                 (f.cariUnvan?.localizedCaseInsensitiveContains(searchText) ?? false) ||
@@ -219,17 +221,10 @@ public struct FaturalarView: View {
     }
     
     private func loadFaturalar() async {
-        isLoading = true
-        do {
-            let items: [Fatura] = try await SupabaseService.shared.fetch(from: "faturalar")
-            await MainActor.run {
-                self.faturalar = items
-            }
-        } catch {
-            print("[FaturalarView] Supabase fetch error: \(error)")
-            await MainActor.run {
-                self.faturalar = []
-            }
+        isLoading = dataStore.faturalar.isEmpty
+        await dataStore.loadFaturalarCacheFirst(forceCloudRefresh: true)
+        if !dataStore.faturalar.isEmpty {
+            self.faturalar = dataStore.faturalar
         }
         isLoading = false
     }

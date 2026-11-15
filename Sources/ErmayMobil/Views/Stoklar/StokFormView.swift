@@ -147,9 +147,10 @@ public struct StokFormView: View {
         isSaving = true
         errorMessage = nil
         
+        let generatedStokId = IdGenerator.generateMobileRecordId()
         let newStok = StokKart(
-            id: UUID().uuidString,
-            stokKodu: stokKodu.isEmpty ? "STK-\(Int.random(in: 100...999))" : stokKodu,
+            id: generatedStokId,
+            stokKodu: stokKodu.isEmpty ? "STK-\(generatedStokId % 100000)" : stokKodu,
             stokAdi: stokAdi,
             barkod: barkod.isEmpty ? nil : barkod,
             grupAdi: grupAdi.isEmpty ? "Genel" : grupAdi,
@@ -164,9 +165,9 @@ public struct StokFormView: View {
         Task {
             do {
                 var itemToSave = newStok
-                if itemToSave.id.isEmpty || Int(itemToSave.id) == nil || Int(itemToSave.id)! <= 0 {
+                if (itemToSave.id ?? 0) <= 0 {
                     let nextId = await SupabaseService.shared.getNextId(for: "stoklar")
-                    itemToSave.id = String(nextId)
+                    itemToSave.id = nextId
                 }
                 try await SupabaseService.shared.insert(into: "stoklar", item: itemToSave)
                 await MainActor.run {
@@ -175,7 +176,7 @@ public struct StokFormView: View {
                 }
             } catch {
                 await MainActor.run {
-                    OfflineQueueService.shared.enqueue(action: "INSERT", table: "stoklar", recordId: newStok.id, payload: try? JSONEncoder().encode(newStok))
+                    OfflineQueueService.shared.enqueue(action: "INSERT", table: "stoklar", recordId: newStok.uuid, payload: try? JSONEncoder().encode(newStok))
                     onSave?(newStok)
                     dismiss()
                 }

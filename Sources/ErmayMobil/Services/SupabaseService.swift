@@ -311,13 +311,65 @@ public final class SupabaseService: ObservableObject, @unchecked Sendable {
         return headers
     }
     
-    // MARK: - PostgREST GET / Fetch
+    // MARK: - PostgREST GET / Paginated Fetch
     public func fetch<T: Decodable>(
         from table: String,
         select: String = "*",
         filters: [String: String] = [:],
         orderBy: String? = nil,
         limit: Int? = nil,
+        applyTenantFilter: Bool = true
+    ) async throws -> [T] {
+        let maxPageSize = 1000
+        let targetLimit = limit ?? Int.max
+        
+        // 1000 ve altı tek sayfa için tek istek yeterlidir
+        if targetLimit <= maxPageSize {
+            return try await fetchSinglePage(
+                from: table,
+                select: select,
+                filters: filters,
+                orderBy: orderBy,
+                limit: targetLimit,
+                offset: 0,
+                applyTenantFilter: applyTenantFilter
+            )
+        }
+        
+        // 1000'den büyük veya limitsiz sorgular için Range / offset chunking (PostgREST 1.000 limitini aşmak için)
+        var allItems: [T] = []
+        var currentOffset = 0
+        let safetyMax = min(targetLimit, 50_000)
+        
+        while allItems.count < safetyMax {
+            let chunkSize = min(maxPageSize, safetyMax - allItems.count)
+            let page: [T] = try await fetchSinglePage(
+                from: table,
+                select: select,
+                filters: filters,
+                orderBy: orderBy,
+                limit: chunkSize,
+                offset: currentOffset,
+                applyTenantFilter: applyTenantFilter
+            )
+            
+            allItems.append(contentsOf: page)
+            if page.count < chunkSize {
+                break // Tablodaki tüm veriler çekildi
+            }
+            currentOffset += page.count
+        }
+        
+        return allItems
+    }
+    
+    private func fetchSinglePage<T: Decodable>(
+        from table: String,
+        select: String = "*",
+        filters: [String: String] = [:],
+        orderBy: String? = nil,
+        limit: Int,
+        offset: Int = 0,
         applyTenantFilter: Bool = true
     ) async throws -> [T] {
         var components = URLComponents(string: "\(baseUrl)/rest/v1/\(table)")
@@ -343,8 +395,9 @@ public final class SupabaseService: ObservableObject, @unchecked Sendable {
             queryItems.append(URLQueryItem(name: "order", value: orderBy))
         }
         
-        if let limit = limit {
-            queryItems.append(URLQueryItem(name: "limit", value: "\(limit)"))
+        queryItems.append(URLQueryItem(name: "limit", value: "\(limit)"))
+        if offset > 0 {
+            queryItems.append(URLQueryItem(name: "offset", value: "\(offset)"))
         }
         
         components?.queryItems = queryItems
@@ -355,6 +408,10 @@ public final class SupabaseService: ObservableObject, @unchecked Sendable {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         defaultHeaders().forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
+        
+        // PostgREST Range header desteği
+        request.setValue("\(offset)-\(offset + limit - 1)", forHTTPHeaderField: "Range")
+        request.setValue("items", forHTTPHeaderField: "Range-Unit")
         
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
@@ -453,18 +510,42 @@ public final class SupabaseService: ObservableObject, @unchecked Sendable {
         return first
     }
     
-    // MARK: - PostgREST Raw Insert
+    // MARK: - PostgREST Raw Insert & Idempotent Upsert
+    public func upsertRaw(into table: String, data: Data, onConflict: String = "uuid") async throws {
+        guard let url = URL(string: "\(baseUrl)/rest/v1/\(table)?on_conflict=\(onConflict)") else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        defaultHeaders(prefer: "resolution=merge-duplicates,return=minimal").forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
+        request.httpBody = data
+        let (_, response) = try await session.data(for: request)
+        if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
+            return
+        }
+        // Fallback to insertRaw if table lacks unique index on onConflict column
+        try await insertRaw(into: table, data: data)
+    }
+
     public func insertRaw(into table: String, data: Data) async throws {
         guard let url = URL(string: "\(baseUrl)/rest/v1/\(table)") else {
             throw URLError(.badURL)
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        defaultHeaders(prefer: "return=minimal").forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
+        defaultHeaders(prefer: "resolution=merge-duplicates,return=minimal").forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
         request.httpBody = data
         let (resData, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 500
             let errorMsg = String(data: resData, encoding: .utf8) ?? "Ham Kayıt Eklenemedi"
+            
+            // Idempotent duplicate UUID guard (23505): if exact UUID already exists from partial bundle retry, treat as committed
+            if statusCode == 409 || errorMsg.contains("23505") {
+                if let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any], dict["uuid"] != nil {
+                    return
+                }
+            }
             
             // Eğer PostgreSQL id sequence atanmamışsa (null value in column "id" violates not-null constraint / 23502)
             if errorMsg.contains("23502") || errorMsg.contains("\"id\"") || errorMsg.contains("'id'") {
@@ -558,16 +639,23 @@ public final class SupabaseService: ObservableObject, @unchecked Sendable {
         return try decoder.decode(R.self, from: data)
     }
     
-    // MARK: - Supabase Realtime WebSocket Listener (Phoenix Channel)
+    // MARK: - Supabase Realtime WebSocket Listener (Phoenix Channel + Heartbeat + Debounce)
     private var webSocketTask: URLSessionWebSocketTask? = nil
     private var isRealtimeActive: Bool = false
+    private var heartbeatTimer: Timer? = nil
+    private var heartbeatRefCounter: Int = 100
+    private var reconnectAttempt: Int = 0
+    private var realtimeDebounceWorkItem: DispatchWorkItem? = nil
     
     public func startRealtimeListener() {
-        guard !isRealtimeActive else { return }
+        guard !isRealtimeActive, !baseUrl.isEmpty, !anonKey.isEmpty else { return }
         isRealtimeActive = true
         
         let wsHost = baseUrl.replacingOccurrences(of: "https://", with: "wss://").replacingOccurrences(of: "http://", with: "ws://")
-        guard let wsUrl = URL(string: "\(wsHost)/realtime/v1/websocket?apikey=\(anonKey)&vsn=1.0.0") else { return }
+        guard let wsUrl = URL(string: "\(wsHost)/realtime/v1/websocket?apikey=\(anonKey)&vsn=1.0.0") else {
+            isRealtimeActive = false
+            return
+        }
         
         webSocketTask = session.webSocketTask(with: wsUrl)
         webSocketTask?.resume()
@@ -576,15 +664,51 @@ public final class SupabaseService: ObservableObject, @unchecked Sendable {
         let joinMessage = """
         {"topic":"realtime:public","event":"phx_join","payload":{"config":{"postgres_changes":[{"event":"*","schema":"public"}]}},"ref":"1"}
         """
-        webSocketTask?.send(.string(joinMessage)) { _ in }
+        webSocketTask?.send(.string(joinMessage)) { [weak self] error in
+            if error == nil {
+                self?.reconnectAttempt = 0
+            }
+        }
         
+        startPhoenixHeartbeatTimer()
         listenWebSocketMessages()
+    }
+    
+    private func startPhoenixHeartbeatTimer() {
+        DispatchQueue.main.async { [weak self] in
+            self?.heartbeatTimer?.invalidate()
+            self?.heartbeatTimer = Timer.scheduledTimer(withTimeInterval: 25.0, repeats: true) { [weak self] _ in
+                guard let self = self, self.isRealtimeActive, let task = self.webSocketTask else { return }
+                self.heartbeatRefCounter += 1
+                let hbMsg = "{\"topic\":\"phoenix\",\"event\":\"heartbeat\",\"payload\":{},\"ref\":\"\(self.heartbeatRefCounter)\"}"
+                task.send(.string(hbMsg)) { _ in }
+            }
+        }
     }
     
     public func stopRealtimeListener() {
         isRealtimeActive = false
+        reconnectAttempt = 0
+        DispatchQueue.main.async { [weak self] in
+            self?.heartbeatTimer?.invalidate()
+            self?.heartbeatTimer = nil
+            self?.realtimeDebounceWorkItem?.cancel()
+            self?.realtimeDebounceWorkItem = nil
+        }
         webSocketTask?.cancel(with: .normalClosure, reason: nil)
         webSocketTask = nil
+    }
+    
+    private func scheduleDebouncedRealtimeBroadcast() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.realtimeDebounceWorkItem?.cancel()
+            let item = DispatchWorkItem {
+                NotificationCenter.default.post(name: .supabaseRealtimeDataChanged, object: nil)
+            }
+            self.realtimeDebounceWorkItem = item
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: item)
+        }
     }
     
     private func listenWebSocketMessages() {
@@ -595,17 +719,18 @@ public final class SupabaseService: ObservableObject, @unchecked Sendable {
             
             switch result {
             case .success(let message):
+                self.reconnectAttempt = 0
                 if case .string(let text) = message {
                     if text.contains("postgres_changes") || text.contains("INSERT") || text.contains("UPDATE") || text.contains("DELETE") {
-                        DispatchQueue.main.async {
-                            NotificationCenter.default.post(name: .supabaseRealtimeDataChanged, object: nil)
-                        }
+                        self.scheduleDebouncedRealtimeBroadcast()
                     }
                 }
                 self.listenWebSocketMessages()
             case .failure:
-                // Yeniden bağlanma (Reconnection with 5s delay)
-                DispatchQueue.global().asyncAfter(deadline: .now() + 5) { [weak self] in
+                // Exponential backoff reconnection (5s, 10s, 20s, up to 60s max) to prevent battery/socket storm
+                self.reconnectAttempt = min(self.reconnectAttempt + 1, 5)
+                let delay = min(60.0, 5.0 * pow(2.0, Double(self.reconnectAttempt - 1)))
+                DispatchQueue.global().asyncAfter(deadline: .now() + delay) { [weak self] in
                     if self?.isRealtimeActive == true {
                         self?.webSocketTask = nil
                         self?.isRealtimeActive = false

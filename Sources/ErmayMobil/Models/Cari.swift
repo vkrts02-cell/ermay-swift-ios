@@ -64,6 +64,7 @@ public struct CariKart: Identifiable, Codable, Hashable {
         case vadeGunu = "vade_gunu"
         case notlar
         case isActive = "is_active"
+        case aktif
         case isDeleted = "is_deleted"
         case syncGuid = "sync_guid"
         case uuid
@@ -89,7 +90,7 @@ public struct CariKart: Identifiable, Codable, Hashable {
         sehir: String? = nil,
         ilce: String? = nil,
         bakiye: Double = 0.0,
-        bakiyeTuru: String? = "A",
+        bakiyeTuru: String? = "B",
         riskLimiti: Double? = nil,
         vadeGunu: Int? = 30,
         odemePlani: String? = nil,
@@ -177,7 +178,7 @@ public struct CariKart: Identifiable, Codable, Hashable {
             self.bakiye = 0.0
         }
         
-        self.bakiyeTuru = (try? c.decode(String.self, forKey: .bakiyeTuru)) ?? (self.bakiye >= 0 ? "A" : "B")
+        self.bakiyeTuru = (try? c.decode(String.self, forKey: .bakiyeTuru)) ?? (self.bakiye >= 0 ? "B" : "A")
         
         if let rVal = try? c.decode(Double.self, forKey: .krediLimiti) {
             self.riskLimiti = rVal
@@ -216,6 +217,7 @@ public struct CariKart: Identifiable, Codable, Hashable {
         try container.encodeIfPresent(tcKimlikNo, forKey: .tcKimlikNo)
         try container.encodeIfPresent(telefon, forKey: .telefon)
         try container.encodeIfPresent(gsm ?? telefon, forKey: .telefon2)
+        try container.encodeIfPresent(gsm ?? telefon, forKey: .gsm)
         try container.encodeIfPresent(email, forKey: .email)
         try container.encodeIfPresent(email, forKey: .eposta)
         try container.encodeIfPresent(webSitesi, forKey: .webSitesi)
@@ -224,7 +226,7 @@ public struct CariKart: Identifiable, Codable, Hashable {
         try container.encodeIfPresent(sehir, forKey: .il)
         try container.encodeIfPresent(ilce, forKey: .ilce)
         try container.encode(bakiye, forKey: .bakiye)
-        try container.encode(bakiyeTuru ?? (bakiye >= 0 ? "A" : "B"), forKey: .bakiyeTuru)
+        try container.encode(bakiyeTuru ?? (bakiye >= 0 ? "B" : "A"), forKey: .bakiyeTuru)
         if let r = riskLimiti {
             try container.encode(r, forKey: .krediLimiti)
         }
@@ -232,6 +234,7 @@ public struct CariKart: Identifiable, Codable, Hashable {
             try container.encode(v, forKey: .vadeGun)
         }
         try container.encode(aktif ?? true, forKey: .isActive)
+        try container.encode(aktif ?? true, forKey: .aktif)
         try container.encode(false, forKey: .isDeleted)
     }
 }

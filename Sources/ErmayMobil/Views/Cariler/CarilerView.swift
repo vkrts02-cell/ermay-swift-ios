@@ -1,7 +1,9 @@
 import SwiftUI
 
 public struct CarilerView: View {
+    @ObservedObject private var dataStore = DataStore.shared
     @State private var cariler: [CariKart] = []
+    @State private var dbSearchResults: [CariKart]? = nil
     @State private var isLoading: Bool = false
     @State private var searchQuery: String = ""
     
@@ -26,12 +28,19 @@ public struct CarilerView: View {
     
     public init() {}
     
-    // Filtrelenmiş ve Sıralanmış Liste
+    // Filtrelenmiş ve Sıralanmış Liste (SQLite Search Pushdown destekli)
     public var filteredCariler: [CariKart] {
-        var list = cariler.filter { c in
-            let composite = "\(c.unvan) \(c.cariKodu ?? "") \(c.yetkili ?? "") \(c.telefon ?? "") \(c.gsm ?? "") \(c.vergiNo ?? "")"
-            let matchSearch = searchQuery.isEmpty || composite.localizedCaseInsensitiveContains(searchQuery)
-            if !matchSearch { return false }
+        let baseList: [CariKart]
+        if !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let pushedDown = dbSearchResults {
+            baseList = pushedDown
+        } else {
+            baseList = !dataStore.cariler.isEmpty ? dataStore.cariler : cariler
+        }
+        var list = baseList.filter { c in
+            if dbSearchResults == nil && !searchQuery.isEmpty {
+                let composite = "\(c.unvan) \(c.cariKodu ?? "") \(c.yetkili ?? "") \(c.telefon ?? "") \(c.gsm ?? "") \(c.vergiNo ?? "")"
+                if !composite.localizedCaseInsensitiveContains(searchQuery) { return false }
+            }
             
             if selectedGrupFilter == "Müşteri" {
                 return (c.cariTuru ?? "").localizedCaseInsensitiveContains("müşteri") || (c.cariTuru ?? "").localizedCaseInsensitiveContains("musteri")
@@ -44,8 +53,8 @@ public struct CarilerView: View {
         
         if sortByBakiye {
             list.sort { a, b in
-                let netA = a.bakiyeTuru == "B" ? -a.bakiye : a.bakiye
-                let netB = b.bakiyeTuru == "B" ? -b.bakiye : b.bakiye
+                let netA = a.bakiyeTuru == "B" ? a.bakiye : -a.bakiye
+                let netB = b.bakiyeTuru == "B" ? b.bakiye : -b.bakiye
                 return bakiyeSortDesc ? (netB < netA) : (netA < netB)
             }
         } else if grupSortState == 1 {
@@ -226,9 +235,14 @@ public struct CarilerView: View {
                                     NavigationLink(destination: CariDetailView(
                                         cari: item,
                                         onUpdate: { updated in
-                                            if let idx = cariler.firstIndex(where: { $0.id == updated.id }) {
+                                            if let idx = cariler.firstIndex(where: {
+                                                $0.id == updated.id ||
+                                                ($0.syncGuid != nil && $0.syncGuid == updated.syncGuid) ||
+                                                ($0.cariKodu != nil && !$0.cariKodu!.isEmpty && $0.cariKodu == updated.cariKodu)
+                                            }) {
                                                 cariler[idx] = updated
                                             }
+                                            cariler = deduplicatedCariler(cariler)
                                         },
                                         onDelete: { deleted in
                                             Task {
@@ -254,15 +268,39 @@ public struct CarilerView: View {
             .navigationBarHidden(true)
             .sheet(isPresented: $showFormSheet) {
                 CariFormView(cariToEdit: editingCari) { saved in
-                    if let idx = cariler.firstIndex(where: { $0.id == saved.id }) {
+                    if let idx = cariler.firstIndex(where: {
+                        $0.id == saved.id ||
+                        ($0.syncGuid != nil && $0.syncGuid == saved.syncGuid) ||
+                        ($0.cariKodu?.isEmpty == false && $0.cariKodu == saved.cariKodu)
+                    }) {
                         cariler[idx] = saved
                     } else {
                         cariler.insert(saved, at: 0)
                     }
+                    cariler = deduplicatedCariler(cariler)
                     Task {
                         try? await Task.sleep(nanoseconds: 600_000_000)
                         await loadLiveCariler()
                     }
+                }
+            }
+            .onChange(of: searchQuery) { newQuery in
+                let trimmed = newQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty {
+                    dbSearchResults = nil
+                } else {
+                    Task {
+                        if let res = try? await LocalDatabaseService.shared.searchCariler(query: trimmed, limit: 50), !res.isEmpty {
+                            await MainActor.run { dbSearchResults = res }
+                        } else {
+                            await MainActor.run { dbSearchResults = nil }
+                        }
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
+                Task {
+                    await loadLiveCariler()
                 }
             }
             .onAppear {
@@ -275,23 +313,40 @@ public struct CarilerView: View {
         }
     }
     
-    // MARK: - Live Supabase Sync
-    private func loadLiveCariler() async {
-        isLoading = true
-        do {
-            let fetched = try await SupabaseService.shared.fetchCariler()
-            await MainActor.run {
-                if !fetched.isEmpty {
-                    self.cariler = fetched
-                }
-                self.isLoading = false
-            }
-        } catch {
-            print("[CarilerView] Supabase cariler çekme hatası: \(error)")
-            await MainActor.run {
-                self.isLoading = false
+    // MARK: - Safe Deduplication
+    private func deduplicatedCariler(_ list: [CariKart]) -> [CariKart] {
+        var seenIds = Set<String>()
+        var seenGuids = Set<String>()
+        var seenKodlar = Set<String>()
+        var result: [CariKart] = []
+        
+        for item in list {
+            let idKey = item.id.trimmingCharacters(in: .whitespacesAndNewlines)
+            let guidKey = item.syncGuid?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let kodKey = item.cariKodu?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            
+            let isDuplicate = (!idKey.isEmpty && seenIds.contains(idKey)) ||
+                (!guidKey.isEmpty && seenGuids.contains(guidKey)) ||
+                (!kodKey.isEmpty && seenKodlar.contains(kodKey))
+            
+            if !isDuplicate {
+                if !idKey.isEmpty { seenIds.insert(idKey) }
+                if !guidKey.isEmpty { seenGuids.insert(guidKey) }
+                if !kodKey.isEmpty { seenKodlar.insert(kodKey) }
+                result.append(item)
             }
         }
+        return result
+    }
+    
+    // MARK: - Live Supabase Sync (Cache-First via DataStore)
+    private func loadLiveCariler() async {
+        isLoading = dataStore.cariler.isEmpty
+        await dataStore.loadCarilerCacheFirst(forceCloudRefresh: true)
+        if !dataStore.cariler.isEmpty {
+            self.cariler = dataStore.cariler
+        }
+        isLoading = false
     }
     
     // MARK: - Apple List Row Component (Exact Parity with CarilerScreen.tsx renderItem)

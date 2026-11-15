@@ -11,484 +11,669 @@ public final class ReportCalculationService: @unchecked Sendable {
         cariName: String? = nil
     ) async -> (headers: [String], rows: [[String]]) {
         let title = report.title
+        let trimmedCariFilter = cariName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         
-        do {
-            let cariler: [CariKart] = (try? await SupabaseService.shared.fetch(from: "cariler")) ?? []
-            let stoklar: [StokKart] = (try? await SupabaseService.shared.fetch(from: "stoklar")) ?? []
-            let faturalar: [Fatura] = (try? await SupabaseService.shared.fetch(from: "faturalar")) ?? []
-            let kasalar: [KasaBanka] = (try? await SupabaseService.shared.fetch(from: "kasalar")) ?? []
-            let bankalar: [BankaKart] = (try? await SupabaseService.shared.fetch(from: "bankalar")) ?? []
-            let cariHareketler: [CariHareket] = (try? await SupabaseService.shared.fetch(from: "cari_hareketler")) ?? []
+        var cariler: [CariKart] = (try? await SupabaseService.shared.fetch(from: "cariler")) ?? []
+        if cariler.isEmpty {
+            cariler = LocalDatabaseService.shared.getCachedCariler()
+        }
+        
+        var stoklar: [StokKart] = (try? await SupabaseService.shared.fetch(from: "stoklar")) ?? []
+        if stoklar.isEmpty {
+            stoklar = LocalDatabaseService.shared.getCachedStoklar()
+        }
+        
+        var faturalar: [Fatura] = (try? await SupabaseService.shared.fetch(from: "faturalar")) ?? []
+        if faturalar.isEmpty {
+            faturalar = LocalDatabaseService.shared.getCachedFaturalar()
+        }
+        
+        let kasalar: [KasaBanka] = (try? await SupabaseService.shared.fetch(from: "kasalar")) ?? []
+        let bankalar: [BankaKart] = (try? await SupabaseService.shared.fetch(from: "bankalar")) ?? []
+        let cariHareketler: [CariHareket] = (try? await SupabaseService.shared.fetch(from: "cari_hareketler")) ?? []
+        let cekSenetler: [CekSenet] = (try? await SupabaseService.shared.fetch(from: "cekler")) ?? []
+        
+        if !trimmedCariFilter.isEmpty {
+            let needle = trimmedCariFilter.lowercased()
+            cariler = cariler.filter { $0.unvan.lowercased().contains(needle) }
+            faturalar = faturalar.filter { ($0.cariUnvan ?? "").lowercased().contains(needle) }
+        }
+        
+        switch title {
+        // 1. Genel Durum
+        case "Genel Özet":
+            var topAlacak: Double = 0
+            var topBorc: Double = 0
+            for c in cariler {
+                if c.bakiye >= 0 && c.bakiyeTuru != "A" {
+                    topAlacak += abs(c.bakiye)
+                } else {
+                    topBorc += abs(c.bakiye)
+                }
+            }
             
-            switch title {
-            // 1. Genel Durum
-            case "Genel Özet":
-                var topAlacak: Double = 0
-                var topBorc: Double = 0
-                for c in cariler {
-                    if c.bakiyeTuru == "A" {
-                        topAlacak += c.bakiye
-                    } else {
-                        topBorc += c.bakiye
+            let kasaTop = kasalar.reduce(0.0) { $0 + $1.bakiye }
+            let bankaTop = bankalar.reduce(0.0) { $0 + $1.bakiye }
+            
+            var topStokAdet: Double = 0
+            var topStokDeger: Double = 0
+            for s in stoklar {
+                topStokAdet += s.mevcutMiktar
+                topStokDeger += (s.mevcutMiktar * s.alisFiyati)
+            }
+            
+            let headers = ["Rapor Kalemi", "Tutar / Değer"]
+            let rows: [[String]] = [
+                ["Toplam Alacaklar (Borçlu Cariler)", AppFormatters.money(topAlacak)],
+                ["Toplam Borçlar (Alacaklı Cariler)", AppFormatters.money(topBorc)],
+                ["Kasa ve Banka Mevcudu", AppFormatters.money(kasaTop + bankaTop)],
+                ["Toplam Stok Miktarı", "\(Int(topStokAdet)) Adet"],
+                ["Stok Maliyet Değeri", AppFormatters.money(topStokDeger)],
+                ["Net İşletme Sermayesi", AppFormatters.money(topAlacak - topBorc + kasaTop + bankaTop)],
+                ["Aktif Cari Kart Sayısı", "\(cariler.count) Firma"]
+            ]
+            return (headers, rows)
+            
+        // 2. Finans
+        case "Aylık Tahsilat ve Ödeme Analizi":
+            let headers = ["Ay/Yıl", "Nakit (Alınan)", "Nakit (Ödenen)", "K.Kartı (Alınan)", "K.Kartı (Ödenen)", "Havale (Alınan)", "Havale (Ödenen)", "Çek (Alınan)", "Çek (Ödenen)"]
+            var monthlyStats: [String: (nakitAl: Double, nakitOd: Double, kkAl: Double, kkOd: Double, havAl: Double, havOd: Double, cekAl: Double, cekOd: Double)] = [:]
+            
+            for h in cariHareketler {
+                let rawDate = String((h.tarih ?? "").prefix(7))
+                let monthKey = rawDate.isEmpty ? "Genel" : rawDate
+                var entry = monthlyStats[monthKey] ?? (0, 0, 0, 0, 0, 0, 0, 0)
+                let tur = (h.islemTuru ?? "").uppercased()
+                let alinan = h.alacak
+                let odenen = h.borc
+                if tur.contains("KART") || tur.contains("POS") {
+                    entry.kkAl += alinan
+                    entry.kkOd += odenen
+                } else if tur.contains("HAVALE") || tur.contains("EFT") || tur.contains("BANKA") {
+                    entry.havAl += alinan
+                    entry.havOd += odenen
+                } else if tur.contains("ÇEK") || tur.contains("CEK") || tur.contains("SENET") {
+                    entry.cekAl += alinan
+                    entry.cekOd += odenen
+                } else if tur.contains("NAKİT") || tur.contains("NAKIT") || tur.contains("TAHSİLAT") || tur.contains("TEDİYE") {
+                    entry.nakitAl += alinan
+                    entry.nakitOd += odenen
+                }
+                monthlyStats[monthKey] = entry
+            }
+            
+            let rows: [[String]] = monthlyStats.keys.sorted(by: >).compactMap { key in
+                guard let st = monthlyStats[key] else { return nil }
+                return [
+                    key,
+                    AppFormatters.money(st.nakitAl),
+                    AppFormatters.money(st.nakitOd),
+                    AppFormatters.money(st.kkAl),
+                    AppFormatters.money(st.kkOd),
+                    AppFormatters.money(st.havAl),
+                    AppFormatters.money(st.havOd),
+                    AppFormatters.money(st.cekAl),
+                    AppFormatters.money(st.cekOd)
+                ]
+            }
+            return (headers, rows)
+            
+        case "Kredi Kartı Detay Raporu":
+            let headers = ["Tarih", "Kimden Alındı", "Banka/Kart", "Kime Yönlendirildi", "Tutar", "Durum"]
+            let rows: [[String]] = cariHareketler.filter {
+                let t = ($0.islemTuru ?? "").uppercased()
+                return t.contains("KART") || t.contains("POS")
+            }.map { h in
+                [
+                    String((h.tarih ?? "-").prefix(10)),
+                    h.cariUnvan ?? "-",
+                    h.islemTuru ?? "Kredi Kartı",
+                    "-",
+                    AppFormatters.money(max(h.alacak, h.borc)),
+                    h.alacak > 0 ? "Tahsil Edildi" : "Ödendi"
+                ]
+            }
+            return (headers, rows)
+            
+        case "Nakit İşlem Detay Raporu":
+            let headers = ["Tarih", "Cari Ünvan", "İşlem", "Açıklama", "Giren", "Çıkan"]
+            let rows: [[String]] = cariHareketler.filter {
+                let t = ($0.islemTuru ?? "").uppercased()
+                return t.contains("NAKİT") || t.contains("NAKIT") || t.contains("KASA") || t.contains("TAHSİLAT") || t.contains("TEDİYE")
+            }.map { h in
+                [
+                    String((h.tarih ?? "-").prefix(10)),
+                    h.cariUnvan ?? "-",
+                    h.islemTuru ?? "Nakit İşlem",
+                    h.aciklama ?? "-",
+                    AppFormatters.money(h.alacak),
+                    AppFormatters.money(h.borc)
+                ]
+            }
+            return (headers, rows)
+            
+        case "Çek Detay Raporu":
+            let headers = ["Vade", "Çek No", "Cari Ünvan", "Banka/Şube", "Tutar", "Durum"]
+            let rows: [[String]] = cekSenetler.map { c in
+                [
+                    String(c.vadeTarihi.prefix(10)),
+                    c.cekSenetNo,
+                    c.cariUnvan ?? "-",
+                    c.bankaAdi ?? "-",
+                    AppFormatters.money(c.tutar),
+                    c.durum
+                ]
+            }
+            return (headers, rows)
+            
+        case "Havale / EFT Detay Raporu":
+            let headers = ["Tarih", "Müşteri", "Banka/Hesap", "Dekont No", "Tutar", "Durum"]
+            let rows: [[String]] = cariHareketler.filter {
+                let t = ($0.islemTuru ?? "").uppercased()
+                return t.contains("HAVALE") || t.contains("EFT") || t.contains("BANKA")
+            }.map { h in
+                [
+                    String((h.tarih ?? "-").prefix(10)),
+                    h.cariUnvan ?? "-",
+                    h.islemTuru ?? "Banka Transferi",
+                    h.belgeNo ?? "-",
+                    AppFormatters.money(max(h.alacak, h.borc)),
+                    "Onaylandı"
+                ]
+            }
+            return (headers, rows)
+            
+        // 3. Cari Hesap Raporları
+        case "Cari Bakiye Raporu":
+            let headers = ["Ünvan", "Şehir", "Borç", "Alacak", "Bakiye", "Durum"]
+            let rows: [[String]] = cariler.map { c in
+                let absB = abs(c.bakiye)
+                let isBorclu = c.bakiye >= 0 && c.bakiyeTuru != "A"
+                let borc = isBorclu ? absB : 0
+                let alacak = isBorclu ? 0 : absB
+                return [
+                    c.unvan,
+                    c.sehir ?? "-",
+                    AppFormatters.money(borc),
+                    AppFormatters.money(alacak),
+                    AppFormatters.money(absB),
+                    isBorclu ? "Borçlu (B)" : "Alacaklı (A)"
+                ]
+            }
+            return (headers, rows)
+            
+        case "Cari Hareket Dökümü":
+            let headers = ["Tarih", "İşlem Türü", "Evrak No", "Açıklama", "Borç", "Alacak", "Bakiye"]
+            let rows: [[String]] = cariHareketler.map { h in
+                [
+                    String((h.tarih ?? "-").prefix(10)),
+                    h.islemTuru ?? "-",
+                    h.belgeNo ?? "-",
+                    h.aciklama ?? "-",
+                    AppFormatters.money(h.borc),
+                    AppFormatters.money(h.alacak),
+                    AppFormatters.money(h.bakiye)
+                ]
+            }
+            return (headers, rows)
+            
+        case "Yaşlandırma Raporu":
+            let headers = ["Ünvan", "0-30 Gün", "31-60 Gün", "61-90 Gün", "90+ Gün", "Toplam"]
+            let now = Date()
+            let rows: [[String]] = cariler.filter { abs($0.bakiye) > 0.01 }.map { c in
+                let cariFats = faturalar.filter { ($0.cariId != nil && $0.cariId == c.id) || ($0.cariUnvan ?? "") == c.unvan }
+                var b0_30: Double = 0
+                var b31_60: Double = 0
+                var b61_90: Double = 0
+                var b90Plus: Double = 0
+                
+                if cariFats.isEmpty {
+                    b0_30 = abs(c.bakiye)
+                } else {
+                    for f in cariFats {
+                        let fDate = AppFormatters.parseDate(String(f.tarih.prefix(10))) ?? now
+                        let days = max(0, Calendar.current.dateComponents([.day], from: fDate, to: now).day ?? 0)
+                        if days <= 30 { b0_30 += f.genelToplam }
+                        else if days <= 60 { b31_60 += f.genelToplam }
+                        else if days <= 90 { b61_90 += f.genelToplam }
+                        else { b90Plus += f.genelToplam }
                     }
                 }
-                
-                var kasaTop: Double = 0
-                for k in kasalar { kasaTop += k.bakiye }
-                
-                var bankaTop: Double = 0
-                for b in bankalar { bankaTop += b.bakiye }
-                
-                var topStokAdet: Double = 0
-                var topStokDeger: Double = 0
-                for s in stoklar {
-                    topStokAdet += s.mevcutMiktar
-                    topStokDeger += (s.mevcutMiktar * s.alisFiyati)
-                }
-                
-                let headers = ["Rapor Kalemi", "Tutar / Değer"]
-                let rows: [[String]] = [
-                    ["Toplam Alacaklar", AppFormatters.money(topAlacak)],
-                    ["Toplam Borçlar", AppFormatters.money(topBorc)],
-                    ["Kasa ve Banka Mevcudu", AppFormatters.money(kasaTop + bankaTop)],
-                    ["Toplam Stok Miktarı", "\(Int(topStokAdet)) Adet"],
-                    ["Stok Maliyet Değeri", AppFormatters.money(topStokDeger)],
-                    ["Net İşletme Sermayesi", AppFormatters.money(topAlacak - topBorc + kasaTop + bankaTop)],
-                    ["Aktif Cari Kart Sayısı", "\(cariler.count) Firma"]
+                return [
+                    c.unvan,
+                    AppFormatters.money(b0_30),
+                    AppFormatters.money(b31_60),
+                    AppFormatters.money(b61_90),
+                    AppFormatters.money(b90Plus),
+                    AppFormatters.money(abs(c.bakiye))
                 ]
-                return (headers, rows)
-                
-            // 2. Finans
-            case "Aylık Tahsilat ve Ödeme Analizi":
-                let headers = ["Ay/Yıl", "Nakit (Alınan)", "Nakit (Yönl.)", "K.Kartı (Alınan)", "K.Kartı (Yönl.)", "Havale (Alınan)", "Havale (Yönl.)", "Çek (Alınan)", "Çek (Yönl.)"]
-                let rows: [[String]] = [
-                    ["11/2026", "₺45.000,00", "₺12.000,00", "₺82.500,00", "₺15.000,00", "₺120.000,00", "₺60.000,00", "₺35.000,00", "₺10.000,00"],
-                    ["10/2026", "₺52.000,00", "₺18.500,00", "₺76.000,00", "₺11.200,00", "₺98.000,00", "₺45.000,00", "₺50.000,00", "₺22.000,00"],
-                    ["09/2026", "₺38.500,00", "₺9.400,00", "₺69.000,00", "₺8.500,00", "₺105.000,00", "₺52.000,00", "₺40.000,00", "₺15.000,00"],
-                    ["08/2026", "₺44.200,00", "₺14.000,00", "₺71.300,00", "₺10.000,00", "₺112.000,00", "₺48.000,00", "₺30.000,00", "₺12.000,00"]
+            }
+            return (headers, rows)
+            
+        case "Hareketsiz Cariler":
+            let headers = ["Ünvan", "Grup", "Telefon", "Son İşlem", "Bakiye"]
+            let activeCariIds = Set(cariHareketler.compactMap { $0.cariId })
+            let rows: [[String]] = cariler.filter { c in
+                guard let cid = c.id else { return true }
+                return !activeCariIds.contains(cid)
+            }.map { c in
+                [
+                    c.unvan,
+                    c.cariTipi,
+                    c.telefon ?? "-",
+                    "Hareket Yok",
+                    AppFormatters.money(abs(c.bakiye))
                 ]
-                return (headers, rows)
-                
-            case "Kredi Kartı Detay Raporu":
-                let headers = ["Tarih", "Kimden Alındı", "Banka/Kart", "Kime Yönlendirildi", "Tutar", "Durum"]
-                var rows: [[String]] = []
-                for b in bankalar {
-                    rows.append(["04.11.2026", "Müşteri Tahsilatı", "\(b.bankaAdi) (POS)", "-", AppFormatters.money(b.bakiye * 0.4), "Hesaba Geçti"])
-                }
-                if rows.isEmpty {
-                    rows = [
-                        ["03.11.2026", "Akıncılar Çelik Ltd.", "Garanti POS", "Özdemir Sanayi", "₺14.500,00", "Yönlendirildi"],
-                        ["02.11.2026", "Özdemir Makine", "Yapı Kredi", "-", "₺8.200,00", "Portföyde"],
-                        ["01.11.2026", "Tekin Metal A.Ş.", "İş Bankası", "-", "₺22.000,00", "Tahsil Edildi"]
-                    ]
-                }
-                return (headers, rows)
-                
-            case "Nakit İşlem Detay Raporu":
-                let headers = ["Tarih", "Cari Ünvan", "İşlem", "Açıklama", "Giren", "Çıkan"]
-                var rows: [[String]] = []
-                for k in kasalar {
-                    rows.append(["04.11.2026", k.hesapAdi, "Nakit Tahsilat", "Elden Satış Tahsilatı", AppFormatters.money(k.bakiye), "₺0,00"])
-                }
-                if rows.isEmpty {
-                    rows = [
-                        ["04.11.2026 14:30", "Merkez Kasa", "Nakit Tahsilat", "Elden Satış Tahsilatı", "₺5.000,00", "₺0,00"],
-                        ["03.11.2026 11:15", "Merkez Kasa", "Nakit Tediye", "Yemek & İkram Gideri", "₺0,00", "₺450,00"],
-                        ["02.11.2026 16:45", "Şube Kasası", "Nakit Tahsilat", "Cari Fatura Tahsilatı", "₺12.000,00", "₺0,00"]
-                    ]
-                }
-                return (headers, rows)
-                
-            case "Çek Detay Raporu":
-                let headers = ["Vade", "Çek No", "Cari Ünvan", "Banka/Şube", "Tutar", "Durum"]
-                let rows: [[String]] = [
-                    ["15.11.2026", "ÇK-10928", "Doruk İnşaat A.Ş.", "Garanti BBVA / Maslak", "₺35.000,00", "Portföyde"],
-                    ["28.11.2026", "ÇK-10929", "Kuzey Çelik San.", "Akbank / Dudullu", "₺50.000,00", "Portföyde"],
-                    ["05.12.2026", "ÇK-10930", "Yıldız Ticaret", "Yapı Kredi / İkitelli", "₺27.500,00", "Tahsile Verildi"],
-                    ["15.12.2026", "ÇK-10931", "Asil Makine Ltd.", "İş Bankası / Kartal", "₺62.000,00", "Portföyde"]
-                ]
-                return (headers, rows)
-                
-            case "Havale / EFT Detay Raporu":
-                let headers = ["Tarih", "Müşteri", "Banka/Hesap", "Dekont No", "Tutar", "Durum"]
-                var rows: [[String]] = []
-                for b in bankalar {
-                    rows.append(["04.11.2026", "Müşteri Havalesi", "\(b.bankaAdi) / \(b.hesapNo ?? "TL")", "DK-9921", AppFormatters.money(b.bakiye * 0.3), "Onaylandı"])
-                }
-                if rows.isEmpty {
-                    rows = [
-                        ["03.11.2026", "Demir Grup Sanayi", "İş Bankası Ticari", "DK-10023", "₺45.000,00", "Onaylandı"],
-                        ["02.11.2026", "Yılmazlar Nakliyat", "Garanti BBVA TL", "DK-10024", "₺6.800,00", "Onaylandı"],
-                        ["01.11.2026", "Birlik Makine A.Ş.", "Akbank Şirket", "DK-10025", "₺80.000,00", "Onaylandı"]
-                    ]
-                }
-                return (headers, rows)
-                
-            // 3. Cari Hesap Raporları
-            case "Cari Bakiye Raporu":
-                let headers = ["Ünvan", "Şehir", "Borç", "Alacak", "Bakiye", "Durum"]
-                var rows: [[String]] = []
-                for c in cariler {
-                    let b = c.bakiye
-                    let borc = c.bakiyeTuru == "B" ? b : 0
-                    let alacak = c.bakiyeTuru == "A" ? b : 0
-                    rows.append([
-                        c.unvan,
-                        c.sehir ?? "İstanbul",
-                        AppFormatters.money(borc),
-                        AppFormatters.money(alacak),
-                        AppFormatters.money(b),
-                        c.bakiyeTuru == "A" ? "Alacaklı (+)" : "Borçlu (-)"
-                    ])
-                }
-                if rows.isEmpty {
-                    rows = [
-                        ["Akıncılar Çelik Ltd.", "İstanbul", "₺0,00", "₺142.500,00", "₺142.500,00", "Alacaklı (+)"],
-                        ["Özdemir Makine San.", "Bursa", "₺35.200,00", "₺0,00", "₺35.200,00", "Borçlu (-)"],
-                        ["Doruk İnşaat A.Ş.", "Ankara", "₺0,00", "₺88.000,00", "₺88.000,00", "Alacaklı (+)"],
-                        ["Kuzey Boru Ticaret", "Kocaeli", "₺12.400,00", "₺0,00", "₺12.400,00", "Borçlu (-)"]
-                    ]
-                }
-                return (headers, rows)
-                
-            case "Cari Hareket Dökümü":
-                let headers = ["Tarih", "İşlem Türü", "Evrak No", "Açıklama", "Borç", "Alacak", "Bakiye"]
-                var rows: [[String]] = []
-                for h in cariHareketler {
-                    rows.append([
-                        String((h.tarih ?? "2026-11-04").prefix(10)),
-                        h.islemTuru ?? "Fatura",
-                        h.belgeNo ?? "EVR-1",
-                        h.aciklama ?? "-",
-                        AppFormatters.money(h.borc),
-                        AppFormatters.money(h.alacak),
-                        AppFormatters.money(h.bakiye)
-                    ])
-                }
-                if rows.isEmpty {
-                    rows = [
-                        ["04.11.2026", "Satış Faturası", "MB-FTR-101", "Demir & Profil Satışı", "₺48.500,00", "₺0,00", "₺48.500,00"],
-                        ["02.11.2026", "Banka Tahsilat", "EFT-8812", "Cari Hesap Tahsilatı", "₺0,00", "₺25.000,00", "₺23.500,00"],
-                        ["28.10.2026", "Satış Faturası", "MB-FTR-098", "Kaynak Teli ve Sac", "₺32.000,00", "₺0,00", "₺55.500,00"],
-                        ["20.10.2026", "Çek Girişi", "ÇK-10928", "Vadeli Çek Alındı", "₺0,00", "₺35.000,00", "₺20.500,00"]
-                    ]
-                }
-                return (headers, rows)
-                
-            case "Yaşlandırma Raporu":
-                let headers = ["Ünvan", "0-30 Gün", "31-60 Gün", "61-90 Gün", "90+ Gün", "Toplam"]
-                var rows: [[String]] = []
-                for c in cariler.prefix(15) {
-                    let b = c.bakiye
-                    rows.append([
-                        c.unvan,
-                        AppFormatters.money(b * 0.45),
-                        AppFormatters.money(b * 0.30),
-                        AppFormatters.money(b * 0.15),
-                        AppFormatters.money(b * 0.10),
-                        AppFormatters.money(b)
-                    ])
-                }
-                if rows.isEmpty {
-                    rows = [
-                        ["Akıncılar Çelik Ltd.", "₺65.000,00", "₺45.000,00", "₺22.500,00", "₺10.000,00", "₺142.500,00"],
-                        ["Doruk İnşaat A.Ş.", "₺40.000,00", "₺28.000,00", "₺15.000,00", "₺5.000,00", "₺88.000,00"],
-                        ["Tekin Metal San.", "₺25.000,00", "₺18.000,00", "₺8.400,00", "₺0,00", "₺51.400,00"],
-                        ["Güneş Rulman Ltd.", "₺10.000,00", "₺12.000,00", "₺14.000,00", "₺18.500,00", "₺54.500,00"]
-                    ]
-                }
-                return (headers, rows)
-                
-            case "Hareketsiz Cariler":
-                let headers = ["Ünvan", "Grup", "Telefon", "Son İşlem", "Gün"]
-                let rows: [[String]] = [
-                    ["Asil Otomotiv Sanayi", "Müşteri", "0212 555 12 34", "12.04.2026", "206 Gün"],
-                    ["Güneş Rulman Ltd.", "Müşteri", "0216 444 88 99", "24.05.2026", "164 Gün"],
-                    ["Erler Civata Dağıtım", "Müşteri", "0224 333 11 22", "08.06.2026", "149 Gün"],
-                    ["Kuzey Boru Profil", "Tedarikçi", "0262 666 77 88", "15.07.2026", "112 Gün"]
-                ]
-                return (headers, rows)
-                
-            case "Vadesi Geçmiş Alacaklar":
-                let headers = ["Müşteri", "Cari Bakiyesi", "Ort. Gecikme Günü", "Fatura / Evrak No", "Fatura Bakiyesi", "Gecikme (Gün)"]
-                let rows: [[String]] = [
-                    ["Akıncılar Çelik Ltd.", "₺142.500,00", "28 Gün", "MB-FTR-082", "₺35.000,00", "32 Gün"],
-                    ["Doruk İnşaat A.Ş.", "₺88.000,00", "19 Gün", "MB-FTR-089", "₺28.000,00", "24 Gün"],
-                    ["Güneş Rulman Ltd.", "₺54.500,00", "45 Gün", "MB-FTR-074", "₺18.500,00", "52 Gün"],
-                    ["Özdemir Makine San.", "₺35.200,00", "14 Gün", "MB-FTR-095", "₺14.000,00", "18 Gün"]
-                ]
-                return (headers, rows)
-                
-            // 4. Stok Raporları
-            case "Stok Mevcudu":
-                let headers = ["Stok Kodu", "Stok Adı", "Kategori", "Miktar", "Ort. Alış F.", "Ort. Satış F.", "Satış F."]
-                var rows: [[String]] = []
-                for s in stoklar {
-                    rows.append([
-                        s.stokKodu ?? "STK-\(s.id)",
-                        s.stokAdi,
-                        s.kategori ?? "Genel",
-                        "\(String(format: "%.1f", s.mevcutMiktar)) \(s.birim ?? "Adet")",
-                        AppFormatters.money(s.alisFiyati),
-                        AppFormatters.money(s.satisFiyati * 0.95),
-                        AppFormatters.money(s.satisFiyati)
-                    ])
-                }
-                if rows.isEmpty {
-                    rows = [
-                        ["STK-001", "Paslanmaz Çelik Sac 2mm", "Sac Grubu", "450 Adet", "₺480,00", "₺620,00", "₺650,00"],
-                        ["STK-002", "Sanayi Profil Boru 40x40", "Profil", "820 Metre", "₺195,00", "₺260,00", "₺275,00"],
-                        ["STK-003", "Gazaltı Kaynak Teli 1.2mm", "Kaynak", "150 Makara", "₺95,00", "₺130,00", "₺140,00"],
-                        ["STK-004", "Galvaniz Rulo Sac 1.5mm", "Sac Grubu", "12 Ton", "₺32.000,00", "₺39.500,00", "₺41.000,00"]
-                    ]
-                }
-                return (headers, rows)
-                
-            case "Stok Hareketleri":
-                let headers = ["Tarih", "Stok Adı", "İşlem", "Giren", "Çıkan", "Birim Fiyat", "Kalan"]
-                let rows: [[String]] = [
-                    ["04.11.2026", "Paslanmaz Sac 2mm", "Satış Faturası", "0", "50", "₺650,00", "450"],
-                    ["03.11.2026", "Profil Boru 40x40", "Satış Faturası", "0", "120", "₺275,00", "820"],
-                    ["01.11.2026", "Kaynak Teli 1.2mm", "Alış Faturası", "100", "0", "₺95,00", "150"],
-                    ["28.10.2026", "Galvaniz Rulo Sac", "Satış Faturası", "0", "3", "₺41.000,00", "12"]
-                ]
-                return (headers, rows)
-                
-            case "Kritik Stok Seviyesi":
-                let headers = ["Stok Kodu", "Stok Adı", "Mevcut", "Min. Seviye", "Durum", "Satış Fiyatı"]
-                var rows: [[String]] = []
-                for s in stoklar {
-                    let minSev = s.kritikMiktar ?? 10.0
-                    if s.mevcutMiktar <= minSev {
+            }
+            return (headers, rows)
+            
+        case "Vadesi Geçmiş Alacaklar":
+            let headers = ["Müşteri", "Cari Bakiyesi", "Fatura / Evrak No", "Fatura Tarihi", "Fatura Tutarı", "Gecikme (Gün)"]
+            let now = Date()
+            var rows: [[String]] = []
+            for f in faturalar {
+                let vadeStr = f.vadeTarihi ?? f.tarih
+                if let vadeDate = AppFormatters.parseDate(String(vadeStr.prefix(10))) {
+                    let days = Calendar.current.dateComponents([.day], from: vadeDate, to: now).day ?? 0
+                    if days > 0 {
+                        let matchedCari = cariler.first { $0.id == f.cariId || $0.unvan == f.cariUnvan }
                         rows.append([
-                            s.stokKodu ?? "STK-\(s.id)",
-                            s.stokAdi,
-                            "\(String(format: "%.1f", s.mevcutMiktar)) \(s.birim ?? "Adet")",
-                            "\(String(format: "%.1f", minSev))",
-                            "KRİTİK SEVİYE",
-                            AppFormatters.money(s.satisFiyati)
-                        ])
-                    }
-                }
-                if rows.isEmpty {
-                    rows = [
-                        ["STK-008", "Kare Profil 50x50x3", "8 Adet", "25 Adet", "KRİTİK (-17)", "₺420,00"],
-                        ["STK-014", "Elektrot 3.25mm Askaynak", "5 Paket", "20 Paket", "KRİTİK (-15)", "₺380,00"],
-                        ["STK-022", "Kesici Taş 180x3 Karbosan", "12 Adet", "50 Adet", "KRİTİK (-38)", "₺65,00"]
-                    ]
-                }
-                return (headers, rows)
-                
-            case "Ölü Stok Raporu":
-                let headers = ["Stok Adı", "Barkod", "Stok Kodu", "Mevcut Miktar", "Çakışma Nedeni"]
-                let rows: [[String]] = [
-                    ["Çelik Lama 30x5mm", "869000100234", "STK-112", "180 Metre", "6 Aydır Hareket Görmedi"],
-                    ["T-Demiri 40x40", "869000100567", "STK-145", "65 Adet", "8 Aydır Hareket Görmedi"],
-                    ["Dkp Sac 0.8mm", "869000100890", "STK-189", "40 Adet", "12 Aydır Hareket Görmedi"]
-                ]
-                return (headers, rows)
-                
-            case "Stok Devir Hızı":
-                let headers = ["Stok Adı", "Mevcut Stok", "Toplam Satış (Çıkan)", "Stok Devir Hızı", "Kategori"]
-                let rows: [[String]] = [
-                    ["Paslanmaz Sac 2mm", "450 Adet", "1.250 Adet", "2.78 / Yıl", "Sac Grubu"],
-                    ["Profil Boru 40x40", "820 Metre", "3.400 Metre", "4.15 / Yıl", "Profil"],
-                    ["Kaynak Teli 1.2mm", "150 Makara", "950 Makara", "6.33 / Yıl", "Kaynak"],
-                    ["Galvaniz Sac 1.5mm", "12 Ton", "48 Ton", "4.00 / Yıl", "Sac Grubu"]
-                ]
-                return (headers, rows)
-                
-            // 5. Satış & Karlılık Raporları
-            case "Satış Faturası Dökümü":
-                let headers = ["Fatura No", "Tarih", "Müşteri", "Ara Toplam", "KDV", "Genel Toplam"]
-                var rows: [[String]] = []
-                for f in faturalar {
-                    let tur = f.faturaTuru.uppercased()
-                    if tur.contains("SATIS") || tur.contains("SAT") {
-                        rows.append([
+                            f.cariUnvan ?? matchedCari?.unvan ?? "-",
+                            AppFormatters.money(abs(matchedCari?.bakiye ?? f.genelToplam)),
                             f.faturaNo,
                             String(f.tarih.prefix(10)),
-                            f.cariUnvan ?? "Müşteri",
-                            AppFormatters.money(f.araToplam),
-                            AppFormatters.money(f.kdvToplami),
-                            AppFormatters.money(f.genelToplam)
+                            AppFormatters.money(f.genelToplam),
+                            "\(days) Gün"
                         ])
                     }
                 }
-                if rows.isEmpty {
-                    rows = [
-                        ["MB-FTR-101", "04.11.2026", "Akıncılar Çelik Ltd.", "₺40.416,67", "₺8.083,33", "₺48.500,00"],
-                        ["MB-FTR-098", "28.10.2026", "Doruk İnşaat A.Ş.", "₺26.666,67", "₺5.333,33", "₺32.000,00"],
-                        ["MB-FTR-094", "22.10.2026", "Tekin Metal San.", "₺18.333,33", "₺3.666,67", "₺22.000,00"],
-                        ["MB-FTR-091", "15.10.2026", "Kuzey Çelik A.Ş.", "₺54.166,67", "₺10.833,33", "₺65.000,00"]
-                    ]
-                }
-                return (headers, rows)
-                
-            case "Ürün Karlılık Raporu":
-                let headers = ["Ürün Adı", "Alış Fiyatı", "Satış Fiyatı", "Kar", "Kar Marjı %"]
-                var rows: [[String]] = []
-                for s in stoklar {
-                    let kar = s.satisFiyati - s.alisFiyati
-                    let marj = s.satisFiyati > 0 ? (kar / s.satisFiyati) * 100 : 0
-                    rows.append([
-                        s.stokAdi,
-                        AppFormatters.money(s.alisFiyati),
-                        AppFormatters.money(s.satisFiyati),
-                        AppFormatters.money(kar),
-                        "%\(String(format: "%.1f", marj))"
-                    ])
-                }
-                if rows.isEmpty {
-                    rows = [
-                        ["Paslanmaz Çelik Sac 2mm", "₺480,00", "₺650,00", "₺170,00", "%26.2"],
-                        ["Sanayi Profil Boru 40x40", "₺195,00", "₺275,00", "₺80,00", "%29.1"],
-                        ["Gazaltı Kaynak Teli 1.2mm", "₺95,00", "₺140,00", "₺45,00", "%32.1"],
-                        ["Galvaniz Sac 1.5mm", "₺32.000,00", "₺41.000,00", "₺9.000,00", "%22.0"]
-                    ]
-                }
-                return (headers, rows)
-                
-            case "Müşteri Karlılık Analizi":
-                let headers = ["Müşteri", "Toplam Satış", "Tahmini Maliyet", "Net Kar", "Kar Marjı (%)", "Fatura Sayısı"]
-                let rows: [[String]] = [
-                    ["Akıncılar Çelik Ltd.", "₺840.000,00", "₺610.000,00", "₺230.000,00", "%27.4", "18 Fatura"],
-                    ["Özdemir Makine San.", "₺480.000,00", "₺345.000,00", "₺135.000,00", "%28.1", "12 Fatura"],
-                    ["Doruk İnşaat A.Ş.", "₺320.000,00", "₺238.000,00", "₺82.000,00", "%25.6", "8 Fatura"],
-                    ["Kuzey Boru Ticaret", "₺210.000,00", "₺155.000,00", "₺55.000,00", "%26.2", "6 Fatura"]
-                ]
-                return (headers, rows)
-                
-            case "En Çok Satan Ürünler":
-                let headers = ["Sıra", "Ürün Adı", "Mevcut Stok", "Satış Fiyatı", "Kategori"]
-                let rows: [[String]] = [
-                    ["1", "Sanayi Profil Boru 40x40", "820 Metre", "₺275,00", "Profil"],
-                    ["2", "Paslanmaz Çelik Sac 2mm", "450 Adet", "₺650,00", "Sac Grubu"],
-                    ["3", "Gazaltı Kaynak Teli 1.2mm", "150 Makara", "₺140,00", "Kaynak"],
-                    ["4", "Galvaniz Sac 1.5mm", "12 Ton", "₺41.000,00", "Sac Grubu"],
-                    ["5", "Kare Profil 50x50x3", "8 Adet", "₺420,00", "Profil"]
-                ]
-                return (headers, rows)
-                
-            case "Gelir Tablosu":
-                let headers = ["Kalem", "Tutar"]
-                let rows: [[String]] = [
-                    ["Brüt Satış Gelirleri", "₺1.850.000,00"],
-                    ["Satış İndirimleri ve İadeler (-)", "₺42.500,00"],
-                    ["Net Satışlar", "₺1.807.500,00"],
-                    ["Satılan Malın Maliyeti (SMM) (-)", "₺1.310.000,00"],
-                    ["BRÜT SATIŞ KÂRI", "₺497.500,00"],
-                    ["Faaliyet Giderleri (Genel/Pazarlama) (-)", "₺145.000,00"],
-                    ["FAALİYET KÂRI (EBIT)", "₺352.500,00"],
-                    ["Finansman Giderleri (-)", "₺32.000,00"],
-                    ["DÖNEM NET KÂRI", "₺320.500,00"]
-                ]
-                return (headers, rows)
-                
-            case "Detaylı Gelir ve Maliyet Analizi":
-                let headers = ["Tarih", "Ürün Adı", "Müşteri (Kime)", "Miktar", "Satış Fiyatı", "Tutar (Net/KDV)", "Tahsilat Yöntemi & Süresi", "En Son Tedarikçi", "Alış Fiyatı & Değişim", "Maliyet", "Net Kar & Durum", "Marj", "Ödeme Yöntemi & Süresi"]
-                let rows: [[String]] = [
-                    ["04.11.2026", "Paslanmaz Sac 2mm", "Akıncılar Çelik Ltd.", "50 Adet", "₺650,00", "₺32.500 (+KDV)", "Nakit • 0 Gün", "Ereğli Demir Çelik", "₺480,00 (%0)", "₺24.000,00", "₺8.500 (Kâr)", "%26.2", "Vadeli • 30 Gün"],
-                    ["03.11.2026", "Profil Boru 40x40", "Özdemir Makine", "120 Metre", "₺275,00", "₺33.000 (+KDV)", "Kredi Kartı • 1 Gün", "Borusan Mannesmann", "₺195,00 (+%4)", "₺23.400,00", "₺9.600 (Kâr)", "%29.1", "Peşin • 0 Gün"],
-                    ["01.11.2026", "Gazaltı Tel 1.2mm", "Doruk İnşaat A.Ş.", "25 Makara", "₺140,00", "₺3.500 (+KDV)", "Havale • 3 Gün", "Oerlikon Kaynak", "₺95,00 (%0)", "₺2.375,00", "₺1.125 (Kâr)", "%32.1", "Vadeli • 45 Gün"]
-                ]
-                return (headers, rows)
-                
-            case "Nakit Akış Tablosu":
-                let headers = ["Tarih", "Açıklama", "Giren", "Çıkan", "Bakiye"]
-                let rows: [[String]] = [
-                    ["04.11.2026", "Akıncılar Fatura Tahsilatı", "₺48.500,00", "₺0,00", "₺215.300,00"],
-                    ["03.11.2026", "Tedarikçi Mal Alımı Ödemesi", "₺0,00", "₺32.000,00", "₺166.800,00"],
-                    ["02.11.2026", "Özdemir Makine Nakit Tahsilat", "₺15.000,00", "₺0,00", "₺198.800,00"],
-                    ["01.11.2026", "Personel Maaş & SGK Ödemeleri", "₺0,00", "₺65.000,00", "₺183.800,00"]
-                ]
-                return (headers, rows)
-                
-            // 6. Stratejik ve Analitik Raporlar
-            case "Müşteri ABC Analizi":
-                let headers = ["Müşteri", "Toplam Satış", "Yüzde", "Sınıf"]
-                let rows: [[String]] = [
-                    ["Akıncılar Çelik Ltd.", "₺840.000,00", "%45.4", "A Sınıfı (Önemli)"],
-                    ["Özdemir Makine San.", "₺480.000,00", "%25.9", "A Sınıfı (Önemli)"],
-                    ["Doruk İnşaat A.Ş.", "₺320.000,00", "%17.3", "B Sınıfı (Orta)"],
-                    ["Kuzey Boru Ticaret", "₺145.000,00", "%7.8", "C Sınıfı (Standart)"],
-                    ["Tekin Metal A.Ş.", "₺65.000,00", "%3.6", "C Sınıfı (Standart)"]
-                ]
-                return (headers, rows)
-                
-            case "Kar-Zarar Mukayesesi":
-                let headers = ["Dönem", "Bu Yıl Ciro", "Geçen Yıl Ciro", "Değişim Tutarı", "Büyüme %"]
-                let rows: [[String]] = [
-                    ["Ekim", "₺428.500,00", "₺320.000,00", "+₺108.500,00", "+%33.9"],
-                    ["Eylül", "₺395.000,00", "₺290.000,00", "+₺105.000,00", "+%36.2"],
-                    ["Ağustos", "₺360.000,00", "₺310.000,00", "+₺50.000,00", "+%16.1"],
-                    ["Temmuz", "₺340.000,00", "₺280.000,00", "+₺60.000,00", "+%21.4"]
-                ]
-                return (headers, rows)
-                
-            case "Müşteri Kayıp (Churn)":
-                let headers = ["Müşteri", "Son İşlem", "Geçen Gün", "Kayıp Riski"]
-                let rows: [[String]] = [
-                    ["Asil Otomotiv Ltd.", "12.04.2026", "206 Gün", "YÜKSEK (Kayıp)"],
-                    ["Güneş Rulman San.", "24.05.2026", "164 Gün", "YÜKSEK (Kayıp)"],
-                    ["Erler Civata Dağıtım", "08.06.2026", "149 Gün", "ORTA (Riskli)"],
-                    ["Kuzey Boru Profil", "15.07.2026", "112 Gün", "DÜŞÜK (İzleniyor)"]
-                ]
-                return (headers, rows)
-                
-            case "Fiyat Dalgalanma Raporu":
-                let headers = ["Ürün", "Min Fiyat", "Max Fiyat", "Ort Fiyat", "Fark %"]
-                let rows: [[String]] = [
-                    ["Paslanmaz Sac 2mm", "₺540,00", "₺650,00", "₺595,00", "+%20.3"],
-                    ["Profil Boru 40x40", "₺220,00", "₺275,00", "₺247,50", "+%25.0"],
-                    ["Kaynak Teli 1.2mm", "₺110,00", "₺140,00", "₺125,00", "+%27.2"],
-                    ["Galvaniz Sac 1.5mm", "₺35.000,00", "₺41.000,00", "₺38.000,00", "+%17.1"]
-                ]
-                return (headers, rows)
-                
-            case "Müşteri Sadakat (LTV)":
-                let headers = ["Müşteri", "İlk Alışveriş", "Son Alışveriş", "Toplam Harcama", "Ortalama Sepet"]
-                let rows: [[String]] = [
-                    ["Akıncılar Çelik Ltd.", "14.02.2024", "04.11.2026", "₺840.000,00", "₺46.666,67"],
-                    ["Özdemir Makine San.", "18.06.2024", "03.11.2026", "₺480.000,00", "₺40.000,00"],
-                    ["Doruk İnşaat A.Ş.", "10.09.2024", "28.10.2026", "₺320.000,00", "₺40.000,00"],
-                    ["Kuzey Boru Ticaret", "05.01.2025", "18.10.2026", "₺210.000,00", "₺35.000,00"]
-                ]
-                return (headers, rows)
-                
-            case "Finansal Isı Haritası":
-                let headers = ["Tarih", "Satış", "Alış", "Kasa Giren", "Kasa Çıkan", "Net Akış"]
-                let rows: [[String]] = [
-                    ["04.11.2026", "₺24.500,00", "₺12.000,00", "₺5.000,00", "₺2.500,00", "+₺15.000,00"],
-                    ["03.11.2026", "₺18.200,00", "₺15.000,00", "₺2.000,00", "₺1.800,00", "+₺3.400,00"],
-                    ["02.11.2026", "₺12.000,00", "₺22.000,00", "₺4.000,00", "₺3.000,00", "-₺9.000,00"],
-                    ["01.11.2026", "₺35.000,00", "₺8.000,00", "₺6.000,00", "₺1.000,00", "+₺32.000,00"]
-                ]
-                return (headers, rows)
-                
-            case "Tahsilat Süresi (DSO)":
-                let headers = ["Müşteri", "Ortalama Tahsilat Süresi (Gün)", "Toplam Alacak", "Durum"]
-                let rows: [[String]] = [
-                    ["Akıncılar Çelik Ltd.", "28 Gün", "₺142.500,00", "Normal (Vadesinde)"],
-                    ["Doruk İnşaat A.Ş.", "34 Gün", "₺88.000,00", "Kabul Edilebilir"],
-                    ["Güneş Rulman San.", "52 Gün", "₺54.500,00", "Gecikmeli (Riskli)"],
-                    ["Özdemir Makine San.", "22 Gün", "₺35.200,00", "Mükemmel (Hızlı)"]
-                ]
-                return (headers, rows)
-                
-            case "Bütçe / Hedef Takibi":
-                let headers = ["Dönem (Ay)", "Hedeflenen Ciro", "Gerçekleşen Satış", "Fark", "Başarı Oranı %"]
-                let rows: [[String]] = [
-                    ["Kasım (Hedef)", "₺450.000,00", "₺95.000,00", "-₺355.000,00", "%21.1"],
-                    ["Ekim 2026", "₺400.000,00", "₺428.500,00", "+₺28.500,00", "%107.1"],
-                    ["Eylül 2026", "₺380.000,00", "₺395.000,00", "+₺15.000,00", "%103.9"],
-                    ["Ağustos 2026", "₺350.000,00", "₺360.000,00", "+₺10.000,00", "%102.8"]
-                ]
-                return (headers, rows)
-                
-            default:
-                return (report.headers, report.defaultRows)
             }
+            return (headers, rows)
+            
+        // 4. Stok Raporları
+        case "Stok Mevcudu":
+            let headers = ["Stok Kodu", "Stok Adı", "Kategori", "Miktar", "Alış F.", "Satış F.", "Stok Değeri"]
+            let rows: [[String]] = stoklar.map { s in
+                [
+                    s.stokKodu ?? "STK-\(s.id ?? 0)",
+                    s.stokAdi,
+                    s.kategori ?? "Genel",
+                    "\(String(format: "%.1f", s.mevcutMiktar)) \(s.birim ?? "Adet")",
+                    AppFormatters.money(s.alisFiyati),
+                    AppFormatters.money(s.satisFiyati),
+                    AppFormatters.money(s.mevcutMiktar * s.alisFiyati)
+                ]
+            }
+            return (headers, rows)
+            
+        case "Stok Hareketleri":
+            let headers = ["Tarih", "Fatura No", "Cari Ünvan", "İşlem Türü", "Ara Toplam", "KDV", "Genel Toplam"]
+            let rows: [[String]] = faturalar.map { f in
+                [
+                    String(f.tarih.prefix(10)),
+                    f.faturaNo,
+                    f.cariUnvan ?? "-",
+                    f.faturaTuru,
+                    AppFormatters.money(f.araToplam),
+                    AppFormatters.money(f.kdvToplami),
+                    AppFormatters.money(f.genelToplam)
+                ]
+            }
+            return (headers, rows)
+            
+        case "Kritik Stok Seviyesi":
+            let headers = ["Stok Kodu", "Stok Adı", "Mevcut", "Min. Seviye", "Durum", "Satış Fiyatı"]
+            let rows: [[String]] = stoklar.compactMap { s in
+                let minSev = s.kritikMiktar ?? 10.0
+                guard s.mevcutMiktar <= minSev else { return nil }
+                return [
+                    s.stokKodu ?? "STK-\(s.id ?? 0)",
+                    s.stokAdi,
+                    "\(String(format: "%.1f", s.mevcutMiktar)) \(s.birim ?? "Adet")",
+                    "\(String(format: "%.1f", minSev))",
+                    "KRİTİK SEVİYE",
+                    AppFormatters.money(s.satisFiyati)
+                ]
+            }
+            return (headers, rows)
+            
+        case "Ölü Stok Raporu":
+            let headers = ["Stok Adı", "Barkod", "Stok Kodu", "Mevcut Miktar", "Stok Maliyeti"]
+            let rows: [[String]] = stoklar.filter { $0.mevcutMiktar > 0 }.map { s in
+                [
+                    s.stokAdi,
+                    s.barkod ?? "-",
+                    s.stokKodu ?? "STK-\(s.id ?? 0)",
+                    "\(String(format: "%.1f", s.mevcutMiktar)) \(s.birim ?? "Adet")",
+                    AppFormatters.money(s.mevcutMiktar * s.alisFiyati)
+                ]
+            }
+            return (headers, rows)
+            
+        case "Stok Devir Hızı":
+            let headers = ["Stok Adı", "Mevcut Stok", "Alış Fiyatı", "Satış Fiyatı", "Kategori"]
+            let rows: [[String]] = stoklar.map { s in
+                [
+                    s.stokAdi,
+                    "\(String(format: "%.1f", s.mevcutMiktar)) \(s.birim ?? "Adet")",
+                    AppFormatters.money(s.alisFiyati),
+                    AppFormatters.money(s.satisFiyati),
+                    s.kategori ?? "Genel"
+                ]
+            }
+            return (headers, rows)
+            
+        // 5. Satış & Karlılık Raporları
+        case "Satış Faturası Dökümü":
+            let headers = ["Fatura No", "Tarih", "Müşteri", "Ara Toplam", "KDV", "Genel Toplam"]
+            let rows: [[String]] = faturalar.filter { f in
+                let tur = f.faturaTuru.uppercased()
+                return tur.contains("SATIS") || tur.contains("SATIŞ") || tur.contains("SAT")
+            }.map { f in
+                [
+                    f.faturaNo,
+                    String(f.tarih.prefix(10)),
+                    f.cariUnvan ?? "-",
+                    AppFormatters.money(f.araToplam),
+                    AppFormatters.money(f.kdvToplami),
+                    AppFormatters.money(f.genelToplam)
+                ]
+            }
+            return (headers, rows)
+            
+        case "Ürün Karlılık Raporu":
+            let headers = ["Ürün Adı", "Alış Fiyatı", "Satış Fiyatı", "Birim Kar", "Kar Marjı %"]
+            let rows: [[String]] = stoklar.map { s in
+                let kar = s.satisFiyati - s.alisFiyati
+                let marj = s.satisFiyati > 0 ? (kar / s.satisFiyati) * 100 : 0
+                return [
+                    s.stokAdi,
+                    AppFormatters.money(s.alisFiyati),
+                    AppFormatters.money(s.satisFiyati),
+                    AppFormatters.money(kar),
+                    "%\(String(format: "%.1f", marj))"
+                ]
+            }
+            return (headers, rows)
+            
+        case "Müşteri Karlılık Analizi":
+            let headers = ["Müşteri", "Toplam Satış", "KDV Hariç Net", "KDV Toplamı", "Fatura Sayısı"]
+            var grouped: [String: (topSatis: Double, araTop: Double, kdvTop: Double, count: Int)] = [:]
+            for f in faturalar {
+                let tur = f.faturaTuru.uppercased()
+                guard tur.contains("SAT") else { continue }
+                let name = f.cariUnvan ?? "Genel Müşteri"
+                var cur = grouped[name] ?? (0, 0, 0, 0)
+                cur.topSatis += f.genelToplam
+                cur.araTop += f.araToplam
+                cur.kdvTop += f.kdvToplami
+                cur.count += 1
+                grouped[name] = cur
+            }
+            let rows: [[String]] = grouped.sorted { $0.value.topSatis > $1.value.topSatis }.map { k, v in
+                [
+                    k,
+                    AppFormatters.money(v.topSatis),
+                    AppFormatters.money(v.araTop),
+                    AppFormatters.money(v.kdvTop),
+                    "\(v.count) Fatura"
+                ]
+            }
+            return (headers, rows)
+            
+        case "En Çok Satan Ürünler":
+            let headers = ["Sıra", "Ürün Adı", "Mevcut Stok", "Satış Fiyatı", "Kategori"]
+            let rows: [[String]] = stoklar.enumerated().map { idx, s in
+                [
+                    "\(idx + 1)",
+                    s.stokAdi,
+                    "\(String(format: "%.1f", s.mevcutMiktar)) \(s.birim ?? "Adet")",
+                    AppFormatters.money(s.satisFiyati),
+                    s.kategori ?? "Genel"
+                ]
+            }
+            return (headers, rows)
+            
+        case "Gelir Tablosu":
+            let headers = ["Kalem", "Tutar"]
+            var brutSatis: Double = 0
+            var satisIade: Double = 0
+            var alisToplam: Double = 0
+            for f in faturalar {
+                let tur = f.faturaTuru.uppercased()
+                if tur.contains("İADE") || tur.contains("IADE") {
+                    satisIade += f.araToplam
+                } else if tur.contains("SAT") {
+                    brutSatis += f.araToplam
+                } else if tur.contains("AL") {
+                    alisToplam += f.araToplam
+                }
+            }
+            let netSatis = brutSatis - satisIade
+            let brutKar = netSatis - alisToplam
+            let rows: [[String]] = [
+                ["Brüt Satış Gelirleri", AppFormatters.money(brutSatis)],
+                ["Satış İadeleri (-)", AppFormatters.money(satisIade)],
+                ["Net Satışlar", AppFormatters.money(netSatis)],
+                ["Alış / Maliyet Toplamı (-)", AppFormatters.money(alisToplam)],
+                ["DÖNEM BRÜT KÂRI", AppFormatters.money(brutKar)]
+            ]
+            return (headers, rows)
+            
+        case "Detaylı Gelir ve Maliyet Analizi":
+            let headers = ["Tarih", "Fatura No", "Müşteri", "Tür", "Ara Toplam", "KDV", "Genel Toplam"]
+            let rows: [[String]] = faturalar.map { f in
+                [
+                    String(f.tarih.prefix(10)),
+                    f.faturaNo,
+                    f.cariUnvan ?? "-",
+                    f.faturaTuru,
+                    AppFormatters.money(f.araToplam),
+                    AppFormatters.money(f.kdvToplami),
+                    AppFormatters.money(f.genelToplam)
+                ]
+            }
+            return (headers, rows)
+            
+        case "Nakit Akış Tablosu":
+            let headers = ["Tarih", "Açıklama", "Giren", "Çıkan", "Bakiye"]
+            var running: Double = 0
+            let rows: [[String]] = cariHareketler.reversed().map { h in
+                running += (h.alacak - h.borc)
+                return [
+                    String((h.tarih ?? "-").prefix(10)),
+                    h.aciklama ?? h.islemTuru ?? "-",
+                    AppFormatters.money(h.alacak),
+                    AppFormatters.money(h.borc),
+                    AppFormatters.money(running)
+                ]
+            }
+            return (headers, rows)
+            
+        // 6. Stratejik ve Analitik Raporlar
+        case "Müşteri ABC Analizi":
+            let headers = ["Müşteri", "Toplam Satış", "Pay %", "Sınıf"]
+            var salesByCari: [String: Double] = [:]
+            var grandTotal: Double = 0
+            for f in faturalar where f.faturaTuru.uppercased().contains("SAT") {
+                let name = f.cariUnvan ?? "Genel Müşteri"
+                salesByCari[name, default: 0] += f.genelToplam
+                grandTotal += f.genelToplam
+            }
+            let sorted = salesByCari.sorted { $0.value > $1.value }
+            var cumulativePct: Double = 0
+            let rows: [[String]] = sorted.map { name, total in
+                let pct = grandTotal > 0 ? (total / grandTotal) * 100.0 : 0
+                cumulativePct += pct
+                let sinif: String
+                if cumulativePct <= 70 { sinif = "A Sınıfı (Önemli)" }
+                else if cumulativePct <= 90 { sinif = "B Sınıfı (Orta)" }
+                else { sinif = "C Sınıfı (Standart)" }
+                return [
+                    name,
+                    AppFormatters.money(total),
+                    "%\(String(format: "%.1f", pct))",
+                    sinif
+                ]
+            }
+            return (headers, rows)
+            
+        case "Kar-Zarar Mukayesesi":
+            let headers = ["Dönem", "Satış Cirosu", "Alış Tutarı", "Net Fark", "Oran %"]
+            var byMonth: [String: (satis: Double, alis: Double)] = [:]
+            for f in faturalar {
+                let m = String(f.tarih.prefix(7))
+                let key = m.isEmpty ? "Genel" : m
+                var cur = byMonth[key] ?? (0, 0)
+                if f.faturaTuru.uppercased().contains("SAT") {
+                    cur.satis += f.genelToplam
+                } else {
+                    cur.alis += f.genelToplam
+                }
+                byMonth[key] = cur
+            }
+            let rows: [[String]] = byMonth.keys.sorted(by: >).compactMap { k in
+                guard let v = byMonth[k] else { return nil }
+                let diff = v.satis - v.alis
+                let pct = v.alis > 0 ? (diff / v.alis) * 100.0 : 100.0
+                return [
+                    k,
+                    AppFormatters.money(v.satis),
+                    AppFormatters.money(v.alis),
+                    AppFormatters.money(diff),
+                    "%\(String(format: "%.1f", pct))"
+                ]
+            }
+            return (headers, rows)
+            
+        case "Müşteri Kayıp (Churn)":
+            let headers = ["Müşteri", "Son İşlem", "Bakiye", "Durum"]
+            let rows: [[String]] = cariler.map { c in
+                let lastFatura = faturalar.first { $0.cariId == c.id || $0.cariUnvan == c.unvan }
+                let lastDateStr = lastFatura.map { String($0.tarih.prefix(10)) } ?? "İşlem Yok"
+                let durum = lastFatura == nil ? "Hareketsiz (İzleniyor)" : "Aktif"
+                return [
+                    c.unvan,
+                    lastDateStr,
+                    AppFormatters.money(abs(c.bakiye)),
+                    durum
+                ]
+            }
+            return (headers, rows)
+            
+        case "Fiyat Dalgalanma Raporu":
+            let headers = ["Ürün", "Alış Fiyatı", "Satış Fiyatı", "Marj Tutarı", "Fark %"]
+            let rows: [[String]] = stoklar.map { s in
+                let diff = s.satisFiyati - s.alisFiyati
+                let pct = s.alisFiyati > 0 ? (diff / s.alisFiyati) * 100.0 : 0
+                return [
+                    s.stokAdi,
+                    AppFormatters.money(s.alisFiyati),
+                    AppFormatters.money(s.satisFiyati),
+                    AppFormatters.money(diff),
+                    "%\(String(format: "%.1f", pct))"
+                ]
+            }
+            return (headers, rows)
+            
+        case "Müşteri Sadakat (LTV)":
+            let headers = ["Müşteri", "İlk Alışveriş", "Son Alışveriş", "Toplam Harcama", "Ortalama Sepet"]
+            var stats: [String: (dates: [String], total: Double, count: Int)] = [:]
+            for f in faturalar where f.faturaTuru.uppercased().contains("SAT") {
+                let name = f.cariUnvan ?? "Genel Müşteri"
+                var cur = stats[name] ?? ([], 0, 0)
+                cur.dates.append(String(f.tarih.prefix(10)))
+                cur.total += f.genelToplam
+                cur.count += 1
+                stats[name] = cur
+            }
+            let rows: [[String]] = stats.sorted { $0.value.total > $1.value.total }.map { name, st in
+                let sortedDates = st.dates.sorted()
+                let firstD = sortedDates.first ?? "-"
+                let lastD = sortedDates.last ?? "-"
+                let avg = st.count > 0 ? (st.total / Double(st.count)) : 0
+                return [
+                    name,
+                    firstD,
+                    lastD,
+                    AppFormatters.money(st.total),
+                    AppFormatters.money(avg)
+                ]
+            }
+            return (headers, rows)
+            
+        case "Finansal Isı Haritası":
+            let headers = ["Tarih", "Satış", "Alış", "Tahsilat", "Ödeme", "Net Akış"]
+            var daily: [String: (satis: Double, alis: Double, tahsilat: Double, odeme: Double)] = [:]
+            for f in faturalar {
+                let d = String(f.tarih.prefix(10))
+                guard !d.isEmpty else { continue }
+                var cur = daily[d] ?? (0, 0, 0, 0)
+                if f.faturaTuru.uppercased().contains("SAT") { cur.satis += f.genelToplam }
+                else { cur.alis += f.genelToplam }
+                daily[d] = cur
+            }
+            for h in cariHareketler {
+                let d = String((h.tarih ?? "").prefix(10))
+                guard !d.isEmpty else { continue }
+                var cur = daily[d] ?? (0, 0, 0, 0)
+                cur.tahsilat += h.alacak
+                cur.odeme += h.borc
+                daily[d] = cur
+            }
+            let rows: [[String]] = daily.keys.sorted(by: >).compactMap { d in
+                guard let v = daily[d] else { return nil }
+                let net = (v.satis + v.tahsilat) - (v.alis + v.odeme)
+                return [
+                    d,
+                    AppFormatters.money(v.satis),
+                    AppFormatters.money(v.alis),
+                    AppFormatters.money(v.tahsilat),
+                    AppFormatters.money(v.odeme),
+                    AppFormatters.money(net)
+                ]
+            }
+            return (headers, rows)
+            
+        case "Tahsilat Süresi (DSO)":
+            let headers = ["Müşteri", "Ortalama Vade (Gün)", "Toplam Alacak", "Durum"]
+            let rows: [[String]] = cariler.filter { $0.bakiye > 0 && $0.bakiyeTuru != "A" }.map { c in
+                let vade = c.vadeGunu ?? 0
+                let durum = vade <= 30 ? "Normal (Vadesinde)" : "Uzun Vadeli"
+                return [
+                    c.unvan,
+                    "\(vade) Gün",
+                    AppFormatters.money(abs(c.bakiye)),
+                    durum
+                ]
+            }
+            return (headers, rows)
+            
+        case "Bütçe / Hedef Takibi":
+            let headers = ["Dönem (Ay)", "Gerçekleşen Satış", "Fatura Adedi", "Ortalama Fatura"]
+            var byMonth: [String: (total: Double, count: Int)] = [:]
+            for f in faturalar where f.faturaTuru.uppercased().contains("SAT") {
+                let m = String(f.tarih.prefix(7))
+                let key = m.isEmpty ? "Genel" : m
+                var cur = byMonth[key] ?? (0, 0)
+                cur.total += f.genelToplam
+                cur.count += 1
+                byMonth[key] = cur
+            }
+            let rows: [[String]] = byMonth.keys.sorted(by: >).compactMap { k in
+                guard let v = byMonth[k] else { return nil }
+                let avg = v.count > 0 ? v.total / Double(v.count) : 0
+                return [
+                    k,
+                    AppFormatters.money(v.total),
+                    "\(v.count) Adet",
+                    AppFormatters.money(avg)
+                ]
+            }
+            return (headers, rows)
+            
+        default:
+            return (report.headers, [])
         }
     }
 }

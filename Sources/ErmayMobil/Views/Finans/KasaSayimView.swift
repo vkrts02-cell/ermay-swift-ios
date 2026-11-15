@@ -181,19 +181,22 @@ public struct KasaSayimView: View {
         df.dateFormat = "yyyy-MM-dd"
         let bugun = df.string(from: Date())
         
+        let khId = IdGenerator.generateMobileRecordId()
+        let evrakNo = "SYM-\(khId % 100000)"
         let fis = KasaHareket(
-            id: UUID().uuidString,
+            id: khId,
             tarih: bugun,
             islemTuru: kasaFarki >= 0 ? "KASA_FAZLASI" : "KASA_NOKSANI",
             cariUnvan: "KASA MUTABAKATI",
-            belgeNo: "SYM-\(Int.random(in: 100...999))",
+            belgeNo: evrakNo,
             tutar: abs(kasaFarki),
             aciklama: "Günlük Kasa Sayım Fişi - Fiziki: \(AppFormatters.money(fizikiToplam))"
         )
         
         Task {
             let payload: [String: Any] = [
-                "uuid": UUID().uuidString,
+                "id": khId,
+                "uuid": fis.uuid,
                 "tenant_id": SupabaseService.shared.tenantId,
                 "tarih": bugun,
                 "islem_turu": kasaFarki >= 0 ? "KASA_FAZLASI" : "KASA_NOKSANI",
@@ -203,13 +206,19 @@ public struct KasaSayimView: View {
                 "gelir": kasaFarki >= 0 ? abs(kasaFarki) : 0.0,
                 "gider": kasaFarki < 0 ? abs(kasaFarki) : 0.0,
                 "cari_unvan": "KASA MUTABAKATI",
-                "evrak_no": "SYM-\(Int.random(in: 100...999))",
+                "evrak_no": evrakNo,
                 "tutar": abs(kasaFarki),
                 "aciklama": "Günlük Kasa Sayım Fişi - Fiziki: \(AppFormatters.money(fizikiToplam))",
                 "is_deleted": false
             ]
             if let data = try? JSONSerialization.data(withJSONObject: payload) {
-                try? await SupabaseService.shared.insertRaw(into: "kasa_hareketler", data: data)
+                try? await SupabaseService.shared.upsertRaw(into: "kasa_hareketler", data: data)
+            }
+            if let kasalar: [KasaBanka] = try? await SupabaseService.shared.fetch(from: "kasalar"),
+               var targetKasa = kasalar.first,
+               let kasaId = targetKasa.id {
+                targetKasa.bakiye = fizikiToplam
+                try? await SupabaseService.shared.update(table: "kasalar", id: "\(kasaId)", item: targetKasa)
             }
             await MainActor.run {
                 isFinalizing = false

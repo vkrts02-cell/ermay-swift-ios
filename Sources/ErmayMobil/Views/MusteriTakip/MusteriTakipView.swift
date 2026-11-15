@@ -294,14 +294,17 @@ public struct MusteriTakipView: View {
             .padding(.horizontal, 20)
             
             Button {
-                guard !newCariUnvan.isEmpty else { return }
+                let trimmedUnvan = newCariUnvan.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmedUnvan.isEmpty else { return }
+                let matchedCari = LocalDatabaseService.shared.searchCachedCariler(query: trimmedUnvan, limit: 1).first
+                let generatedId = IdGenerator.generateMobileRecordId()
                 let newFolder = MusteriTakipKlasor(
-                    id: Int.random(in: 1000...9999),
-                    cariId: Int.random(in: 10...99),
-                    cariUnvan: newCariUnvan,
-                    cariKod: "CARI-\(Int.random(in: 100...999))",
-                    telefon: newTelefon,
-                    yetkili: newYetkili,
+                    id: generatedId,
+                    cariId: Int(matchedCari?.id ?? "") ?? 0,
+                    cariUnvan: trimmedUnvan,
+                    cariKod: matchedCari?.cariKodu ?? "CARI-\(generatedId % 100000)",
+                    telefon: newTelefon.isEmpty ? (matchedCari?.telefon ?? "") : newTelefon,
+                    yetkili: newYetkili.isEmpty ? (matchedCari?.yetkili ?? "") : newYetkili,
                     etiket: newEtiket,
                     renk: newRenk
                 )

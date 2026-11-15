@@ -602,15 +602,26 @@ public struct CariDetailView: View {
     
     // MARK: - Silme İşlemi (Canlı Supabase & UI)
     private func performDelete() {
+        if abs(currentCari.bakiye) > 0.01 {
+            deleteErrorMessage = "Bakiyesi sıfır olmayan (\(AppFormatters.money(abs(currentCari.bakiye)))) cari kart silinemez."
+            return
+        }
+        guard let cariId = currentCari.id else {
+            deleteErrorMessage = "Cari kimliği doğrulanamadı."
+            return
+        }
         Task {
             do {
-                try await SupabaseService.shared.delete(table: "cariler", id: currentCari.id)
+                try await SupabaseService.shared.delete(table: "cariler", id: cariId)
+                await MainActor.run {
+                    onDelete?(currentCari)
+                    presentationMode.wrappedValue.dismiss()
+                }
             } catch {
                 print("[CariDetail] Silme hatası: \(error)")
-            }
-            await MainActor.run {
-                onDelete?(currentCari)
-                presentationMode.wrappedValue.dismiss()
+                await MainActor.run {
+                    self.deleteErrorMessage = "Cari kart silinemedi: \(error.localizedDescription)"
+                }
             }
         }
     }

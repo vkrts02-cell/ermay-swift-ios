@@ -197,10 +197,21 @@ public struct BorcHatirlaticiView: View {
     
     private func sendWhatsAppReminder(_ item: HatirlaticiItem) {
         guard let phone = item.telefon else { return }
-        let clean = phone.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "-", with: "")
+        let digits = phone.filter { $0.isNumber }
+        let normalizedPhone: String
+        if digits.hasPrefix("90") && digits.count == 12 {
+            normalizedPhone = digits
+        } else if digits.hasPrefix("0") && digits.count == 11 {
+            normalizedPhone = "90" + String(digits.dropFirst())
+        } else if digits.count == 10 {
+            normalizedPhone = "90" + digits
+        } else {
+            normalizedPhone = digits
+        }
+        guard !normalizedPhone.isEmpty else { return }
         let text = "Sayın \(item.cariUnvan), \(item.belgeNo) nolu \(AppFormatters.money(item.tutar)) tutarındaki faturanızın vadesi dolmuştur. Ödemenizi rica eder, iyi çalışmalar dileriz. - Ermay Muhasebe"
         let enc = text.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        if let url = URL(string: "https://wa.me/90\(clean)?text=\(enc)") {
+        if let url = URL(string: "https://wa.me/\(normalizedPhone)?text=\(enc)") {
             #if canImport(UIKit)
             UIApplication.shared.open(url)
             #endif

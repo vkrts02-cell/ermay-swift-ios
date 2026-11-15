@@ -25,9 +25,24 @@ public struct AppFormatters {
     
     public static let isoDate: DateFormatter = {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter
     }()
+
+    public static let utcIso8601: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        if let gmt = TimeZone(secondsFromGMT: 0) {
+            formatter.timeZone = gmt
+        }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
+    public static func formatUtcIso8601(_ date: Date = Date()) -> String {
+        return utcIso8601.string(from: date)
+    }
     
     public static func formatDate(_ date: Date?) -> String {
         guard let d = date else { return "-" }

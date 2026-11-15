@@ -94,20 +94,52 @@ public struct CariPickerSheet: View {
             .task {
                 await loadCariler()
             }
+            .onChange(of: searchText) { newQuery in
+                Task {
+                    await performSearch(query: newQuery)
+                }
+            }
+        }
+    }
+    
+    private func performSearch(query: String) async {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            if !DataStore.shared.cariler.isEmpty {
+                await MainActor.run { self.cariler = DataStore.shared.cariler }
+            } else if let cached = try? await LocalDatabaseService.shared.fetchCariler(), !cached.isEmpty {
+                await MainActor.run { self.cariler = cached }
+            }
+            return
+        }
+        if let dbResults = try? await LocalDatabaseService.shared.searchCariler(query: trimmed, limit: 50), !dbResults.isEmpty {
+            await MainActor.run { self.cariler = dbResults }
         }
     }
     
     private func loadCariler() async {
-        isLoading = true
+        // 1. Önce yerel SQLite veya DataStore önbelleğinden anında yükle (Offline destekli)
+        if !DataStore.shared.cariler.isEmpty {
+            await MainActor.run { self.cariler = DataStore.shared.cariler }
+        } else if let cached = try? await LocalDatabaseService.shared.fetchCariler(), !cached.isEmpty {
+            await MainActor.run { self.cariler = cached }
+        } else {
+            await MainActor.run { isLoading = true }
+        }
+        
+        // 2. Arka planda buluttan güncel veriyi çek ve yerel önbelleği besle
         do {
             let items: [CariKart] = try await SupabaseService.shared.fetchCariler()
+            try? await LocalDatabaseService.shared.upsertCariler(items)
             await MainActor.run {
-                self.cariler = items
+                if searchText.isEmpty {
+                    self.cariler = items
+                }
             }
         } catch {
-            print("[CariPickerSheet] Cari çekme hatası: \(error)")
+            print("[CariPickerSheet] Çevrimdışı mod — yerel önbellek kullanılıyor: \(error.localizedDescription)")
         }
-        isLoading = false
+        await MainActor.run { isLoading = false }
     }
 }
 
@@ -210,17 +242,49 @@ public struct StokPickerSheet: View {
             .task {
                 await loadStoklar()
             }
+            .onChange(of: searchText) { newQuery in
+                Task {
+                    await performSearch(query: newQuery)
+                }
+            }
+        }
+    }
+    
+    private func performSearch(query: String) async {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            if !DataStore.shared.stoklar.isEmpty {
+                await MainActor.run { self.stoklar = DataStore.shared.stoklar }
+            } else if let cached = try? await LocalDatabaseService.shared.fetchStoklar(), !cached.isEmpty {
+                await MainActor.run { self.stoklar = cached }
+            }
+            return
+        }
+        if let dbResults = try? await LocalDatabaseService.shared.searchStoklar(query: trimmed, limit: 50), !dbResults.isEmpty {
+            await MainActor.run { self.stoklar = dbResults }
         }
     }
     
     @MainActor
     private func loadStoklar() async {
-        isLoading = true
+        // 1. Önce yerel SQLite veya DataStore önbelleğinden anında yükle (Offline destekli)
+        if !DataStore.shared.stoklar.isEmpty {
+            self.stoklar = DataStore.shared.stoklar
+        } else if let cached = try? await LocalDatabaseService.shared.fetchStoklar(), !cached.isEmpty {
+            self.stoklar = cached
+        } else {
+            isLoading = true
+        }
+        
+        // 2. Arka planda buluttan güncel veriyi çek ve yerel önbelleği besle
         do {
             let items: [StokKart] = try await SupabaseService.shared.fetchStoklar()
-            self.stoklar = items
+            try? await LocalDatabaseService.shared.upsertStoklar(items)
+            if searchText.isEmpty {
+                self.stoklar = items
+            }
         } catch {
-            print("[StokPickerSheet] Supabase stok çekme hatası: \(error.localizedDescription)")
+            print("[StokPickerSheet] Çevrimdışı mod — yerel önbellek kullanılıyor: \(error.localizedDescription)")
         }
         isLoading = false
     }

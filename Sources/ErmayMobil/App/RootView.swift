@@ -26,6 +26,7 @@ public struct RootView: View {
             }
         }
         .onAppear {
+            OfflineQueueService.shared.startAutoProcessing()
             if supabaseService.isConfigured {
                 SupabaseService.shared.startRealtimeListener()
             }

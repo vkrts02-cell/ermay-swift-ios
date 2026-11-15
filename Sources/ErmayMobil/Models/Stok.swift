@@ -324,7 +324,11 @@ public struct StokHareket: Identifiable, Codable, Hashable {
     
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
+        if let intId = Int(id), intId > 0 {
+            try container.encode(intId, forKey: .id)
+        }
+        let finalUuid = syncGuid ?? (Int(id) == nil ? id : UUID().uuidString)
+        try container.encode(finalUuid, forKey: .uuid)
         try container.encode(stokId, forKey: .stokId)
         try container.encodeIfPresent(tarih, forKey: .tarih)
         try container.encodeIfPresent(islemTuru, forKey: .islemTuru)

@@ -29,30 +29,6 @@ public final class KeyboardAccessoryHelper {
         return toolbar
     }
 }
-
-extension UITextField {
-    @objc open override func didMoveToWindow() {
-        super.didMoveToWindow()
-        if self.inputAccessoryView == nil {
-            self.inputAccessoryView = KeyboardAccessoryHelper.makeToolbar(
-                target: self,
-                action: #selector(resignFirstResponder)
-            )
-        }
-    }
-}
-
-extension UITextView {
-    @objc open override func didMoveToWindow() {
-        super.didMoveToWindow()
-        if self.inputAccessoryView == nil {
-            self.inputAccessoryView = KeyboardAccessoryHelper.makeToolbar(
-                target: self,
-                action: #selector(resignFirstResponder)
-            )
-        }
-    }
-}
 #endif
 
 // MARK: - SwiftUI View Modifiers for Keyboard

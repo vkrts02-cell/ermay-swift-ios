@@ -22,9 +22,11 @@ public struct StokHareketItem: Identifiable, Hashable {
 
 public struct StoklarView: View {
     @Environment(\.presentationMode) var presentationMode
+    @ObservedObject private var dataStore = DataStore.shared
     
     // Stok Listesi State
     @State private var stoklar: [StokKart] = []
+    @State private var dbSearchResults: [StokKart]? = nil
     
     // Filters & Paging State
     @State private var filterKod: String = ""
@@ -68,13 +70,20 @@ public struct StoklarView: View {
     public init() {}
     
     public var filteredStoklar: [StokKart] {
-        stoklar.filter { s in
-            let matchText = filterKod.isEmpty ||
-                s.stokAdi.localizedCaseInsensitiveContains(filterKod) ||
-                (s.stokKodu ?? "").localizedCaseInsensitiveContains(filterKod) ||
-                (s.barkod ?? "").localizedCaseInsensitiveContains(filterKod) ||
-                (s.grupAdi ?? "").localizedCaseInsensitiveContains(filterKod)
-            if !matchText { return false }
+        let baseList: [StokKart]
+        if !filterKod.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let pushedDown = dbSearchResults {
+            baseList = pushedDown
+        } else {
+            baseList = !dataStore.stoklar.isEmpty ? dataStore.stoklar : stoklar
+        }
+        return baseList.filter { s in
+            if dbSearchResults == nil && !filterKod.isEmpty {
+                let matchText = s.stokAdi.localizedCaseInsensitiveContains(filterKod) ||
+                    (s.stokKodu ?? "").localizedCaseInsensitiveContains(filterKod) ||
+                    (s.barkod ?? "").localizedCaseInsensitiveContains(filterKod) ||
+                    (s.grupAdi ?? "").localizedCaseInsensitiveContains(filterKod)
+                if !matchText { return false }
+            }
             if onlyWithBalance && s.mevcutMiktar <= 0 { return false }
             return true
         }
@@ -511,6 +520,20 @@ public struct StoklarView: View {
                     await loadLiveStoklar()
                 }
             }
+            .onChange(of: filterKod) { newQuery in
+                let trimmed = newQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty {
+                    dbSearchResults = nil
+                } else {
+                    Task {
+                        if let res = try? await LocalDatabaseService.shared.searchStoklar(query: trimmed, limit: 50), !res.isEmpty {
+                            await MainActor.run { dbSearchResults = res }
+                        } else {
+                            await MainActor.run { dbSearchResults = nil }
+                        }
+                    }
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .supabaseRealtimeDataChanged)) { _ in
                 Task {
                     await loadLiveStoklar()
@@ -520,13 +543,9 @@ public struct StoklarView: View {
     }
     
     private func loadLiveStoklar() async {
-        do {
-            let fetched = try await SupabaseService.shared.fetchStoklar()
-            await MainActor.run {
-                self.stoklar = fetched
-            }
-        } catch {
-            print("[StoklarView] Canlı stok çekme hatası: \(error)")
+        await dataStore.loadStoklarCacheFirst(forceCloudRefresh: true)
+        if !dataStore.stoklar.isEmpty {
+            self.stoklar = dataStore.stoklar
         }
     }
     

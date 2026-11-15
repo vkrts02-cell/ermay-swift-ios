@@ -285,9 +285,11 @@ struct EftGonderimView: View {
                             let tutarNum = Double(tutar) ?? 0.0
                             let df = DateFormatter()
                             df.dateFormat = "dd.MM.yyyy"
+                            let bhId = IdGenerator.generateMobileRecordId()
+                            let targetBank = bankalar.first
                             let h = BankaHareket(
-                                id: UUID().uuidString,
-                                bankaAdi: bankalar.first?.bankaAdi ?? "Garanti BBVA",
+                                id: bhId,
+                                bankaAdi: targetBank?.bankaAdi ?? "Banka Hesabı",
                                 iban: aliciIban,
                                 tarih: df.string(from: Date()),
                                 islemTuru: "GONDERILEN_EFT",
@@ -299,7 +301,9 @@ struct EftGonderimView: View {
                             onEftComplete(h)
                             Task {
                                 let payload: [String: Any] = [
-                                    "uuid": UUID().uuidString,
+                                    "id": bhId,
+                                    "banka_id": targetBank?.id ?? 1,
+                                    "uuid": h.uuid,
                                     "tenant_id": SupabaseService.shared.tenantId,
                                     "tarih": AppFormatters.isoDate.string(from: Date()),
                                     "islem_turu": "EFT / Havale",
@@ -308,13 +312,17 @@ struct EftGonderimView: View {
                                     "cikan": tutarNum,
                                     "ceken": tutarNum,
                                     "cari_unvan": aliciUnvan,
-                                    "evrak_no": "EFT-\(Int.random(in: 100...999))",
+                                    "evrak_no": "EFT-\(bhId % 100000)",
                                     "tutar": tutarNum,
                                     "aciklama": aciklama.isEmpty ? "Mobil EFT/Havale Gönderimi: \(aliciIban)" : aciklama,
                                     "is_deleted": false
                                 ]
                                 if let bData = try? JSONSerialization.data(withJSONObject: payload) {
-                                    try? await SupabaseService.shared.insertRaw(into: "banka_hareketler", data: bData)
+                                    try? await SupabaseService.shared.upsertRaw(into: "banka_hareketler", data: bData)
+                                }
+                                if var updatedBank = targetBank, let bankId = updatedBank.id {
+                                    updatedBank.bakiye -= tutarNum
+                                    try? await SupabaseService.shared.update(table: "bankalar", id: "\(bankId)", item: updatedBank)
                                 }
                             }
                             dismiss()

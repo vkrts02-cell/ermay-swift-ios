@@ -575,10 +575,59 @@ public struct FaturaFormView: View {
                     dismiss()
                 }
             } catch {
+                // Offline fallback: create local invoice, save to local SQLite, enqueue to OfflineQueueService
+                let subtotal = req.items.reduce(0.0) { $0 + ($1.miktar * $1.birimFiyat) }
+                let totalIskonto = req.items.reduce(0.0) { $0 + $1.iskontoTutari }
+                let totalKdv = req.items.reduce(0.0) { $0 + $1.kdvTutari }
+                let grandTotal = subtotal - totalIskonto + totalKdv
+                let isSatis = req.tur == "Satış" || req.tur.contains("SATIS")
+                let isPaid = req.odemeSekli != "Açık Hesap"
+                let faturaNo = req.faturaNo.hasPrefix("MB-") ? req.faturaNo : "MB-\(req.faturaNo)"
+                let invoiceUuid = UUID().uuidString
+                
+                let localFatura = Fatura(
+                    id: invoiceUuid,
+                    faturaNo: faturaNo,
+                    faturaTuru: isSatis ? "SATIS" : "ALIS",
+                    cariId: req.cari.id,
+                    cariUnvan: req.cari.unvan,
+                    tarih: req.tarih,
+                    vadeTarihi: req.vadeTarihi,
+                    araToplam: subtotal,
+                    kdvToplami: totalKdv,
+                    iskontoToplami: totalIskonto,
+                    genelToplam: grandTotal,
+                    odemeDurumu: isPaid ? "ODENDI" : "BEKLIYOR",
+                    durum: isPaid ? "Kapalı" : req.durum,
+                    aciklama: req.aciklama,
+                    kalemler: req.items,
+                    syncGuid: invoiceUuid,
+                    tenantId: SupabaseService.shared.tenantId
+                )
+                
+                // 1. Save to local SQLite database
+                try? await LocalDatabaseService.shared.upsertFaturalar([localFatura])
+                
+                // 2. Enqueue atomic invoice RPC payload
+                if let payloadData = try? JSONEncoder().encode(localFatura),
+                   let payloadJson = String(data: payloadData, encoding: .utf8) {
+                    OfflineQueueService.shared.enqueue(
+                        endpoint: "save_invoice_atomic",
+                        method: "RPC",
+                        payload: payloadJson
+                    )
+                }
+                
                 await MainActor.run {
-                    self.errorMessage = "Fatura kaydedilirken hata oluştu: \(error.localizedDescription)"
+                    HardwareService.shared.hapticSuccess()
+                    NotificationCenter.default.post(
+                        name: .userToastNotification,
+                        object: nil,
+                        userInfo: ["message": "Fatura çevrimdışı kaydedildi. Bağlantı sağlandığında eşitlenecek."]
+                    )
+                    onSave?(localFatura)
                     self.isSaving = false
-                    HardwareService.shared.hapticError()
+                    dismiss()
                 }
             }
         }
