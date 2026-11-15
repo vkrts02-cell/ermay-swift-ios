@@ -290,7 +290,6 @@ public struct CariFormView: View {
                         let nextId = await SupabaseService.shared.getNextId(for: "cariler")
                         itemToSave.id = String(nextId)
                     }
-                    }
                     try await SupabaseService.shared.insert(into: "cariler", item: itemToSave)
                 }
                 await MainActor.run {
