@@ -223,9 +223,7 @@ public struct FaturalarView: View {
     private func loadFaturalar() async {
         isLoading = dataStore.faturalar.isEmpty
         await dataStore.loadFaturalarCacheFirst(forceCloudRefresh: true)
-        if !dataStore.faturalar.isEmpty {
-            self.faturalar = dataStore.faturalar
-        }
+        self.faturalar = dataStore.faturalar
         isLoading = false
     }
 }

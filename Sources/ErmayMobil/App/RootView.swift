@@ -23,12 +23,22 @@ public struct RootView: View {
         .onChange(of: supabaseService.isConfigured) { configured in
             if configured {
                 SupabaseService.shared.startRealtimeListener()
+                Task { await DataStore.shared.syncAll() }
+            }
+        }
+        .onChange(of: authService.isAuthenticated) { authenticated in
+            if authenticated && supabaseService.isConfigured {
+                SupabaseService.shared.startRealtimeListener()
+                Task { await DataStore.shared.syncAll() }
             }
         }
         .onAppear {
             OfflineQueueService.shared.startAutoProcessing()
             if supabaseService.isConfigured {
                 SupabaseService.shared.startRealtimeListener()
+                if authService.isAuthenticated {
+                    Task { await DataStore.shared.syncAll() }
+                }
             }
         }
     }

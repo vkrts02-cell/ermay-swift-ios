@@ -61,14 +61,12 @@ public final class DataStore: ObservableObject {
         
         do {
             let cloudCariler = try await SupabaseService.shared.fetchCariler()
-            if !cloudCariler.isEmpty {
-                try await LocalDatabaseService.shared.upsertCariler(cloudCariler)
-                self.cariler = try await LocalDatabaseService.shared.fetchCariler()
-                self.lastSyncDate = Date()
-            }
+            try await LocalDatabaseService.shared.upsertCariler(cloudCariler, replaceAll: true)
+            self.cariler = try await LocalDatabaseService.shared.fetchCariler()
+            self.lastSyncDate = Date()
         } catch {
             print("[DataStore] Supabase cariler sync failed, maintaining local cache: \(error)")
-            // Crucial: Cache preserved, lists are NEVER emptied
+            // Crucial: Cache preserved, lists are NEVER emptied on network error
         }
         isLoadingCariler = false
     }
@@ -89,11 +87,9 @@ public final class DataStore: ObservableObject {
         
         do {
             let cloudStoklar = try await SupabaseService.shared.fetchStoklar()
-            if !cloudStoklar.isEmpty {
-                try await LocalDatabaseService.shared.upsertStoklar(cloudStoklar)
-                self.stoklar = try await LocalDatabaseService.shared.fetchStoklar()
-                self.lastSyncDate = Date()
-            }
+            try await LocalDatabaseService.shared.upsertStoklar(cloudStoklar, replaceAll: true)
+            self.stoklar = try await LocalDatabaseService.shared.fetchStoklar()
+            self.lastSyncDate = Date()
         } catch {
             print("[DataStore] Supabase stoklar sync failed, maintaining local cache: \(error)")
         }
@@ -116,14 +112,11 @@ public final class DataStore: ObservableObject {
         
         do {
             let cloudFaturalar: [Fatura] = try await SupabaseService.shared.fetch(from: "faturalar", orderBy: "tarih.desc", limit: 5000)
-            if !cloudFaturalar.isEmpty {
-                try await LocalDatabaseService.shared.upsertFaturalar(cloudFaturalar)
-                self.faturalar = try await LocalDatabaseService.shared.fetchFaturalar()
-                self.lastSyncDate = Date()
-            }
+            try await LocalDatabaseService.shared.upsertFaturalar(cloudFaturalar, replaceAll: true)
+            self.faturalar = try await LocalDatabaseService.shared.fetchFaturalar()
+            self.lastSyncDate = Date()
         } catch {
             print("[DataStore] Supabase faturalar sync failed, maintaining local cache: \(error)")
-            // Eliminates the defect in FaturalarView.swift where faturalar was wiped to []
         }
         isLoadingFaturalar = false
     }

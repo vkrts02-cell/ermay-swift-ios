@@ -5,8 +5,10 @@ import KeychainAccess
 public final class SupabaseService: ObservableObject, @unchecked Sendable {
     public static let shared = SupabaseService()
     
-    public static let defaultBaseUrl = ""
-    public static let defaultAnonKey = ""
+    public static let defaultBaseUrl = "https://fqgbdymffknglqeqoogt.supabase.co"
+    public static let defaultAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZxZ2JkeW1mZmtuZ2xxZXFvb2d0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1ODUzMDEsImV4cCI6MjEwNTE2MTMwMX0.pBeE2ivWpbkAd8KSN1y2pXNZPIr_1mGMLXXHYPzjTDg"
+    private let unsupportedColsLock = NSLock()
+    private var unsupportedColumnsByTable: [String: Set<String>] = [:]
     
     @Published public var baseUrl: String = SupabaseService.defaultBaseUrl
     @Published public var anonKey: String = SupabaseService.defaultAnonKey
@@ -480,6 +482,48 @@ public final class SupabaseService: ObservableObject, @unchecked Sendable {
         return 1
     }
     
+    // MARK: - Schema-Resilient Column Stripping Helpers
+    private func recordUnsupportedColumn(table: String, column: String) {
+        let baseTable = table.components(separatedBy: "?").first?.lowercased() ?? table.lowercased()
+        unsupportedColsLock.lock()
+        defer { unsupportedColsLock.unlock() }
+        var set = unsupportedColumnsByTable[baseTable] ?? Set<String>()
+        set.insert(column)
+        unsupportedColumnsByTable[baseTable] = set
+    }
+
+    private func stripUnsupportedColumns(table: String, data: Data) -> Data {
+        let baseTable = table.components(separatedBy: "?").first?.lowercased() ?? table.lowercased()
+        unsupportedColsLock.lock()
+        let cols = unsupportedColumnsByTable[baseTable] ?? Set<String>()
+        unsupportedColsLock.unlock()
+        guard !cols.isEmpty else { return data }
+        if var dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+            for col in cols { dict.removeValue(forKey: col) }
+            if let stripped = try? JSONSerialization.data(withJSONObject: dict) { return stripped }
+        }
+        return data
+    }
+
+    private func extractMissingColumn(from errorMsg: String) -> String? {
+        guard errorMsg.contains("PGRST204") || errorMsg.contains("42703") || errorMsg.contains("does not exist") else {
+            return nil
+        }
+        let patterns = [
+            "Could not find the '([^']+)' column",
+            "column \"([^\"]+)\" of relation"
+        ]
+        for pattern in patterns {
+            if let regex = try? NSRegularExpression(pattern: pattern),
+               let match = regex.firstMatch(in: errorMsg, range: NSRange(errorMsg.startIndex..., in: errorMsg)),
+               match.numberOfRanges > 1,
+               let range = Range(match.range(at: 1), in: errorMsg) {
+                return String(errorMsg[range])
+            }
+        }
+        return nil
+    }
+
     // MARK: - PostgREST Insert
     public func insert<T: Encodable>(into table: String, item: T) async throws {
         let data = try encoder.encode(item)
@@ -490,24 +534,37 @@ public final class SupabaseService: ObservableObject, @unchecked Sendable {
         guard let url = URL(string: "\(baseUrl)/rest/v1/\(table)") else {
             throw URLError(.badURL)
         }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        defaultHeaders(prefer: "return=representation").forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
-        
-        request.httpBody = try encoder.encode(item)
-        
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+        var currentData = stripUnsupportedColumns(table: table, data: try encoder.encode(item))
+        var retries = 25
+        while retries > 0 {
+            retries -= 1
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            defaultHeaders(prefer: "return=representation").forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
+            request.httpBody = currentData
+            
+            let (data, response) = try await session.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
+                let results = try decoder.decode([R].self, from: data)
+                guard let first = results.first else {
+                    throw NSError(domain: "SupabaseError", code: 404, userInfo: [NSLocalizedDescriptionKey: "Sonuç bulunamadı"])
+                }
+                return first
+            }
             let errorMsg = String(data: data, encoding: .utf8) ?? "Kayıt Eklenemedi"
+            if let missingCol = extractMissingColumn(from: errorMsg),
+               var dict = (try? JSONSerialization.jsonObject(with: currentData)) as? [String: Any],
+               dict.keys.contains(missingCol) {
+                recordUnsupportedColumn(table: table, column: missingCol)
+                dict.removeValue(forKey: missingCol)
+                if let nextData = try? JSONSerialization.data(withJSONObject: dict) {
+                    currentData = nextData
+                    continue
+                }
+            }
             throw NSError(domain: "SupabaseError", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: [NSLocalizedDescriptionKey: errorMsg])
         }
-        
-        let results = try decoder.decode([R].self, from: data)
-        guard let first = results.first else {
-            throw NSError(domain: "SupabaseError", code: 404, userInfo: [NSLocalizedDescriptionKey: "Sonuç bulunamadı"])
-        }
-        return first
+        throw NSError(domain: "SupabaseError", code: 500, userInfo: [NSLocalizedDescriptionKey: "Kayıt Eklenemedi"])
     }
     
     // MARK: - PostgREST Raw Insert & Idempotent Upsert
@@ -515,57 +572,85 @@ public final class SupabaseService: ObservableObject, @unchecked Sendable {
         guard let url = URL(string: "\(baseUrl)/rest/v1/\(table)?on_conflict=\(onConflict)") else {
             throw URLError(.badURL)
         }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        defaultHeaders(prefer: "resolution=merge-duplicates,return=minimal").forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
-        request.httpBody = data
-        let (_, response) = try await session.data(for: request)
-        if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
-            return
+        var currentData = stripUnsupportedColumns(table: table, data: data)
+        var retries = 25
+        while retries > 0 {
+            retries -= 1
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            defaultHeaders(prefer: "resolution=merge-duplicates,return=minimal").forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
+            request.httpBody = currentData
+            let (resData, response) = try await session.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
+                return
+            }
+            let errorMsg = String(data: resData, encoding: .utf8) ?? ""
+            if let missingCol = extractMissingColumn(from: errorMsg),
+               var dict = (try? JSONSerialization.jsonObject(with: currentData)) as? [String: Any],
+               dict.keys.contains(missingCol) {
+                recordUnsupportedColumn(table: table, column: missingCol)
+                dict.removeValue(forKey: missingCol)
+                if let nextData = try? JSONSerialization.data(withJSONObject: dict) {
+                    currentData = nextData
+                    continue
+                }
+            }
+            break
         }
         // Fallback to insertRaw if table lacks unique index on onConflict column
-        try await insertRaw(into: table, data: data)
+        try await insertRaw(into: table, data: currentData)
     }
 
     public func insertRaw(into table: String, data: Data) async throws {
         guard let url = URL(string: "\(baseUrl)/rest/v1/\(table)") else {
             throw URLError(.badURL)
         }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        defaultHeaders(prefer: "resolution=merge-duplicates,return=minimal").forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
-        request.httpBody = data
-        let (resData, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+        var currentData = stripUnsupportedColumns(table: table, data: data)
+        var retries = 25
+        while retries > 0 {
+            retries -= 1
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            defaultHeaders(prefer: "resolution=merge-duplicates,return=minimal").forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
+            request.httpBody = currentData
+            let (resData, response) = try await session.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
+                return
+            }
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 500
             let errorMsg = String(data: resData, encoding: .utf8) ?? "Ham Kayıt Eklenemedi"
             
+            if let missingCol = extractMissingColumn(from: errorMsg),
+               var dict = (try? JSONSerialization.jsonObject(with: currentData)) as? [String: Any],
+               dict.keys.contains(missingCol) {
+                recordUnsupportedColumn(table: table, column: missingCol)
+                dict.removeValue(forKey: missingCol)
+                if let nextData = try? JSONSerialization.data(withJSONObject: dict) {
+                    currentData = nextData
+                    continue
+                }
+            }
+            
             // Idempotent duplicate UUID guard (23505): if exact UUID already exists from partial bundle retry, treat as committed
             if statusCode == 409 || errorMsg.contains("23505") {
-                if let dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any], dict["uuid"] != nil {
+                if let dict = (try? JSONSerialization.jsonObject(with: currentData)) as? [String: Any], dict["uuid"] != nil {
                     return
                 }
             }
             
             // Eğer PostgreSQL id sequence atanmamışsa (null value in column "id" violates not-null constraint / 23502)
             if errorMsg.contains("23502") || errorMsg.contains("\"id\"") || errorMsg.contains("'id'") {
-                if var dict = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any], dict["id"] == nil {
+                if var dict = (try? JSONSerialization.jsonObject(with: currentData)) as? [String: Any], dict["id"] == nil {
                     let nextId = await getNextId(for: table)
                     dict["id"] = nextId
                     if let fallbackData = try? JSONSerialization.data(withJSONObject: dict) {
-                        var fbReq = URLRequest(url: url)
-                        fbReq.httpMethod = "POST"
-                        defaultHeaders(prefer: "return=minimal").forEach { fbReq.setValue($0.value, forHTTPHeaderField: $0.key) }
-                        fbReq.httpBody = fallbackData
-                        let (_, fbResponse) = try await session.data(for: fbReq)
-                        if let fbHttp = fbResponse as? HTTPURLResponse, (200...299).contains(fbHttp.statusCode) {
-                            return
-                        }
+                        currentData = fallbackData
+                        continue
                     }
                 }
             }
             
-            throw NSError(domain: "SupabaseError", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: [NSLocalizedDescriptionKey: errorMsg])
+            throw NSError(domain: "SupabaseError", code: statusCode, userInfo: [NSLocalizedDescriptionKey: errorMsg])
         }
     }
     
@@ -575,34 +660,37 @@ public final class SupabaseService: ObservableObject, @unchecked Sendable {
         guard let url = URL(string: "\(baseUrl)/rest/v1/\(table)?\(filter)") else {
             throw URLError(.badURL)
         }
-        var request = URLRequest(url: url)
-        request.httpMethod = "PATCH"
-        defaultHeaders(prefer: "return=minimal").forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
-        request.httpBody = data
-        let (resData, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+        var currentData = stripUnsupportedColumns(table: table, data: data)
+        var retries = 25
+        while retries > 0 {
+            retries -= 1
+            var request = URLRequest(url: url)
+            request.httpMethod = "PATCH"
+            defaultHeaders(prefer: "return=minimal").forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
+            request.httpBody = currentData
+            let (resData, response) = try await session.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
+                return
+            }
             let errorMsg = String(data: resData, encoding: .utf8) ?? "Ham Güncelleme Başarısız"
+            if let missingCol = extractMissingColumn(from: errorMsg),
+               var dict = (try? JSONSerialization.jsonObject(with: currentData)) as? [String: Any],
+               dict.keys.contains(missingCol) {
+                recordUnsupportedColumn(table: table, column: missingCol)
+                dict.removeValue(forKey: missingCol)
+                if let nextData = try? JSONSerialization.data(withJSONObject: dict) {
+                    currentData = nextData
+                    continue
+                }
+            }
             throw NSError(domain: "SupabaseError", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: [NSLocalizedDescriptionKey: errorMsg])
         }
     }
     
     // MARK: - PostgREST Update
     public func update<T: Encodable>(table: String, id: String, item: T) async throws {
-        let filter = Int(id) != nil ? "id=eq.\(id)" : "uuid=eq.\(id)"
-        guard let url = URL(string: "\(baseUrl)/rest/v1/\(table)?\(filter)") else {
-            throw URLError(.badURL)
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "PATCH"
-        defaultHeaders(prefer: "return=minimal").forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
-        request.httpBody = try encoder.encode(item)
-        
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-            let errorMsg = String(data: data, encoding: .utf8) ?? "Güncelleme Başarısız"
-            throw NSError(domain: "SupabaseError", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: [NSLocalizedDescriptionKey: errorMsg])
-        }
+        let data = try encoder.encode(item)
+        try await updateRaw(table: table, id: id, data: data)
     }
     
     // MARK: - PostgREST Soft Delete (Silinen kayıtlar deleted_at ile işaretlenir, diğer cihazlara yayılır)

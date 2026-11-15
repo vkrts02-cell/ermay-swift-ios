@@ -259,12 +259,15 @@ public actor LocalDatabaseService {
     }
     
     // MARK: - Async CRUD: Cariler
-    public func upsertCariler(_ list: [CariKart]) throws {
+    public func upsertCariler(_ list: [CariKart], replaceAll: Bool = false) throws {
         lock.lock()
         defer { lock.unlock() }
         guard let db = db else { return }
         let encoder = JSONEncoder()
         execSQLSync("BEGIN TRANSACTION;")
+        if replaceAll {
+            execSQLSync("DELETE FROM cariler;")
+        }
         let sql = """
         INSERT OR REPLACE INTO cariler (uuid, id, tenant_id, cari_kodu, unvan, cari_turu, yetkili, telefon, gsm, vergi_no, is_deleted, json_data)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?);
@@ -308,12 +311,15 @@ public actor LocalDatabaseService {
     }
     
     // MARK: - Async CRUD: Stoklar
-    public func upsertStoklar(_ list: [StokKart]) throws {
+    public func upsertStoklar(_ list: [StokKart], replaceAll: Bool = false) throws {
         lock.lock()
         defer { lock.unlock() }
         guard let db = db else { return }
         let encoder = JSONEncoder()
         execSQLSync("BEGIN TRANSACTION;")
+        if replaceAll {
+            execSQLSync("DELETE FROM stoklar;")
+        }
         let sql = """
         INSERT OR REPLACE INTO stoklar (uuid, id, tenant_id, stok_kodu, stok_adi, barkod, grup_adi, mevcut_miktar, is_deleted, json_data)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?);
@@ -355,12 +361,15 @@ public actor LocalDatabaseService {
     }
     
     // MARK: - Async CRUD: Faturalar
-    public func upsertFaturalar(_ list: [Fatura]) throws {
+    public func upsertFaturalar(_ list: [Fatura], replaceAll: Bool = false) throws {
         lock.lock()
         defer { lock.unlock() }
         guard let db = db else { return }
         let encoder = JSONEncoder()
         execSQLSync("BEGIN TRANSACTION;")
+        if replaceAll {
+            execSQLSync("DELETE FROM faturalar;")
+        }
         let sql = """
         INSERT OR REPLACE INTO faturalar (uuid, id, tenant_id, fatura_no, fatura_turu, cari_unvan, tarih, is_deleted, json_data)
         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?);

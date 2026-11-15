@@ -304,10 +304,8 @@ public struct CarilerView: View {
                 }
             }
             .onAppear {
-                if cariler.isEmpty {
-                    Task {
-                        await loadLiveCariler()
-                    }
+                Task {
+                    await loadLiveCariler()
                 }
             }
         }
@@ -343,9 +341,7 @@ public struct CarilerView: View {
     private func loadLiveCariler() async {
         isLoading = dataStore.cariler.isEmpty
         await dataStore.loadCarilerCacheFirst(forceCloudRefresh: true)
-        if !dataStore.cariler.isEmpty {
-            self.cariler = dataStore.cariler
-        }
+        self.cariler = dataStore.cariler
         isLoading = false
     }
     

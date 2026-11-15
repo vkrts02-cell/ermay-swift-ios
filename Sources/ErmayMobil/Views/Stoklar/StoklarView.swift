@@ -544,9 +544,7 @@ public struct StoklarView: View {
     
     private func loadLiveStoklar() async {
         await dataStore.loadStoklarCacheFirst(forceCloudRefresh: true)
-        if !dataStore.stoklar.isEmpty {
-            self.stoklar = dataStore.stoklar
-        }
+        self.stoklar = dataStore.stoklar
     }
     
     // MARK: - Helper Views
