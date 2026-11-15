@@ -306,7 +306,7 @@ public struct CariFormView: View {
                     OfflineQueueService.shared.enqueue(
                         action: cariToEdit == nil ? "INSERT" : "UPDATE",
                         table: "cariler",
-                        recordId: itemToSave.uuid,
+                        recordId: itemToSave.id,
                         payload: try? JSONEncoder().encode(itemToSave)
                     )
                 }

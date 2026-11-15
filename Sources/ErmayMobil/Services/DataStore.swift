@@ -129,6 +129,10 @@ public final class DataStore: ObservableObject {
     }
     
     // MARK: - Global Full Sync
+    public func refreshAll(force: Bool = true) async {
+        await syncAll()
+    }
+
     public func syncAll() async {
         guard !isSyncingAll else { return }
         isSyncingAll = true

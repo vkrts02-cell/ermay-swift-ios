@@ -620,6 +620,25 @@ public final class SupabaseService: ObservableObject, @unchecked Sendable {
     }
     
     // MARK: - RPC Calls
+    public func rpcRaw(function: String, params: [String: Any]) async throws -> [String: Any] {
+        guard let url = URL(string: "\(baseUrl)/rest/v1/rpc/\(function)") else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        defaultHeaders().forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
+        request.httpBody = try JSONSerialization.data(withJSONObject: params)
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+            let errorMsg = String(data: data, encoding: .utf8) ?? "RPC Çağrısı Başarısız"
+            throw NSError(domain: "SupabaseError", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: [NSLocalizedDescriptionKey: errorMsg])
+        }
+        if let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            return dict
+        }
+        return ["success": true]
+    }
+
     public func rpc<T: Encodable, R: Decodable>(function: String, params: T) async throws -> R {
         guard let url = URL(string: "\(baseUrl)/rest/v1/rpc/\(function)") else {
             throw URLError(.badURL)

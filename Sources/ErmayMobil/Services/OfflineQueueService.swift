@@ -230,7 +230,7 @@ public final class OfflineQueueService: @unchecked Sendable {
         switch item.method.uppercased() {
         case "RPC":
             if let dict = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any] {
-                let res = try await SupabaseService.shared.rpc(function: item.endpoint, params: dict)
+                let res = try await SupabaseService.shared.rpcRaw(function: item.endpoint, params: dict)
                 if let success = res["success"] as? Bool, !success {
                     let msg = (res["message"] as? String) ?? "Atomic RPC failed"
                     throw NSError(domain: "SupabaseRPC", code: 500, userInfo: [NSLocalizedDescriptionKey: msg])

@@ -176,7 +176,7 @@ public struct StokFormView: View {
                 }
             } catch {
                 await MainActor.run {
-                    OfflineQueueService.shared.enqueue(action: "INSERT", table: "stoklar", recordId: newStok.uuid, payload: try? JSONEncoder().encode(newStok))
+                    OfflineQueueService.shared.enqueue(action: "INSERT", table: "stoklar", recordId: newStok.id, payload: try? JSONEncoder().encode(newStok))
                     onSave?(newStok)
                     dismiss()
                 }
