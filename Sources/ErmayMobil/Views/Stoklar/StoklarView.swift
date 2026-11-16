@@ -615,12 +615,7 @@ public struct StoklarView: View {
         editKdv = String(Int(item.kdvOrani))
         editAcilisBakiye = String(item.mevcutMiktar)
         
-        // Mock Hareketler
-        hareketler = [
-            StokHareketItem(tarih: "03.11.2026", islemTuru: "GİRİŞ", aciklama: "Satın Alma Faturası", miktar: 50.0, kalanMiktar: item.mevcutMiktar, isGiris: true),
-            StokHareketItem(tarih: "28.10.2026", islemTuru: "ÇIKIŞ", aciklama: "Satış Faturası", miktar: 15.0, kalanMiktar: item.mevcutMiktar - 50.0 + 15.0, isGiris: false),
-            StokHareketItem(tarih: "10.10.2026", islemTuru: "GİRİŞ", aciklama: "Açılış Bakiyesi", miktar: item.mevcutMiktar - 35.0, kalanMiktar: item.mevcutMiktar - 35.0, isGiris: true)
-        ]
+        hareketler = []
     }
     
     private func handleCreateNew() {

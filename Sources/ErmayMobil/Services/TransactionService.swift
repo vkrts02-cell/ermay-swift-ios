@@ -343,6 +343,7 @@ public struct AtomicInvoicePayload: Codable {
     public var odenen: Double?
     public var aciklama: String?
     public var cihaz_rolu: String?
+    public var mali_yil: Int?
     public var detaylar: [AtomicFaturaDetayData]
 }
 
@@ -556,6 +557,7 @@ public final class TransactionService: @unchecked Sendable {
             odenen: isPaid ? grandTotal : 0.0,
             aciklama: req.aciklama,
             cihaz_rolu: "Mobil",
+            mali_yil: Calendar.current.component(.year, from: Date()),
             detaylar: req.items.map { it in
                 let sIdInt: Int? = it.stokId != nil ? Int(it.stokId!) : nil
                 return AtomicFaturaDetayData(

@@ -477,16 +477,8 @@ public struct RaporlarView: View {
     
     private let categories = ["Genel Durum", "Finans", "Cari Hesap", "Stok", "Satış", "Karlılık", "Stratejik"]
     
-    // Sample cariler for the overlay picker
-    private let sampleCariler = [
-        "Akıncılar Çelik Ltd. Şti.",
-        "Özdemir Makine Sanayi",
-        "Tekin Metal A.Ş.",
-        "Kuzey Yapı Market",
-        "Birlik Hırdavat",
-        "Doruk İnşaat A.Ş.",
-        "Demir Grup Sanayi"
-    ]
+    // Cariler for the overlay picker (cleaned from mock data)
+    private let sampleCariler: [String] = []
     
     public init() {}
     
@@ -682,27 +674,37 @@ public struct RaporlarView: View {
                     .cornerRadius(12)
                     .padding(.horizontal, 16)
                     
-                    List {
-                        ForEach(sampleCariler.filter { cariSearch.isEmpty || $0.localizedCaseInsensitiveContains(cariSearch) }, id: \.self) { c in
-                            Button {
-                                selectedCariName = c
-                                isCariOverlayOpen = false
-                            } label: {
-                                HStack {
-                                    Text(c)
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundColor(.white)
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(Color(hex: "64748B"))
-                                }
-                                .padding(.vertical, 4)
-                            }
-                            .listRowBackground(Color(hex: "121216"))
+                    if sampleCariler.isEmpty {
+                        VStack(spacing: 8) {
+                            Text("Kayıtlı cari hesabı bulunamadı.")
+                                .font(.system(size: 13))
+                                .foregroundColor(Color(hex: "8E8E93"))
+                                .padding(.top, 24)
                         }
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    } else {
+                        List {
+                            ForEach(sampleCariler.filter { cariSearch.isEmpty || $0.localizedCaseInsensitiveContains(cariSearch) }, id: \.self) { c in
+                                Button {
+                                    selectedCariName = c
+                                    isCariOverlayOpen = false
+                                } label: {
+                                    HStack {
+                                        Text(c)
+                                            .font(.system(size: 14, weight: .semibold))
+                                            .foregroundColor(.white)
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(Color(hex: "64748B"))
+                                    }
+                                    .padding(.vertical, 4)
+                                }
+                                .listRowBackground(Color(hex: "121216"))
+                            }
+                        }
+                        .listStyle(.plain)
                     }
-                    .listStyle(.plain)
                     .scrollContentBackground(.hidden)
                 }
             }

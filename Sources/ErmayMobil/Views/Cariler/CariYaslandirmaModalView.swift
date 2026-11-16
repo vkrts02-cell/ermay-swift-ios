@@ -196,37 +196,41 @@ public struct CariYaslandirmaModalView: View {
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(Color(hex: "8E8E93"))
             
-            let sampleInvoices = [
-                ("FTR-2026-0042", "15.09.2026", 18500.0, "50 Gün Gecikti", Color(hex: "EF4444")),
-                ("FTR-2026-0051", "05.10.2026", 12300.0, "30 Gün Gecikti", Color(hex: "F59E0B")),
-                ("FTR-2026-0060", "28.10.2026", 14400.0, "7 Gün Gecikti", Color(hex: "3B82F6"))
-            ]
+            let sampleInvoices: [(String, String, Double, String, Color)] = []
             
-            ForEach(sampleInvoices, id: \.0) { inv in
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(inv.0)
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.white)
-                        Text("Vade: \(inv.1)")
-                            .font(.system(size: 10))
-                            .foregroundColor(Color(hex: "8E8E93"))
+            if sampleInvoices.isEmpty {
+                Text("Vadesi geçmiş veya bekleyen fatura kaydı bulunmamaktadır.")
+                    .font(.system(size: 12))
+                    .foregroundColor(Color(hex: "8E8E93"))
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 16)
+            } else {
+                ForEach(sampleInvoices, id: \.0) { inv in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(inv.0)
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.white)
+                            Text("Vade: \(inv.1)")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(hex: "8E8E93"))
+                        }
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(AppFormatters.money(inv.2))
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(.white)
+                            Text(inv.3)
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(inv.4)
+                        }
                     }
-                    
-                    Spacer()
-                    
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(AppFormatters.money(inv.2))
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.white)
-                        Text(inv.3)
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(inv.4)
-                    }
+                    .padding(10)
+                    .background(Color.white.opacity(0.02))
+                    .cornerRadius(8)
                 }
-                .padding(10)
-                .background(Color.white.opacity(0.02))
-                .cornerRadius(8)
             }
         }
         .padding(14)
