@@ -18,6 +18,8 @@ public struct Fatura: Identifiable, Codable, Hashable {
     public var kalemler: [FaturaKalem]?
     public var syncGuid: String?
     public var tenantId: String?
+    public var isDeleted: Bool = false
+    public var deletedAt: String? = nil
     
     public var idInt: Int? { Int(id) }
     public var uuid: String {
@@ -52,6 +54,7 @@ public struct Fatura: Identifiable, Codable, Hashable {
         case uuid
         case tenantId = "tenant_id"
         case isDeleted = "is_deleted"
+        case deletedAt = "deleted_at"
     }
     
     public init(
@@ -72,7 +75,9 @@ public struct Fatura: Identifiable, Codable, Hashable {
         aciklama: String? = nil,
         kalemler: [FaturaKalem]? = nil,
         syncGuid: String? = nil,
-        tenantId: String? = nil
+        tenantId: String? = nil,
+        isDeleted: Bool = false,
+        deletedAt: String? = nil
     ) {
         self.id = id
         self.faturaNo = faturaNo
@@ -91,6 +96,8 @@ public struct Fatura: Identifiable, Codable, Hashable {
         self.kalemler = kalemler
         self.syncGuid = syncGuid
         self.tenantId = tenantId
+        self.isDeleted = isDeleted
+        self.deletedAt = deletedAt
     }
     
     public init(from decoder: Decoder) throws {
@@ -161,6 +168,8 @@ public struct Fatura: Identifiable, Codable, Hashable {
         self.kalemler = try? c.decode([FaturaKalem].self, forKey: .kalemler)
         self.syncGuid = (try? c.decode(String.self, forKey: .syncGuid)) ?? (try? c.decode(String.self, forKey: .uuid))
         self.tenantId = try? c.decode(String.self, forKey: .tenantId)
+        self.isDeleted = (try? c.decode(Bool.self, forKey: .isDeleted)) ?? false
+        self.deletedAt = try? c.decode(String.self, forKey: .deletedAt)
     }
     
     public func encode(to encoder: Encoder) throws {
@@ -186,6 +195,8 @@ public struct Fatura: Identifiable, Codable, Hashable {
         try container.encodeIfPresent(kalemler, forKey: .kalemler)
         try container.encodeIfPresent(syncGuid, forKey: .syncGuid)
         try container.encodeIfPresent(tenantId, forKey: .tenantId)
+        try container.encode(isDeleted, forKey: .isDeleted)
+        try container.encodeIfPresent(deletedAt, forKey: .deletedAt)
     }
 }
 

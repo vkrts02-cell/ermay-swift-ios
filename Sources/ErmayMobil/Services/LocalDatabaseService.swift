@@ -423,7 +423,7 @@ public actor LocalDatabaseService {
                 bindText(stmt, 5, item.faturaTuru)
                 bindText(stmt, 6, item.cariUnvan)
                 bindText(stmt, 7, item.tarih)
-                sqlite3_bind_int(stmt, 8, (item.isDeleted ?? false) ? 1 : 0)
+                sqlite3_bind_int(stmt, 8, item.isDeleted ? 1 : 0)
                 bindText(stmt, 9, jsonStr)
                 sqlite3_step(stmt)
             }
