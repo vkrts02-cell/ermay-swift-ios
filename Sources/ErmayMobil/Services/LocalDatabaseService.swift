@@ -311,7 +311,7 @@ public actor LocalDatabaseService {
         return fetchCarilerSync(query: query, limit: limit)
     }
     
-    public func markCariDeleted(uuid: String) {
+    public nonisolated func markCariDeleted(uuid: String) {
         lock.lock()
         defer { lock.unlock() }
         guard let db = db else { return }
@@ -376,7 +376,7 @@ public actor LocalDatabaseService {
         return fetchStoklarSync(query: query, limit: limit)
     }
     
-    public func markStokDeleted(uuid: String) {
+    public nonisolated func markStokDeleted(uuid: String) {
         lock.lock()
         defer { lock.unlock() }
         guard let db = db else { return }
