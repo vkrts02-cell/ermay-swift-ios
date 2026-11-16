@@ -40,6 +40,7 @@ jobs:
 
       - name: Archive iOS App
         run: |
+          set -o pipefail
           xcodebuild -project ErmayMobil.xcodeproj \
             -scheme ErmayMobil \
             -configuration Release \
@@ -48,7 +49,14 @@ jobs:
             archive \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGN_IDENTITY="" 2>&1 | tee xcodebuild.log || (echo "=== XCODEBUILD FAILED - COMPILER ERRORS ===" && grep -E "error:" xcodebuild.log -B 2 -A 4 | head -n 100 && exit 1)
+
+      - name: Upload Build Log on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-failure-log
+          path: xcodebuild.log
 
       - name: Package Payload into IPA
         run: |
