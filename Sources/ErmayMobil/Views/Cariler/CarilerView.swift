@@ -245,10 +245,26 @@ public struct CarilerView: View {
                                             cariler = deduplicatedCariler(cariler)
                                         },
                                         onDelete: { deleted in
+                                            let cariUuid = deleted.syncGuid ?? deleted.id
+                                            let cariId = deleted.id
+                                            LocalDatabaseService.shared.markCariDeleted(uuid: cariUuid)
+                                            cariler.removeAll { $0.id == deleted.id || $0.syncGuid == cariUuid }
+                                            
                                             Task {
-                                                try? await SupabaseService.shared.delete(table: "cariler", id: deleted.id)
+                                                let nowUtc = AppFormatters.isoDate.string(from: Date())
+                                                let softDeleteJson = "{\"is_deleted\": true, \"deleted_at\": \"\(nowUtc)\"}"
+                                                do {
+                                                    if let payloadData = softDeleteJson.data(using: .utf8) {
+                                                        try await SupabaseService.shared.updateRaw(table: "cariler", id: cariId, data: payloadData)
+                                                    }
+                                                } catch {
+                                                    OfflineQueueService.shared.enqueue(
+                                                        endpoint: "cariler/\(cariId)",
+                                                        method: "PUT",
+                                                        payload: softDeleteJson
+                                                    )
+                                                }
                                             }
-                                            cariler.removeAll { $0.id == deleted.id }
                                         }
                                     )) {
                                         renderAppleListRow(item: item, index: index)

@@ -16,6 +16,8 @@ public struct StokKart: Identifiable, Codable, Hashable {
     public var aktif: Bool?
     public var syncGuid: String?
     public var tenantId: String?
+    public var isDeleted: Bool = false
+    public var deletedAt: String? = nil
     
     // Compatibility properties
     public var kategori: String? {
@@ -56,6 +58,7 @@ public struct StokKart: Identifiable, Codable, Hashable {
         case aktif
         case isActive = "is_active"
         case isDeleted = "is_deleted"
+        case deletedAt = "deleted_at"
         case syncGuid = "sync_guid"
         case uuid
         case tenantId = "tenant_id"
@@ -76,7 +79,9 @@ public struct StokKart: Identifiable, Codable, Hashable {
         aciklama: String? = nil,
         aktif: Bool? = true,
         syncGuid: String? = UUID().uuidString,
-        tenantId: String? = nil
+        tenantId: String? = nil,
+        isDeleted: Bool = false,
+        deletedAt: String? = nil
     ) {
         self.id = id
         self.stokKodu = stokKodu
@@ -93,6 +98,8 @@ public struct StokKart: Identifiable, Codable, Hashable {
         self.aktif = aktif
         self.syncGuid = syncGuid
         self.tenantId = tenantId
+        self.isDeleted = isDeleted
+        self.deletedAt = deletedAt
     }
     
     // Robust decoding for Supabase
@@ -167,6 +174,8 @@ public struct StokKart: Identifiable, Codable, Hashable {
         self.aktif = (try? c.decode(Bool.self, forKey: .aktif)) ?? (try? c.decode(Bool.self, forKey: .isActive)) ?? true
         self.syncGuid = (try? c.decode(String.self, forKey: .syncGuid)) ?? (try? c.decode(String.self, forKey: .uuid))
         self.tenantId = try? c.decode(String.self, forKey: .tenantId)
+        self.isDeleted = (try? c.decode(Bool.self, forKey: .isDeleted)) ?? false
+        self.deletedAt = try? c.decode(String.self, forKey: .deletedAt)
     }
     
     public func encode(to encoder: Encoder) throws {
@@ -192,7 +201,8 @@ public struct StokKart: Identifiable, Codable, Hashable {
         try container.encodeIfPresent(aciklama, forKey: .aciklama)
         try container.encode(aktif ?? true, forKey: .aktif)
         try container.encode(aktif ?? true, forKey: .isActive)
-        try container.encode(false, forKey: .isDeleted)
+        try container.encode(isDeleted, forKey: .isDeleted)
+        try container.encodeIfPresent(deletedAt, forKey: .deletedAt)
     }
 }
 

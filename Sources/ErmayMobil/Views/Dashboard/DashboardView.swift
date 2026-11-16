@@ -738,25 +738,29 @@ public struct DashboardView: View {
                 var recentList: [DashboardListItem] = []
                 
                 for c in cariler {
-                    if c.bakiyeTuru == "A" {
-                        topAlacak += c.bakiye
-                        if c.bakiye > 0 {
+                    // bakiyeTuru == "B" borçludur (Müşterinin firmaya borcu = Firmanın ALACAĞI)
+                    // bakiyeTuru == "A" alacaklıdır (Firmanın tedarikçiye BORCU)
+                    if c.bakiyeTuru == "B" || (c.bakiye > 0 && c.bakiyeTuru != "A") {
+                        let amt = abs(c.bakiye)
+                        topAlacak += amt
+                        if amt > 0 {
                             alacakList.append(DashboardListItem(
                                 title: c.unvan,
-                                description: "Müşteri",
-                                amount: c.bakiye,
+                                description: "Müşteri Alacağı",
+                                amount: amt,
                                 date: "Alacak",
                                 vade: c.vadeGunu,
                                 type: "In"
                             ))
                         }
                     } else {
-                        topBorc += c.bakiye
-                        if c.bakiye > 0 {
+                        let amt = abs(c.bakiye)
+                        topBorc += amt
+                        if amt > 0 {
                             borcList.append(DashboardListItem(
                                 title: c.unvan,
-                                description: "Tedarikçi",
-                                amount: c.bakiye,
+                                description: "Tedarikçi Borcu",
+                                amount: amt,
                                 date: "Borç",
                                 vade: c.vadeGunu,
                                 type: "Out"
@@ -765,14 +769,14 @@ public struct DashboardView: View {
                     }
                     
                     if recentList.count < 5 {
-                        let isAlacakli = (c.bakiyeTuru == "A")
+                        let isAlacak = (c.bakiyeTuru == "B" || (c.bakiye > 0 && c.bakiyeTuru != "A"))
                         recentList.append(DashboardListItem(
                             title: c.unvan,
-                            description: isAlacakli ? "Alacak Bakiyesi" : "Borç Bakiyesi",
-                            amount: c.bakiye,
+                            description: isAlacak ? "Müşteri Alacağı" : "Tedarikçi Borcu",
+                            amount: abs(c.bakiye),
                             date: "Güncel",
                             vade: c.vadeGunu,
-                            type: isAlacakli ? "In" : "Out"
+                            type: isAlacak ? "In" : "Out"
                         ))
                     }
                 }

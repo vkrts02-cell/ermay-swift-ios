@@ -30,6 +30,8 @@ public struct CariKart: Identifiable, Codable, Hashable {
     public var odemePlani: String?
     public var ticaretSicilNo: String?
     public var iban: String?
+    public var isDeleted: Bool = false
+    public var deletedAt: String? = nil
     
     public var grupAdi: String? {
         get { grup }
@@ -70,6 +72,7 @@ public struct CariKart: Identifiable, Codable, Hashable {
         case isActive = "is_active"
         case aktif
         case isDeleted = "is_deleted"
+        case deletedAt = "deleted_at"
         case syncGuid = "sync_guid"
         case uuid
         case tenantId = "tenant_id"
@@ -104,7 +107,9 @@ public struct CariKart: Identifiable, Codable, Hashable {
         olusturmaTarihi: String? = nil,
         aktif: Bool? = true,
         syncGuid: String? = UUID().uuidString,
-        tenantId: String? = nil
+        tenantId: String? = nil,
+        isDeleted: Bool = false,
+        deletedAt: String? = nil
     ) {
         self.id = id
         self.cariKodu = cariKodu
@@ -135,6 +140,8 @@ public struct CariKart: Identifiable, Codable, Hashable {
         self.aktif = aktif
         self.syncGuid = syncGuid
         self.tenantId = tenantId
+        self.isDeleted = isDeleted
+        self.deletedAt = deletedAt
     }
     
     // Robust decoding for Supabase Int/String PK and alias tolerance
@@ -201,6 +208,8 @@ public struct CariKart: Identifiable, Codable, Hashable {
         self.aktif = (try? c.decode(Bool.self, forKey: .isActive)) ?? true
         self.syncGuid = (try? c.decode(String.self, forKey: .uuid)) ?? (try? c.decode(String.self, forKey: .syncGuid))
         self.tenantId = try? c.decode(String.self, forKey: .tenantId)
+        self.isDeleted = (try? c.decode(Bool.self, forKey: .isDeleted)) ?? false
+        self.deletedAt = try? c.decode(String.self, forKey: .deletedAt)
     }
     
     public func encode(to encoder: Encoder) throws {
@@ -239,7 +248,8 @@ public struct CariKart: Identifiable, Codable, Hashable {
         }
         try container.encode(aktif ?? true, forKey: .isActive)
         try container.encode(aktif ?? true, forKey: .aktif)
-        try container.encode(false, forKey: .isDeleted)
+        try container.encode(isDeleted, forKey: .isDeleted)
+        try container.encodeIfPresent(deletedAt, forKey: .deletedAt)
     }
 }
 

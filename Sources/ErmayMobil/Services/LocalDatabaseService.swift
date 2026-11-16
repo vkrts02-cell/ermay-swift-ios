@@ -270,7 +270,7 @@ public actor LocalDatabaseService {
         }
         let sql = """
         INSERT OR REPLACE INTO cariler (uuid, id, tenant_id, cari_kodu, unvan, cari_turu, yetkili, telefon, gsm, vergi_no, is_deleted, json_data)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?);
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
@@ -294,7 +294,8 @@ public actor LocalDatabaseService {
                 bindText(stmt, 8, item.telefon)
                 bindText(stmt, 9, item.gsm)
                 bindText(stmt, 10, item.vergiNo)
-                bindText(stmt, 11, jsonStr)
+                sqlite3_bind_int(stmt, 11, item.isDeleted ? 1 : 0)
+                bindText(stmt, 12, jsonStr)
                 sqlite3_step(stmt)
             }
         }
@@ -310,6 +311,20 @@ public actor LocalDatabaseService {
         return fetchCarilerSync(query: query, limit: limit)
     }
     
+    public func markCariDeleted(uuid: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db = db else { return }
+        let sql = "UPDATE cariler SET is_deleted = 1 WHERE uuid = ? OR id = ?;"
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            bindText(stmt, 1, uuid)
+            bindText(stmt, 2, uuid)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+    }
+    
     // MARK: - Async CRUD: Stoklar
     public func upsertStoklar(_ list: [StokKart], replaceAll: Bool = false) throws {
         lock.lock()
@@ -322,7 +337,7 @@ public actor LocalDatabaseService {
         }
         let sql = """
         INSERT OR REPLACE INTO stoklar (uuid, id, tenant_id, stok_kodu, stok_adi, barkod, grup_adi, mevcut_miktar, is_deleted, json_data)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?);
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
@@ -344,7 +359,8 @@ public actor LocalDatabaseService {
                 bindText(stmt, 6, item.barkod)
                 bindText(stmt, 7, item.grupAdi)
                 sqlite3_bind_double(stmt, 8, item.mevcutMiktar)
-                bindText(stmt, 9, jsonStr)
+                sqlite3_bind_int(stmt, 9, item.isDeleted ? 1 : 0)
+                bindText(stmt, 10, jsonStr)
                 sqlite3_step(stmt)
             }
         }
@@ -360,6 +376,20 @@ public actor LocalDatabaseService {
         return fetchStoklarSync(query: query, limit: limit)
     }
     
+    public func markStokDeleted(uuid: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let db = db else { return }
+        let sql = "UPDATE stoklar SET is_deleted = 1 WHERE uuid = ? OR id = ?;"
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            bindText(stmt, 1, uuid)
+            bindText(stmt, 2, uuid)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+    }
+    
     // MARK: - Async CRUD: Faturalar
     public func upsertFaturalar(_ list: [Fatura], replaceAll: Bool = false) throws {
         lock.lock()
@@ -372,7 +402,7 @@ public actor LocalDatabaseService {
         }
         let sql = """
         INSERT OR REPLACE INTO faturalar (uuid, id, tenant_id, fatura_no, fatura_turu, cari_unvan, tarih, is_deleted, json_data)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?);
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
@@ -393,7 +423,8 @@ public actor LocalDatabaseService {
                 bindText(stmt, 5, item.faturaTuru)
                 bindText(stmt, 6, item.cariUnvan)
                 bindText(stmt, 7, item.tarih)
-                bindText(stmt, 8, jsonStr)
+                sqlite3_bind_int(stmt, 8, (item.isDeleted ?? false) ? 1 : 0)
+                bindText(stmt, 9, jsonStr)
                 sqlite3_step(stmt)
             }
         }

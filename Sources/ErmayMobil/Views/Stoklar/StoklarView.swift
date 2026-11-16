@@ -504,11 +504,27 @@ public struct StoklarView: View {
             .alert("Stok Kartını Sil", isPresented: $showDeleteConfirm) {
                 Button("Sil", role: .destructive) {
                     if let sel = selectedStok {
-                        Task {
-                            try? await SupabaseService.shared.delete(table: "stoklar", id: sel.id)
-                        }
-                        stoklar.removeAll { $0.id == sel.id }
+                        let stokUuid = sel.syncGuid ?? sel.id
+                        let stokId = sel.id
+                        LocalDatabaseService.shared.markStokDeleted(uuid: stokUuid)
+                        stoklar.removeAll { $0.id == sel.id || $0.syncGuid == stokUuid }
                         handleCreateNew()
+                        
+                        Task {
+                            let nowUtc = AppFormatters.isoDate.string(from: Date())
+                            let softDeleteJson = "{\"is_deleted\": true, \"deleted_at\": \"\(nowUtc)\"}"
+                            do {
+                                if let payloadData = softDeleteJson.data(using: .utf8) {
+                                    try await SupabaseService.shared.updateRaw(table: "stoklar", id: stokId, data: payloadData)
+                                }
+                            } catch {
+                                OfflineQueueService.shared.enqueue(
+                                    endpoint: "stoklar/\(stokId)",
+                                    method: "PUT",
+                                    payload: softDeleteJson
+                                )
+                            }
+                        }
                     }
                 }
                 Button("Vazgeç", role: .cancel) {}

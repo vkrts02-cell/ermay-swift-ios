@@ -609,13 +609,18 @@ public struct FaturaFormView: View {
                 try? await LocalDatabaseService.shared.upsertFaturalar([localFatura])
                 
                 // 2. Enqueue atomic invoice RPC payload
-                if let payloadData = try? JSONEncoder().encode(localFatura),
-                   let payloadJson = String(data: payloadData, encoding: .utf8) {
-                    OfflineQueueService.shared.enqueue(
-                        endpoint: "save_invoice_atomic",
-                        method: "RPC",
-                        payload: payloadJson
-                    )
+                if let payloadData = try? JSONEncoder().encode(localFatura) {
+                    let rpcWrapper: [String: Any] = [
+                        "p_payload": (try? JSONSerialization.jsonObject(with: payloadData)) ?? [:]
+                    ]
+                    if let wrappedData = try? JSONSerialization.data(withJSONObject: rpcWrapper),
+                       let wrappedJson = String(data: wrappedData, encoding: .utf8) {
+                        OfflineQueueService.shared.enqueue(
+                            endpoint: "save_invoice_atomic",
+                            method: "RPC",
+                            payload: wrappedJson
+                        )
+                    }
                 }
                 
                 await MainActor.run {

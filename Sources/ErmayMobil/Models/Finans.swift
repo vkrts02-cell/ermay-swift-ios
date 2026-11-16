@@ -68,15 +68,27 @@ public struct KasaHareket: Identifiable, Codable, Hashable {
     public var syncGuid: String?
     public var tenantId: String?
     
+    // M-02 UYUMLULUK ALIAS'LARI (PostgreSQL & Desktop Eşleştirmesi):
+    public var kasaId: String? {
+        get { hesapId }
+        set { hesapId = newValue }
+    }
+    public var evrakNo: String? {
+        get { belgeNo }
+        set { belgeNo = newValue }
+    }
+    
     enum CodingKeys: String, CodingKey {
         case id
         case uuid
+        case kasaId = "kasa_id"
+        case evrakNo = "evrak_no"
         case hesapId = "hesap_id"
+        case belgeNo = "belge_no"
         case tarih
         case islemTuru = "islem_turu"
         case cariId = "cari_id"
         case cariUnvan = "cari_unvan"
-        case belgeNo = "belge_no"
         case tutar
         case aciklama
         case syncGuid = "sync_guid"
@@ -148,12 +160,18 @@ public struct KasaHareket: Identifiable, Codable, Hashable {
             self.id = nil
         }
         self.uuid = (try? c.decode(String.self, forKey: .uuid)) ?? (try? c.decode(String.self, forKey: .syncGuid)) ?? UUID().uuidString
-        self.hesapId = try? c.decode(String.self, forKey: .hesapId)
+        if let kId = try? c.decode(String.self, forKey: .kasaId) {
+            self.hesapId = kId
+        } else if let kIntId = try? c.decode(Int.self, forKey: .kasaId) {
+            self.hesapId = String(kIntId)
+        } else {
+            self.hesapId = try? c.decode(String.self, forKey: .hesapId)
+        }
         self.tarih = (try? c.decode(String.self, forKey: .tarih)) ?? AppFormatters.isoDate.string(from: Date())
         self.islemTuru = (try? c.decode(String.self, forKey: .islemTuru)) ?? "TAHSILAT"
         self.cariId = try? c.decode(String.self, forKey: .cariId)
         self.cariUnvan = try? c.decode(String.self, forKey: .cariUnvan)
-        self.belgeNo = try? c.decode(String.self, forKey: .belgeNo)
+        self.belgeNo = (try? c.decode(String.self, forKey: .evrakNo)) ?? (try? c.decode(String.self, forKey: .belgeNo))
         self.tutar = (try? c.decode(Double.self, forKey: .tutar)) ?? 0.0
         self.aciklama = try? c.decode(String.self, forKey: .aciklama)
         self.syncGuid = (try? c.decode(String.self, forKey: .syncGuid)) ?? self.uuid
@@ -166,16 +184,22 @@ public struct KasaHareket: Identifiable, Codable, Hashable {
             try c.encode(intId, forKey: .id)
         }
         try c.encode(uuid, forKey: .uuid)
-        try c.encodeIfPresent(hesapId, forKey: .hesapId)
+        if let kid = hesapId {
+            if let intKid = Int(kid) {
+                try c.encode(intKid, forKey: .kasaId)
+            } else {
+                try c.encode(kid, forKey: .kasaId)
+            }
+        }
         try c.encode(tarih, forKey: .tarih)
         try c.encode(islemTuru, forKey: .islemTuru)
         try c.encodeIfPresent(cariId, forKey: .cariId)
         try c.encodeIfPresent(cariUnvan, forKey: .cariUnvan)
-        try c.encodeIfPresent(belgeNo, forKey: .belgeNo)
+        try c.encodeIfPresent(belgeNo, forKey: .evrakNo)
         try c.encode(tutar, forKey: .tutar)
         try c.encodeIfPresent(aciklama, forKey: .aciklama)
         try c.encode(syncGuid ?? uuid, forKey: .syncGuid)
-        try c.encodeIfPresent(tenantId, forKey: .tenantId)
+        try c.encodeIfPresent(tenantId ?? SupabaseService.shared.tenantId, forKey: .tenantId)
     }
 }
 
