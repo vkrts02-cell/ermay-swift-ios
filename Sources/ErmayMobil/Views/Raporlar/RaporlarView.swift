@@ -704,8 +704,8 @@ public struct RaporlarView: View {
                             }
                         }
                         .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
                     }
-                    .scrollContentBackground(.hidden)
                 }
             }
             .navigationTitle("Cari Hesap Seçiniz")
