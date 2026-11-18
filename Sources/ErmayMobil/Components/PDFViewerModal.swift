@@ -30,6 +30,24 @@ public struct PDFKitRepresentedView: UIViewRepresentable {
 }
 #endif
 
+public struct PDFPreviewItem: Identifiable {
+    public let id = UUID()
+    public let title: String
+    public let data: Data
+    public let fileName: String
+    
+    public init(title: String, data: Data, fileName: String? = nil) {
+        self.title = title
+        self.data = data
+        let rawName = fileName ?? "\(title)_Raporu.pdf"
+        self.fileName = rawName
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "\\", with: "_")
+            .replacingOccurrences(of: ":", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
+    }
+}
+
 public struct PDFViewerModal: View {
     @Environment(\.dismiss) private var dismiss
     public let title: String
@@ -39,7 +57,12 @@ public struct PDFViewerModal: View {
     public init(title: String, pdfData: Data, fileName: String? = nil) {
         self.title = title
         self.pdfData = pdfData
-        self.fileName = fileName ?? "\(title.replacingOccurrences(of: " ", with: "_")).pdf"
+        let rawName = fileName ?? "\(title.replacingOccurrences(of: " ", with: "_")).pdf"
+        self.fileName = rawName
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "\\", with: "_")
+            .replacingOccurrences(of: ":", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
     }
     
     public var body: some View {
@@ -122,19 +145,26 @@ public struct PDFViewerModal: View {
     
     #if canImport(UIKit)
     private func sharePDF() {
-        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+        let safeFileName = fileName
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "\\", with: "_")
+            .replacingOccurrences(of: ":", with: "_")
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(safeFileName)
         do {
-            try pdfData.write(to: tempURL)
+            try pdfData.write(to: tempURL, options: .atomic)
             let av = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
             if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let rootVC = windowScene.windows.first?.rootViewController {
-                // iPad popover crash önlemi
+               let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController ?? windowScene.windows.first?.rootViewController {
+                var topVC = rootVC
+                while let presented = topVC.presentedViewController {
+                    topVC = presented
+                }
                 if let popover = av.popoverPresentationController {
-                    popover.sourceView = rootVC.view
-                    popover.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
+                    popover.sourceView = topVC.view
+                    popover.sourceRect = CGRect(x: topVC.view.bounds.midX, y: topVC.view.bounds.midY, width: 0, height: 0)
                     popover.permittedArrowDirections = []
                 }
-                rootVC.present(av, animated: true)
+                topVC.present(av, animated: true)
             }
         } catch {
             print("PDF kaydetme hatası: \(error)")

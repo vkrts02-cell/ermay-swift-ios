@@ -2,17 +2,13 @@ import SwiftUI
 
 public struct StokDetailView: View {
     public let stok: StokKart
-    @State private var hareketler: [StokHareket] = [
-        StokHareket(id: "1", stokId: "1", tarih: "02.11.2026", islemTuru: "Satış Faturası", miktar: 5, birimFiyat: 220, toplamTutar: 1100, belgeNo: "FTR-2026-0012", aciklama: "Ermay Ltd. Şti. Satışı"),
-        StokHareket(id: "2", stokId: "1", tarih: "25.10.2026", islemTuru: "Alış Faturası", miktar: 50, birimFiyat: 140, toplamTutar: 7000, belgeNo: "FTR-2026-0004", aciklama: "Akıncılar Çelik Alımı")
-    ]
+    @State private var hareketler: [StokHareket] = []
+    @State private var isLoading: Bool = true
+    @State private var pdfPreviewItem: PDFPreviewItem? = nil
+    @State private var isGeneratingPDF: Bool = false
     
     public init(stok: StokKart) {
         self.stok = stok
-    }
-    
-    public var isKritik: Bool {
-        stok.mevcutMiktar <= (stok.kritikMiktar ?? 5.0)
     }
     
     public var body: some View {
@@ -21,100 +17,151 @@ public struct StokDetailView: View {
             
             ScrollView {
                 VStack(spacing: 16) {
-                    // Hero Card
                     GlassCard(cornerRadius: 18, padding: 18) {
                         VStack(spacing: 12) {
-                            Text(stok.stokAdi)
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(AppTheme.textPrimary)
-                                .multilineTextAlignment(.center)
-                            
-                            HStack(spacing: 8) {
-                                if let kod = stok.stokKodu {
-                                    StatusBadge(title: kod, color: AppTheme.primary)
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(stok.stokKodu ?? "KODSUZ")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(AppTheme.primary)
+                                    Text(stok.stokAdi)
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(AppTheme.textPrimary)
                                 }
-                                if let grup = stok.grupAdi {
-                                    StatusBadge(title: grup, color: AppTheme.secondary)
-                                }
+                                Spacer()
+                                StatusBadge(
+                                    title: "\(String(format: "%.2f", stok.mevcutMiktar)) \(stok.birim ?? "Adet")",
+                                    color: stok.mevcutMiktar <= (stok.kritikMiktar ?? 0) ? AppTheme.danger : AppTheme.success
+                                )
                             }
                             
                             Divider().background(AppTheme.border)
                             
-                            VStack(spacing: 2) {
-                                Text("MEVCUT ENVANTER")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(AppTheme.textSecondary)
-                                
-                                Text("\(String(format: "%.2f", stok.mevcutMiktar)) \(stok.birim ?? "Adet")")
-                                    .font(.system(size: 28, weight: .heavy))
-                                    .foregroundColor(isKritik ? AppTheme.danger : AppTheme.success)
-                                
-                                Text(isKritik ? "DİKKAT: Kritik stok eşiğinin altında!" : "Stok durumu yeterli")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(isKritik ? AppTheme.danger : AppTheme.textMuted)
+                            HStack(spacing: 20) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Alış Fiyatı")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(AppTheme.textSecondary)
+                                    Text(AppFormatters.money(stok.alisFiyati))
+                                        .font(.system(size: 15, weight: .bold))
+                                        .foregroundColor(AppTheme.textPrimary)
+                                }
+                                Spacer()
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("Satış Fiyatı")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(AppTheme.textSecondary)
+                                    Text(AppFormatters.money(stok.satisFiyati))
+                                        .font(.system(size: 15, weight: .bold))
+                                        .foregroundColor(AppTheme.primary)
+                                }
                             }
                         }
                     }
                     .padding(.horizontal)
                     
-                    // Fiyat ve Kar Marjı Kartı
-                    GlassCard(cornerRadius: 16, padding: 16) {
-                        VStack(spacing: 12) {
-                            DetailInfoRow(label: "Alış Fiyatı", value: AppFormatters.money(stok.alisFiyati))
-                            DetailInfoRow(label: "Satış Fiyatı", value: AppFormatters.money(stok.satisFiyati))
-                            
-                            let kar = stok.satisFiyati - stok.alisFiyati
-                            let marj = stok.alisFiyati > 0 ? (kar / stok.alisFiyati) * 100 : 0
-                            DetailInfoRow(label: "Birim Kar / Marj", value: "\(AppFormatters.money(kar)) (% \(String(format: "%.1f", marj)))")
-                            
-                            DetailInfoRow(label: "KDV Oranı", value: "%\(Int(stok.kdvOrani))")
-                            DetailInfoRow(label: "Barkod No", value: stok.barkod ?? "-")
-                            DetailInfoRow(label: "Kritik Eşik", value: "\(String(format: "%.0f", stok.kritikMiktar ?? 5.0)) \(stok.birim ?? "")")
+                    ActionButton(
+                        title: isGeneratingPDF ? "PDF Hazırlanıyor..." : "QuestPDF Stok Hareket Raporu Aç",
+                        icon: "doc.text.fill",
+                        color: AppTheme.primary
+                    ) {
+                        #if canImport(UIKit)
+                        Task { @MainActor in
+                            isGeneratingPDF = true
+                            let data = await PDFService.shared.fetchOrGenerateStokHareketPDF(stok: stok, hareketler: hareketler)
+                            isGeneratingPDF = false
+                            pdfPreviewItem = PDFPreviewItem(
+                                title: "\(stok.stokAdi) - Hareket Raporu",
+                                data: data,
+                                fileName: "Stok_Hareket_\(stok.stokKodu ?? "Stok").pdf"
+                            )
                         }
+                        #endif
                     }
                     .padding(.horizontal)
+                    .disabled(isGeneratingPDF)
                     
-                    // Stok Hareketleri Geçmişi
+                    // Stok Hareketleri
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Stok Giriş / Çıkış Hareketleri")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(AppTheme.textPrimary)
-                            .padding(.horizontal)
+                        HStack {
+                            Text("Stok Hareket Geçmişi (\(hareketler.count))")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(AppTheme.textPrimary)
+                            Spacer()
+                            if isLoading {
+                                ProgressView().tint(AppTheme.primary)
+                            }
+                        }
+                        .padding(.horizontal)
                         
-                        VStack(spacing: 8) {
-                            ForEach(hareketler) { h in
-                                GlassCard(cornerRadius: 12, padding: 12) {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(h.islemTuru ?? "Hareket")
-                                                .font(.system(size: 13, weight: .bold))
-                                                .foregroundColor(AppTheme.textPrimary)
-                                            Text("\(h.tarih ?? "-") • \(h.belgeNo ?? "")")
-                                                .font(.system(size: 11))
-                                                .foregroundColor(AppTheme.textMuted)
-                                        }
-                                        Spacer()
-                                        VStack(alignment: .trailing, spacing: 2) {
-                                            Text("\(String(format: "%.0f", h.miktar)) \(stok.birim ?? "Adet")")
-                                                .font(.system(size: 13, weight: .bold))
-                                                .foregroundColor(h.islemTuru?.contains("Satış") == true ? AppTheme.danger : AppTheme.success)
-                                            Text(AppFormatters.money(h.toplamTutar))
-                                                .font(.system(size: 10))
-                                                .foregroundColor(AppTheme.textMuted)
+                        if hareketler.isEmpty && !isLoading {
+                            GlassCard(cornerRadius: 12, padding: 14) {
+                                Text("Bu stok kartına ait kayıtlı hareket bulunmuyor.")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(AppTheme.textMuted)
+                            }
+                            .padding(.horizontal)
+                        } else {
+                            VStack(spacing: 8) {
+                                ForEach(hareketler) { h in
+                                    let isGiris = h.giren > 0 || (h.cikan == 0 && !(h.islemTuru ?? "").localizedCaseInsensitiveContains("çıkış") && !(h.islemTuru ?? "").localizedCaseInsensitiveContains("satış"))
+                                    GlassCard(cornerRadius: 12, padding: 12) {
+                                        HStack {
+                                            Image(systemName: isGiris ? "arrow.down.left.circle.fill" : "arrow.up.right.circle.fill")
+                                                .font(.system(size: 20))
+                                                .foregroundColor(isGiris ? AppTheme.success : AppTheme.danger)
+                                            
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(h.aciklama ?? h.cariUnvan ?? h.islemTuru ?? "Hareket")
+                                                    .font(.system(size: 13, weight: .semibold))
+                                                    .foregroundColor(AppTheme.textPrimary)
+                                                Text(String((h.tarih ?? "-").prefix(10)))
+                                                    .font(.system(size: 11))
+                                                    .foregroundColor(AppTheme.textMuted)
+                                            }
+                                            
+                                            Spacer()
+                                            
+                                            VStack(alignment: .trailing, spacing: 2) {
+                                                Text("\(isGiris ? "+" : "-")\(String(format: "%.2f", max(h.miktar, max(h.giren, h.cikan))))")
+                                                    .font(.system(size: 14, weight: .bold))
+                                                    .foregroundColor(isGiris ? AppTheme.success : AppTheme.danger)
+                                                Text(AppFormatters.money(h.birimFiyat))
+                                                    .font(.system(size: 11))
+                                                    .foregroundColor(AppTheme.textSecondary)
+                                            }
                                         }
                                     }
                                 }
                             }
+                            .padding(.horizontal)
                         }
-                        .padding(.horizontal)
                     }
-                    
-                    Spacer().frame(height: 20)
                 }
                 .padding(.top, 12)
             }
         }
-        .navigationTitle("Stok Kart Detayı")
+        .navigationTitle("Stok Detayı")
         .navigationBarTitleDisplayMode(.inline)
+        .enableSwipeBack()
+        .task {
+            await loadHareketler()
+        }
+        .sheet(item: $pdfPreviewItem) { item in
+            #if canImport(UIKit)
+            PDFViewerModal(title: item.title, pdfData: item.data, fileName: item.fileName)
+            #endif
+        }
+    }
+    
+    private func loadHareketler() async {
+        isLoading = true
+        let all: [StokHareket] = (try? await SupabaseService.shared.fetch(from: "stok_hareketler")) ?? []
+        let filtered = all.filter { $0.stokId == stok.id || $0.stokAdi == stok.stokAdi || ($0.stokKodu != nil && $0.stokKodu == stok.stokKodu) }
+            .sorted { ($0.tarih ?? "") > ($1.tarih ?? "") }
+        await MainActor.run {
+            self.hareketler = filtered
+            self.isLoading = false
+        }
     }
 }

@@ -595,7 +595,7 @@ public struct MusteriTakipDetayView: View {
         <body>
           <div class="header">
             <div class="right-meta">
-              <div>Rapor Tarihi: 03.11.2026</div>
+              <div>Rapor Tarihi: \(AppFormatters.shortDate.string(from: Date()))</div>
               <div style="margin-top: 4px;">Durum: <span class="badge">\(klasorEtiket)</span></div>
             </div>
             <div class="title">MÜŞTERİ TAKİP &amp; CRM RAPORU</div>
@@ -680,16 +680,11 @@ public struct MusteriTakipDetayView: View {
             }
             UIGraphicsEndPDFContext()
             
-            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("Musteri_CRM_Raporu_\(klasor.cariUnvan.replacingOccurrences(of: " ", with: "_")).pdf")
-            try? pdfData.write(to: tempURL, options: .atomic)
-            
             isPdfGenerating = false
-            
-            let av = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let rootVC = windowScene.windows.first?.rootViewController {
-                rootVC.present(av, animated: true)
-            }
+            PDFService.shared.sharePDF(
+                data: pdfData as Data,
+                fileName: "Musteri_CRM_Raporu_\(klasor.cariUnvan).pdf"
+            )
         }
         #else
         isPdfGenerating = false

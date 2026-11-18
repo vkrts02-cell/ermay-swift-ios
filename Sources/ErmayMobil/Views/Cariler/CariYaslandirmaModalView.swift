@@ -1,241 +1,178 @@
 import SwiftUI
 
+public struct CariYaslandirmaDilim: Identifiable {
+    public let id = UUID()
+    public let title: String
+    public let rangeText: String
+    public let amount: Double
+    public let ratio: Double
+    public let color: Color
+    public let invoiceCount: Int
+}
+
 public struct CariYaslandirmaModalView: View {
-    @Environment(\.dismiss) private var dismiss
     public let cari: CariKart
-    
-    // Sample Vade Dilimleri
-    struct AgingBucket: Identifiable {
-        let id = UUID()
-        let label: String
-        let rangeDays: String
-        let amount: Double
-        let color: Color
-        let invoiceCount: Int
-    }
-    
-    private var buckets: [AgingBucket] {
-        let base = cari.bakiye > 0 ? cari.bakiye : 35000.0
-        return [
-            AgingBucket(label: "0 - 30 Gün", rangeDays: "Yeni Vadeler", amount: base * 0.45, color: Color(hex: "10B981"), invoiceCount: 3),
-            AgingBucket(label: "31 - 60 Gün", rangeDays: "Hafif Geciken", amount: base * 0.25, color: Color(hex: "3B82F6"), invoiceCount: 2),
-            AgingBucket(label: "61 - 90 Gün", rangeDays: "Riskli Bölge", amount: base * 0.18, color: Color(hex: "F59E0B"), invoiceCount: 1),
-            AgingBucket(label: "90+ Gün", rangeDays: "Kritik Takip", amount: base * 0.12, color: Color(hex: "EF4444"), invoiceCount: 2)
-        ]
-    }
+    @Environment(\.dismiss) private var dismiss
+    @State private var dilimler: [CariYaslandirmaDilim] = []
+    @State private var isLoading: Bool = true
     
     public init(cari: CariKart) {
         self.cari = cari
     }
     
+    private var totalRisk: Double {
+        dilimler.reduce(0.0) { $0 + $1.amount }
+    }
+    
     public var body: some View {
         NavigationStack {
             ZStack {
-                Color(hex: "080A0C").ignoresSafeArea()
+                AppTheme.background.ignoresSafeArea()
                 
-                VStack(spacing: 0) {
-                    renderHeader()
-                    
-                    ScrollView(showsIndicators: false) {
-                        VStack(spacing: 16) {
-                            renderCariSummary()
-                            renderAgingChart()
-                            renderBucketList()
-                            renderOverdueInvoices()
-                            Spacer().frame(height: 30)
+                ScrollView {
+                    VStack(spacing: 16) {
+                        GlassCard(cornerRadius: 18, padding: 18) {
+                            VStack(spacing: 8) {
+                                Text(cari.unvan)
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(AppTheme.textPrimary)
+                                    .multilineTextAlignment(.center)
+                                
+                                Text("TOPLAM RİSK / AÇIK BAKİYE")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(AppTheme.textMuted)
+                                
+                                Text(AppFormatters.money(max(0, cari.bakiye > 0 ? cari.bakiye : totalRisk)))
+                                    .font(.system(size: 26, weight: .heavy))
+                                    .foregroundColor(AppTheme.danger)
+                            }
+                            .frame(maxWidth: .infinity)
                         }
-                        .padding(16)
+                        .padding(.horizontal)
+                        
+                        // Stacked Bar Chart
+                        GlassCard(cornerRadius: 16, padding: 16) {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Vade Yaşlandırma Dağılımı")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(AppTheme.textPrimary)
+                                
+                                GeometryReader { geo in
+                                    HStack(spacing: 3) {
+                                        ForEach(dilimler) { d in
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .fill(d.color)
+                                                .frame(width: max(8, (geo.size.width - 9) * CGFloat(max(0.05, d.ratio))), height: 18)
+                                        }
+                                    }
+                                }
+                                .frame(height: 18)
+                                
+                                HStack(spacing: 12) {
+                                    ForEach(dilimler) { d in
+                                        HStack(spacing: 4) {
+                                            Circle()
+                                                .fill(d.color)
+                                                .frame(width: 8, height: 8)
+                                            Text(d.rangeText)
+                                                .font(.system(size: 10))
+                                                .foregroundColor(AppTheme.textSecondary)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        
+                        // Dilim Detay Kartları
+                        VStack(spacing: 10) {
+                            ForEach(dilimler) { d in
+                                GlassCard(cornerRadius: 14, padding: 14) {
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            HStack(spacing: 6) {
+                                                Circle()
+                                                    .fill(d.color)
+                                                    .frame(width: 10, height: 10)
+                                                Text(d.title)
+                                                    .font(.system(size: 14, weight: .bold))
+                                                    .foregroundColor(AppTheme.textPrimary)
+                                            }
+                                            Text("\(d.rangeText) • \(d.invoiceCount) Evrak/Hareket")
+                                                .font(.system(size: 11))
+                                                .foregroundColor(AppTheme.textMuted)
+                                        }
+                                        
+                                        Spacer()
+                                        
+                                        VStack(alignment: .trailing, spacing: 2) {
+                                            Text(AppFormatters.money(d.amount))
+                                                .font(.system(size: 15, weight: .heavy))
+                                                .foregroundColor(d.color)
+                                            Text("%\(Int(d.ratio * 100))")
+                                                .font(.system(size: 11, weight: .bold))
+                                                .foregroundColor(AppTheme.textSecondary)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
                     }
+                    .padding(.vertical, 12)
                 }
             }
-            .navigationBarHidden(true)
-        }
-    }
-    
-    @ViewBuilder
-    private func renderHeader() -> some View {
-        HStack {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color(hex: "F59E0B").opacity(0.15))
-                    .frame(width: 38, height: 38)
-                Image(systemName: "chart.bar.xaxis")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(Color(hex: "F59E0B"))
-            }
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Vade Yaşlandırma Analizi")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
-                Text(cari.unvan)
-                    .font(.system(size: 12))
-                    .foregroundColor(Color(hex: "8E8E93"))
-                    .lineLimit(1)
-            }
-            
-            Spacer()
-            
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 24))
-                    .foregroundColor(Color(hex: "8E8E93"))
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color(hex: "121216"))
-        .overlay(Rectangle().frame(height: 1).foregroundColor(Color.white.opacity(0.08)), alignment: .bottom)
-    }
-    
-    @ViewBuilder
-    private func renderCariSummary() -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Toplam Yaşlandırılan Bakiye")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(Color(hex: "8E8E93"))
-                Text(AppFormatters.money(cari.bakiye))
-                    .font(.system(size: 24, weight: .heavy))
-                    .foregroundColor(cari.bakiyeTuru == "B" ? Color(hex: "EF4444") : Color(hex: "10B981"))
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 3) {
-                Text("Ödeme Planı")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(Color(hex: "8E8E93"))
-                Text("\(cari.odemePlani ?? "Peşin") (\(cari.vadeGunu ?? 0) Gün)")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(.white)
-            }
-        }
-        .padding(14)
-        .background(Color(hex: "121216"))
-        .cornerRadius(14)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.08), lineWidth: 1))
-    }
-    
-    @ViewBuilder
-    private func renderAgingChart() -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("VADE DAĞILIM ÇUBUĞU")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(Color(hex: "8E8E93"))
-            
-            // Stacked Distribution Bar
-            GeometryReader { geo in
-                HStack(spacing: 2) {
-                    let total = buckets.reduce(0) { $0 + $1.amount }
-                    ForEach(buckets) { b in
-                        let w = total > 0 ? (CGFloat(b.amount / total) * (geo.size.width - 6)) : 0
-                        Rectangle()
-                            .fill(b.color)
-                            .frame(width: max(w, 4))
-                    }
-                }
-                .cornerRadius(6)
-            }
-            .frame(height: 18)
-            
-            // Legend
-            HStack(spacing: 12) {
-                ForEach(buckets) { b in
-                    HStack(spacing: 4) {
-                        Circle().fill(b.color).frame(width: 8, height: 8)
-                        Text(b.label)
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundColor(Color(hex: "8E8E93"))
-                    }
+            .navigationTitle("Cari Yaşlandırma Analizi")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Kapat") { dismiss() }
+                        .foregroundColor(AppTheme.textSecondary)
                 }
             }
-            .padding(.top, 4)
-        }
-        .padding(14)
-        .background(Color(hex: "121216"))
-        .cornerRadius(14)
-    }
-    
-    @ViewBuilder
-    private func renderBucketList() -> some View {
-        VStack(spacing: 8) {
-            ForEach(buckets) { b in
-                HStack {
-                    Circle().fill(b.color).frame(width: 10, height: 10)
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(b.label)
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.white)
-                        Text("\(b.rangeDays) • \(b.invoiceCount) Belge")
-                            .font(.system(size: 11))
-                            .foregroundColor(Color(hex: "8E8E93"))
-                    }
-                    
-                    Spacer()
-                    
-                    Text(AppFormatters.money(b.amount))
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(b.color)
-                }
-                .padding(12)
-                .background(Color.white.opacity(0.03))
-                .cornerRadius(10)
+            .task {
+                await calculateLiveAging()
             }
         }
-        .padding(14)
-        .background(Color(hex: "121216"))
-        .cornerRadius(14)
     }
     
-    @ViewBuilder
-    private func renderOverdueInvoices() -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("VADESİ GEÇEN VE BEKLEYEN FATURALAR")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(Color(hex: "8E8E93"))
-            
-            let sampleInvoices: [(String, String, Double, String, Color)] = []
-            
-            if sampleInvoices.isEmpty {
-                Text("Vadesi geçmiş veya bekleyen fatura kaydı bulunmamaktadır.")
-                    .font(.system(size: 12))
-                    .foregroundColor(Color(hex: "8E8E93"))
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 16)
+    private func calculateLiveAging() async {
+        let tumHareketler: [CariHareket] = (try? await SupabaseService.shared.fetch(from: "cari_hareketler")) ?? []
+        let cariH = tumHareketler.filter { $0.cariId == cari.id || $0.cariUnvan == cari.unvan }
+        let today = Calendar.current.startOfDay(for: Date())
+        
+        var b0 = 0.0, b31 = 0.0, b61 = 0.0, b90 = 0.0
+        var c0 = 0, c31 = 0, c61 = 0, c90 = 0
+        
+        for h in cariH where (h.borc - h.alacak) > 0 {
+            let net = h.borc - h.alacak
+            if let dStr = h.tarih, let d = AppFormatters.parseDate(String(dStr.prefix(10))) ?? AppFormatters.parseDate(dStr) {
+                let days = max(0, Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: d), to: today).day ?? 0)
+                if days <= 30 { b0 += net; c0 += 1 }
+                else if days <= 60 { b31 += net; c31 += 1 }
+                else if days <= 90 { b61 += net; c61 += 1 }
+                else { b90 += net; c90 += 1 }
             } else {
-                ForEach(sampleInvoices, id: \.0) { inv in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(inv.0)
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(.white)
-                            Text("Vade: \(inv.1)")
-                                .font(.system(size: 10))
-                                .foregroundColor(Color(hex: "8E8E93"))
-                        }
-                        
-                        Spacer()
-                        
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(AppFormatters.money(inv.2))
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(.white)
-                            Text(inv.3)
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(inv.4)
-                        }
-                    }
-                    .padding(10)
-                    .background(Color.white.opacity(0.02))
-                    .cornerRadius(8)
-                }
+                b0 += net; c0 += 1
             }
         }
-        .padding(14)
-        .background(Color(hex: "121216"))
-        .cornerRadius(14)
+        
+        if (b0 + b31 + b61 + b90) == 0 && cari.bakiye > 0 {
+            b0 = cari.bakiye
+            c0 = 1
+        }
+        
+        let tot = max(1.0, b0 + b31 + b61 + b90)
+        let computed: [CariYaslandirmaDilim] = [
+            CariYaslandirmaDilim(title: "Vadesi Gelmemiş / Güncel", rangeText: "0 - 30 Gün", amount: b0, ratio: b0 / tot, color: AppTheme.success, invoiceCount: c0),
+            CariYaslandirmaDilim(title: "Erken Gecikme", rangeText: "31 - 60 Gün", amount: b31, ratio: b31 / tot, color: AppTheme.warning, invoiceCount: c31),
+            CariYaslandirmaDilim(title: "Orta Vadeli Gecikme", rangeText: "61 - 90 Gün", amount: b61, ratio: b61 / tot, color: Color(hex: "F97316"), invoiceCount: c61),
+            CariYaslandirmaDilim(title: "Kritik Gecikme (Tahsilat Riski)", rangeText: "90+ Gün", amount: b90, ratio: b90 / tot, color: AppTheme.danger, invoiceCount: c90)
+        ]
+        
+        await MainActor.run {
+            self.dilimler = computed
+            self.isLoading = false
+        }
     }
 }
-

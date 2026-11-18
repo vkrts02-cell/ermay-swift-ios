@@ -4,8 +4,7 @@ public struct SiparisDetailView: View {
     @State public var siparis: Siparis
     @State private var showConvertAlert: Bool = false
     @State private var convertedSuccess: Bool = false
-    @State private var pdfData: Data? = nil
-    @State private var showPDFModal: Bool = false
+    @State private var pdfPreviewItem: PDFPreviewItem? = nil
     @State private var liveKalemler: [SiparisKalem] = []
     @State private var isLoadingKalemler: Bool = false
     
@@ -122,13 +121,16 @@ public struct SiparisDetailView: View {
                         ) {
                             #if canImport(UIKit)
                             Task { @MainActor in
-                                self.pdfData = await PDFService.shared.fetchOrGenerateSiparisPDF(
+                                if let data = await PDFService.shared.fetchOrGenerateSiparisPDF(
                                     siparis: siparis,
                                     kalemler: displayedKalemler,
                                     firma: .varsayilan
-                                )
-                                if self.pdfData != nil {
-                                    self.showPDFModal = true
+                                ) {
+                                    self.pdfPreviewItem = PDFPreviewItem(
+                                        title: "Sipariş - \(siparis.siparisNo)",
+                                        data: data,
+                                        fileName: "Siparis_\(siparis.siparisNo).pdf"
+                                    )
                                 }
                             }
                             #endif
@@ -152,18 +154,17 @@ public struct SiparisDetailView: View {
         }
         .navigationTitle("Sipariş Detayı")
         .navigationBarTitleDisplayMode(.inline)
+        .enableSwipeBack()
         .task {
             await loadKalemler()
         }
-        .sheet(isPresented: $showPDFModal) {
+        .sheet(item: $pdfPreviewItem) { item in
             #if canImport(UIKit)
-            if let data = pdfData {
-                PDFViewerModal(
-                    title: "Sipariş - \(siparis.siparisNo)",
-                    pdfData: data,
-                    fileName: "Siparis_\(siparis.siparisNo).pdf"
-                )
-            }
+            PDFViewerModal(
+                title: item.title,
+                pdfData: item.data,
+                fileName: item.fileName
+            )
             #endif
         }
         .alert("Faturaya Dönüştür", isPresented: $showConvertAlert) {

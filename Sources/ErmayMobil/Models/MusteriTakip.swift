@@ -20,13 +20,16 @@ public struct MusteriTakipKlasor: Identifiable, Codable, Hashable {
         case tenantId = "tenant_id"
         case cariId = "cari_id"
         case cariUnvan = "cari_unvan"
+        case klasorAdi = "klasor_adi"
         case cariKod = "cari_kod"
         case telefon
         case yetkili
         case etiket
         case renk
         case olusturmaTarihi = "olusturma_tarihi"
+        case createdAt = "created_at"
         case sonIslemTarihi = "son_islem_tarihi"
+        case updatedAt = "updated_at"
         case aciklama
         case isDeleted = "is_deleted"
     }
@@ -59,6 +62,53 @@ public struct MusteriTakipKlasor: Identifiable, Codable, Hashable {
         self.sonIslemTarihi = sonIslemTarihi
         self.aciklama = aciklama
         self.isDeleted = isDeleted
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let intId = try? c.decode(Int.self, forKey: .id) {
+            self.id = intId
+        } else if let strId = try? c.decode(String.self, forKey: .id), let intVal = Int(strId) {
+            self.id = intVal
+        } else {
+            self.id = Int.random(in: 1...999999)
+        }
+        self.tenantId = try? c.decode(String.self, forKey: .tenantId)
+        if let intCid = try? c.decode(Int.self, forKey: .cariId) {
+            self.cariId = intCid
+        } else if let strCid = try? c.decode(String.self, forKey: .cariId), let intVal = Int(strCid) {
+            self.cariId = intVal
+        } else {
+            self.cariId = 0
+        }
+        self.cariUnvan = (try? c.decode(String.self, forKey: .cariUnvan)) ?? (try? c.decode(String.self, forKey: .klasorAdi)) ?? ""
+        self.cariKod = try? c.decode(String.self, forKey: .cariKod)
+        self.telefon = try? c.decode(String.self, forKey: .telefon)
+        self.yetkili = try? c.decode(String.self, forKey: .yetkili)
+        self.etiket = (try? c.decode(String.self, forKey: .etiket)) ?? "Yeni İletişim"
+        self.renk = (try? c.decode(String.self, forKey: .renk)) ?? "#0A84FF"
+        let nowIso = ISO8601DateFormatter().string(from: Date())
+        self.olusturmaTarihi = (try? c.decode(String.self, forKey: .olusturmaTarihi)) ?? (try? c.decode(String.self, forKey: .createdAt)) ?? nowIso
+        self.sonIslemTarihi = (try? c.decode(String.self, forKey: .sonIslemTarihi)) ?? (try? c.decode(String.self, forKey: .updatedAt)) ?? self.olusturmaTarihi
+        self.aciklama = try? c.decode(String.self, forKey: .aciklama)
+        self.isDeleted = (try? c.decode(Bool.self, forKey: .isDeleted)) ?? false
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encodeIfPresent(tenantId ?? SupabaseService.shared.tenantId, forKey: .tenantId)
+        try c.encode(cariId, forKey: .cariId)
+        try c.encode(cariUnvan, forKey: .cariUnvan)
+        try c.encode(cariUnvan, forKey: .klasorAdi)
+        try c.encodeIfPresent(cariKod, forKey: .cariKod)
+        try c.encodeIfPresent(telefon, forKey: .telefon)
+        try c.encodeIfPresent(yetkili, forKey: .yetkili)
+        try c.encodeIfPresent(etiket, forKey: .etiket)
+        try c.encodeIfPresent(renk, forKey: .renk)
+        try c.encode(sonIslemTarihi, forKey: .sonIslemTarihi)
+        try c.encodeIfPresent(aciklama, forKey: .aciklama)
+        try c.encodeIfPresent(isDeleted, forKey: .isDeleted)
     }
 }
 
@@ -121,6 +171,29 @@ public struct MusteriTakipDetay: Identifiable, Codable, Hashable {
         self.gorselBase64 = gorselBase64
         self.tarih = tarih
         self.isDeleted = isDeleted
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let intId = try? c.decode(Int.self, forKey: .id) {
+            self.id = intId
+        } else if let strId = try? c.decode(String.self, forKey: .id), let intVal = Int(strId) {
+            self.id = intVal
+        } else {
+            self.id = Int.random(in: 1...999999)
+        }
+        self.tenantId = try? c.decode(String.self, forKey: .tenantId)
+        self.klasorId = (try? c.decode(Int.self, forKey: .klasorId)) ?? 0
+        self.cariId = (try? c.decode(Int.self, forKey: .cariId)) ?? 0
+        self.baslik = (try? c.decode(String.self, forKey: .baslik)) ?? "Kayıt"
+        self.icerik = try? c.decode(String.self, forKey: .icerik)
+        self.tip = (try? c.decode(String.self, forKey: .tip)) ?? "Not"
+        self.fiyatBilgisi = try? c.decode(Double.self, forKey: .fiyatBilgisi)
+        self.paraBirimi = (try? c.decode(String.self, forKey: .paraBirimi)) ?? "₺"
+        self.dosyaYolu = try? c.decode(String.self, forKey: .dosyaYolu)
+        self.gorselBase64 = try? c.decode(String.self, forKey: .gorselBase64)
+        self.tarih = (try? c.decode(String.self, forKey: .tarih)) ?? ISO8601DateFormatter().string(from: Date())
+        self.isDeleted = (try? c.decode(Bool.self, forKey: .isDeleted)) ?? false
     }
 }
 

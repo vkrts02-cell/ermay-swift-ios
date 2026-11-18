@@ -22,9 +22,7 @@ public struct CariDetailView: View {
     @State private var deleteErrorMessage: String? = nil
     
     // PDF Modal
-    @State private var showPDFModal: Bool = false
-    @State private var generatedPDFData: Data? = nil
-    @State private var pdfTitle: String = ""
+    @State private var pdfPreviewItem: PDFPreviewItem? = nil
     @State private var isGeneratingPDF: Bool = false
     
     // Canlı Cari Hareketler
@@ -112,15 +110,14 @@ public struct CariDetailView: View {
             }
         }
         // PDF Ekstre Önizleme Modalı
-        .sheet(isPresented: $showPDFModal) {
-            if let data = generatedPDFData {
-                PDFViewerModal(
-                    title: pdfTitle,
-                    pdfData: data,
-                    fileName: "Ekstre_\(currentCari.cariKodu ?? "Cari")_\(ISO8601DateFormatter().string(from: Date()).prefix(10)).pdf"
-                )
-            }
+        .sheet(item: $pdfPreviewItem) { item in
+            PDFViewerModal(
+                title: item.title,
+                pdfData: item.data,
+                fileName: item.fileName
+            )
         }
+        .enableSwipeBack()
         // Silme Onay Uyarısı
         .alert("Cari Kartı Sil", isPresented: $showDeleteConfirm) {
             Button("Sil", role: .destructive) {
@@ -558,9 +555,11 @@ public struct CariDetailView: View {
             )
             self.isGeneratingPDF = false
             if let data = pdfData {
-                self.pdfTitle = title
-                self.generatedPDFData = data
-                self.showPDFModal = true
+                self.pdfPreviewItem = PDFPreviewItem(
+                    title: title,
+                    data: data,
+                    fileName: "Ekstre_\(currentCari.cariKodu ?? "Cari")_\(ISO8601DateFormatter().string(from: Date()).prefix(10)).pdf"
+                )
             }
         }
         #endif

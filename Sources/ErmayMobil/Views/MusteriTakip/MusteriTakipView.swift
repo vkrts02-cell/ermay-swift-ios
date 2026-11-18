@@ -42,11 +42,10 @@ public struct MusteriTakipView: View {
     }
     
     public var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.black.ignoresSafeArea()
-                
-                VStack(spacing: 12) {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            
+            VStack(spacing: 12) {
                     // Header Bar (Exact to MusteriTakipScreen.tsx)
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
@@ -137,7 +136,7 @@ public struct MusteriTakipView: View {
                                     .padding(.top, 40)
                             } else {
                                 ForEach(filteredKlasorler) { item in
-                                    NavigationLink(destination: MusteriTakipDetayView(klasor: item)) {
+                                    NavigationLink(destination: MusteriTakipDetayView(klasor: item).enableSwipeBack()) {
                                         renderFolderCard(item: item)
                                     }
                                 }
@@ -161,7 +160,6 @@ public struct MusteriTakipView: View {
                     await loadData()
                 }
             }
-        }
     }
     
     // MARK: - Folder Card Component (Exact to MusteriTakipScreen.tsx)

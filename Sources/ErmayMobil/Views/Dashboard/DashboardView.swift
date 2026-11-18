@@ -31,6 +31,7 @@ public struct DashboardView: View {
     }
     
     @State private var weeklyData: [BarChartPoint] = []
+    @State private var monthlyData: [BarChartPoint] = []
     
     // Tab list data items
     struct DashboardListItem: Identifiable {
@@ -588,13 +589,7 @@ public struct DashboardView: View {
                 // Sağ Panel: Çift Kolonlu Dikey Bar Grafiği (Türkiye Muhasebe Standardı)
                 VStack(spacing: 8) {
                     
-                    let chartPoints = isWeekly ? weeklyData : [
-                        BarChartPoint(label: "Ağu", target: 250000, actual: 210000),
-                        BarChartPoint(label: "Eyl", target: 250000, actual: 265000),
-                        BarChartPoint(label: "Eki", target: 250000, actual: 280000),
-                        BarChartPoint(label: "Kas", target: 250000, actual: 312500),
-                        BarChartPoint(label: "Ara", target: 250000, actual: 295000)
-                    ]
+                    let chartPoints = isWeekly ? weeklyData : monthlyData
                     
                     let maxVal = max(chartPoints.map { max($0.target, $0.actual) }.max() ?? 100000, 1000)
                     
@@ -802,22 +797,75 @@ public struct DashboardView: View {
                 }
             } catch { }
             
-            // 3. Faturalar tablosundan canlı ciroyu ve gerçekleşen satışları çek
+            // 3. Faturalar ve Satış Hedefleri tablosundan canlı ciroyu ve gerçekleşen satışları çek
             do {
                 let faturalar: [Fatura] = (try? await SupabaseService.shared.fetch(from: "faturalar")) ?? []
+                let aylikHedefler: [SatisHedefRow] = (try? await SupabaseService.shared.fetch(from: "satis_hedefleri")) ?? []
+                let haftalikHedefler: [SatisHedefRow] = (try? await SupabaseService.shared.fetch(from: "haftalik_satis_hedefleri")) ?? []
                 let today = AppFormatters.isoDate.string(from: Date())
-                let bugunSatis = faturalar
-                    .filter { $0.tarih.hasPrefix(today) && $0.faturaTuru.localizedCaseInsensitiveContains("satış") }
+                let cal = Calendar.current
+                let curYear = cal.component(.year, from: Date())
+                let curMonth = cal.component(.month, from: Date())
+                let curWeek = Calendar(identifier: .iso8601).component(.weekOfYear, from: Date())
+                
+                let satisFaturalari = faturalar.filter {
+                    $0.faturaTuru.localizedCaseInsensitiveContains("satış") || $0.faturaTuru.localizedCaseInsensitiveContains("satis")
+                }
+                
+                let bugunSatis = satisFaturalari
+                    .filter { $0.tarih.hasPrefix(today) || $0.tarih.hasPrefix(AppFormatters.shortDate.string(from: Date())) }
                     .reduce(0.0) { $0 + $1.genelToplam }
                 
-                let toplamSatis = faturalar
-                    .filter { $0.faturaTuru.localizedCaseInsensitiveContains("satış") }
+                let curMonthPrefix = String(format: "%04d-%02d", curYear, curMonth)
+                let curMonthSuffix = String(format: ".%02d.%04d", curMonth, curYear)
+                let buAySatis = satisFaturalari
+                    .filter { $0.tarih.hasPrefix(curMonthPrefix) || $0.tarih.hasSuffix(curMonthSuffix) }
                     .reduce(0.0) { $0 + $1.genelToplam }
+                
+                let weekStart = cal.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+                let buHaftaSatis = satisFaturalari.filter { f in
+                    guard let d = AppFormatters.parseDate(String(f.tarih.prefix(10))) ?? AppFormatters.parseDate(f.tarih) else { return false }
+                    return d >= cal.startOfDay(for: weekStart)
+                }.reduce(0.0) { $0 + $1.genelToplam }
+                
+                let curAyHedef = aylikHedefler.first(where: { ($0.yil ?? curYear) == curYear && $0.ay == curMonth })?.effectiveHedef ?? 0.0
+                let curHaftaHedef = haftalikHedefler.first(where: { ($0.yil ?? curYear) == curYear && $0.effectiveHafta == curWeek })?.effectiveHedef ?? (curAyHedef / 4.0)
+                
+                let ayIsimleri = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
+                var mPoints: [BarChartPoint] = []
+                for i in (0..<5).reversed() {
+                    if let d = cal.date(byAdding: .month, value: -i, to: Date()) {
+                        let y = cal.component(.year, from: d)
+                        let m = cal.component(.month, from: d)
+                        let p1 = String(format: "%04d-%02d", y, m)
+                        let p2 = String(format: ".%02d.%04d", m, y)
+                        let act = satisFaturalari.filter { $0.tarih.hasPrefix(p1) || $0.tarih.hasSuffix(p2) }.reduce(0.0) { $0 + $1.genelToplam }
+                        let tgt = aylikHedefler.first(where: { ($0.yil ?? y) == y && $0.ay == m })?.effectiveHedef ?? curAyHedef
+                        mPoints.append(BarChartPoint(label: ayIsimleri[max(0, min(11, m - 1))], target: tgt, actual: act))
+                    }
+                }
+                
+                var wPoints: [BarChartPoint] = []
+                for i in (0..<4).reversed() {
+                    let wNo = max(1, curWeek - i)
+                    let hStart = cal.date(byAdding: .day, value: -(i * 7 + 7), to: Date()) ?? Date()
+                    let hEnd = cal.date(byAdding: .day, value: -(i * 7), to: Date()) ?? Date()
+                    let act = satisFaturalari.filter { f in
+                        guard let fd = AppFormatters.parseDate(String(f.tarih.prefix(10))) ?? AppFormatters.parseDate(f.tarih) else { return false }
+                        return fd >= cal.startOfDay(for: hStart) && fd <= hEnd
+                    }.reduce(0.0) { $0 + $1.genelToplam }
+                    let tgt = haftalikHedefler.first(where: { ($0.yil ?? curYear) == curYear && $0.effectiveHafta == wNo })?.effectiveHedef ?? curHaftaHedef
+                    wPoints.append(BarChartPoint(label: "H\(wNo)", target: tgt, actual: act))
+                }
                 
                 await MainActor.run {
                     self.gunlukCiro = bugunSatis
-                    self.haftalikGerceklesen = min(toplamSatis, 85000.0)
-                    self.aylikGerceklesen = toplamSatis
+                    self.haftalikHedef = curHaftaHedef
+                    self.haftalikGerceklesen = buHaftaSatis
+                    self.aylikHedef = curAyHedef
+                    self.aylikGerceklesen = buAySatis
+                    self.monthlyData = mPoints
+                    self.weeklyData = wPoints
                 }
             } catch { }
             

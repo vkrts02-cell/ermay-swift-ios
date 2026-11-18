@@ -209,6 +209,10 @@ public struct StokKart: Identifiable, Codable, Hashable {
 public struct StokHareket: Identifiable, Codable, Hashable {
     public var id: String
     public var stokId: String
+    public var stokAdi: String? = nil
+    public var stokKodu: String? = nil
+    public var giren: Double = 0.0
+    public var cikan: Double = 0.0
     public var tarih: String?
     public var islemTuru: String? // "GIRIS", "CIKIS", "DEVIR", "SAYIM_FAZLASI", "SAYIM_EKSIGI"
     public var miktar: Double
@@ -228,8 +232,14 @@ public struct StokHareket: Identifiable, Codable, Hashable {
     enum CodingKeys: String, CodingKey {
         case id
         case stokId = "stok_id"
+        case stokAdi = "stok_adi"
+        case stokKodu = "stok_kodu"
+        case giren
+        case cikan
+        case fiyat
         case tarih
         case islemTuru = "islem_turu"
+        case hareketTuru = "hareket_turu"
         case miktar
         case birimFiyat = "birim_fiyat"
         case kdvOrani = "kdv_orani"
@@ -294,19 +304,29 @@ public struct StokHareket: Identifiable, Codable, Hashable {
         }
         
         self.tarih = try? c.decode(String.self, forKey: .tarih)
-        self.islemTuru = try? c.decode(String.self, forKey: .islemTuru)
+        self.stokAdi = try? c.decode(String.self, forKey: .stokAdi)
+        self.stokKodu = try? c.decode(String.self, forKey: .stokKodu)
+        let gVal = (try? c.decode(Double.self, forKey: .giren)) ?? 0.0
+        let cVal = (try? c.decode(Double.self, forKey: .cikan)) ?? 0.0
+        self.giren = gVal
+        self.cikan = cVal
+        self.islemTuru = (try? c.decode(String.self, forKey: .islemTuru)) ?? (try? c.decode(String.self, forKey: .hareketTuru)) ?? (cVal > 0 && gVal == 0 ? "ÇIKIŞ" : "GİRİŞ")
         
-        if let dMiktar = try? c.decode(Double.self, forKey: .miktar) {
+        if let dMiktar = try? c.decode(Double.self, forKey: .miktar), dMiktar != 0 {
             self.miktar = dMiktar
-        } else if let iMiktar = try? c.decode(Int.self, forKey: .miktar) {
+        } else if let iMiktar = try? c.decode(Int.self, forKey: .miktar), iMiktar != 0 {
             self.miktar = Double(iMiktar)
+        } else if gVal > 0 || cVal > 0 {
+            self.miktar = max(gVal, cVal)
         } else {
             self.miktar = 0.0
         }
         
-        if let dFiyat = try? c.decode(Double.self, forKey: .birimFiyat) {
+        if let dFiyat = try? c.decode(Double.self, forKey: .birimFiyat), dFiyat != 0 {
             self.birimFiyat = dFiyat
-        } else if let iFiyat = try? c.decode(Int.self, forKey: .birimFiyat) {
+        } else if let dFiyat2 = try? c.decode(Double.self, forKey: .fiyat), dFiyat2 != 0 {
+            self.birimFiyat = dFiyat2
+        } else if let iFiyat = try? c.decode(Int.self, forKey: .birimFiyat), iFiyat != 0 {
             self.birimFiyat = Double(iFiyat)
         } else {
             self.birimFiyat = 0.0

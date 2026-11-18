@@ -96,6 +96,7 @@ public struct FaturaTasarimView: View {
                 }
             }
             .navigationBarHidden(true)
+            .enableSwipeBack()
         }
     }
 }

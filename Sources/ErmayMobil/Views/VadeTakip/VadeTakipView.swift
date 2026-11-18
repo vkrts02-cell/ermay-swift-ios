@@ -40,11 +40,10 @@ public struct VadeTakipView: View {
     }
     
     public var body: some View {
-        NavigationStack {
-            ZStack {
-                AppTheme.background.ignoresSafeArea()
-                
-                VStack(spacing: 12) {
+        ZStack {
+            AppTheme.background.ignoresSafeArea()
+            
+            VStack(spacing: 12) {
                     // Header Bar
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
@@ -193,7 +192,6 @@ public struct VadeTakipView: View {
                     await loadVadeData()
                 }
             }
-        }
     }
     
     private func loadVadeData() async {

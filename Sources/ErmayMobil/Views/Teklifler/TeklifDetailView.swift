@@ -4,8 +4,7 @@ public struct TeklifDetailView: View {
     @State public var teklif: Teklif
     @State private var showConvertAlert: Bool = false
     @State private var convertedNotice: String? = nil
-    @State private var pdfData: Data? = nil
-    @State private var showPDFModal: Bool = false
+    @State private var pdfPreviewItem: PDFPreviewItem? = nil
     @State private var liveKalemler: [TeklifKalem] = []
     @State private var isLoadingKalemler: Bool = false
     
@@ -133,13 +132,16 @@ public struct TeklifDetailView: View {
                         ) {
                             #if canImport(UIKit)
                             Task { @MainActor in
-                                self.pdfData = await PDFService.shared.fetchOrGenerateTeklifPDF(
+                                if let data = await PDFService.shared.fetchOrGenerateTeklifPDF(
                                     teklif: teklif,
                                     kalemler: displayedKalemler,
                                     firma: .varsayilan
-                                )
-                                if self.pdfData != nil {
-                                    self.showPDFModal = true
+                                ) {
+                                    self.pdfPreviewItem = PDFPreviewItem(
+                                        title: "Teklif - \(teklif.teklifNo)",
+                                        data: data,
+                                        fileName: "Teklif_\(teklif.teklifNo).pdf"
+                                    )
                                 }
                             }
                             #endif
@@ -172,18 +174,17 @@ public struct TeklifDetailView: View {
         }
         .navigationTitle("Teklif Detayı")
         .navigationBarTitleDisplayMode(.inline)
+        .enableSwipeBack()
         .task {
             await loadKalemler()
         }
-        .sheet(isPresented: $showPDFModal) {
+        .sheet(item: $pdfPreviewItem) { item in
             #if canImport(UIKit)
-            if let data = pdfData {
-                PDFViewerModal(
-                    title: "Teklif - \(teklif.teklifNo)",
-                    pdfData: data,
-                    fileName: "Teklif_\(teklif.teklifNo).pdf"
-                )
-            }
+            PDFViewerModal(
+                title: item.title,
+                pdfData: item.data,
+                fileName: item.fileName
+            )
             #endif
         }
         .alert("Siparişe Dönüştür", isPresented: $showConvertAlert) {

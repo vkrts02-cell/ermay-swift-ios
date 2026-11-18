@@ -91,21 +91,17 @@ public struct MusteriLimitView: View {
                     id: c.id,
                     cariId: c.id,
                     unvan: c.unvan,
-                    riskLimiti: 75000.0,
+                    riskLimiti: c.riskLimiti ?? 0.0,
                     guncelBakiye: c.bakiye,
-                    vadesiGecenBakiye: c.bakiye > 50000 ? (c.bakiye - 40000) : 0,
-                    gecikmeGunu: c.bakiye > 60000 ? 18 : 0
+                    vadesiGecenBakiye: 0,
+                    gecikmeGunu: 0
                 )
             }
             await MainActor.run {
                 self.musteriler = mapped
             }
         } catch {
-            musteriler = [
-                MusteriRisk(id: "1", unvan: "Ermay Bilişim Sanayi Ltd.", riskLimiti: 60000, guncelBakiye: 72000, vadesiGecenBakiye: 22000, gecikmeGunu: 24),
-                MusteriRisk(id: "2", unvan: "Mega Plastik Sanayi A.Ş.", riskLimiti: 80000, guncelBakiye: 65000, vadesiGecenBakiye: 0, gecikmeGunu: 0),
-                MusteriRisk(id: "3", unvan: "Yıldız Lojistik ve Depolama", riskLimiti: 40000, guncelBakiye: 12000, vadesiGecenBakiye: 0, gecikmeGunu: 0)
-            ]
+            musteriler = []
         }
         isLoading = false
     }

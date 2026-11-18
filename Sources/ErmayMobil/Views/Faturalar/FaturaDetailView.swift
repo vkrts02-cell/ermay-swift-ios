@@ -7,8 +7,7 @@ public struct FaturaDetailView: View {
     public let fatura: Fatura
     @State private var liveKalemler: [FaturaKalem] = []
     @State private var isLoadingKalemler: Bool = false
-    @State private var pdfData: Data? = nil
-    @State private var showPDFModal: Bool = false
+    @State private var pdfPreviewItem: PDFPreviewItem? = nil
     @State private var isGeneratingPDF: Bool = false
     
     public init(fatura: Fatura) {
@@ -161,14 +160,18 @@ public struct FaturaDetailView: View {
                         #if canImport(UIKit)
                         Task { @MainActor in
                             self.isGeneratingPDF = true
-                            self.pdfData = await PDFService.shared.fetchOrGenerateFaturaPDF(
+                            let generated = await PDFService.shared.fetchOrGenerateFaturaPDF(
                                 fatura: fatura,
                                 kalemler: displayedKalemler,
                                 firma: .varsayilan
                             )
                             self.isGeneratingPDF = false
-                            if self.pdfData != nil {
-                                self.showPDFModal = true
+                            if let data = generated {
+                                self.pdfPreviewItem = PDFPreviewItem(
+                                    title: "Fatura - \(fatura.faturaNo)",
+                                    data: data,
+                                    fileName: "Fatura_\(fatura.faturaNo).pdf"
+                                )
                             }
                         }
                         #endif
@@ -183,6 +186,7 @@ public struct FaturaDetailView: View {
         }
         .navigationTitle("Fatura Detayı")
         .navigationBarTitleDisplayMode(.inline)
+        .enableSwipeBack()
         .task {
             await loadKalemler()
         }
@@ -191,15 +195,13 @@ public struct FaturaDetailView: View {
                 await loadKalemler()
             }
         }
-        .sheet(isPresented: $showPDFModal) {
+        .sheet(item: $pdfPreviewItem) { item in
             #if canImport(UIKit)
-            if let data = pdfData {
-                PDFViewerModal(
-                    title: "Fatura - \(fatura.faturaNo)",
-                    pdfData: data,
-                    fileName: "Fatura_\(fatura.faturaNo).pdf"
-                )
-            }
+            PDFViewerModal(
+                title: item.title,
+                pdfData: item.data,
+                fileName: item.fileName
+            )
             #endif
         }
     }

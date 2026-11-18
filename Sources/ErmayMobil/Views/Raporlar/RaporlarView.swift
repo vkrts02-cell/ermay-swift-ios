@@ -1,650 +1,644 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+import PDFKit
+#endif
 
 public struct ReportItemInfo: Identifiable, Hashable {
-    public let id = UUID()
+    public let id: String
     public let title: String
     public let category: String
-    public let description: String
-    public let iconName: String
+    public let icon: String
+    public let desc: String
+    public let colorHex: String
+    public let requiresCari: Bool
+    public let isHeatmap: Bool
     public let headers: [String]
     public let defaultRows: [[String]]
-    public let isHeatmap: Bool
-    public let needsCari: Bool
+    
+    public init(
+        id: String,
+        title: String,
+        category: String,
+        icon: String,
+        desc: String,
+        colorHex: String,
+        requiresCari: Bool = false,
+        isHeatmap: Bool = false,
+        headers: [String],
+        defaultRows: [[String]] = []
+    ) {
+        self.id = id
+        self.title = title
+        self.category = category
+        self.icon = icon
+        self.desc = desc
+        self.colorHex = colorHex
+        self.requiresCari = requiresCari
+        self.isHeatmap = isHeatmap
+        self.headers = headers
+        self.defaultRows = defaultRows
+    }
+    
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    public static func == (lhs: ReportItemInfo, rhs: ReportItemInfo) -> Bool {
+        lhs.id == rhs.id
+    }
 }
 
+public let allReports: [ReportItemInfo] = [
+    // --- GENEL ---
+    ReportItemInfo(
+        id: "1",
+        title: "Genel Özet",
+        category: "Genel",
+        icon: "chart.pie.fill",
+        desc: "İşletmenin genel finansal özeti, alacak, borç, kasa ve stok durumu.",
+        colorHex: "0061FF",
+        headers: ["Rapor Kalemi", "Tutar"]
+    ),
+    
+    // --- CARİ HESAP ---
+    ReportItemInfo(
+        id: "2",
+        title: "Cari Bakiye Raporu",
+        category: "Cari Hesap",
+        icon: "person.2.fill",
+        desc: "Müşteri ve tedarikçilerin güncel borç ve alacak bakiyeleri.",
+        colorHex: "3B82F6",
+        headers: ["Ünvan", "Şehir", "Borç", "Alacak", "Bakiye", "Durum"]
+    ),
+    ReportItemInfo(
+        id: "3",
+        title: "Cari Hareket Dökümü",
+        category: "Cari Hesap",
+        icon: "list.bullet.rectangle.portrait.fill",
+        desc: "Seçilen cari hesabın detaylı hesap ekstresi ve işlem geçmişi.",
+        colorHex: "60A5FA",
+        requiresCari: true,
+        headers: ["Tarih", "Ünvan", "İşlem", "Borç", "Alacak"]
+    ),
+    ReportItemInfo(
+        id: "4",
+        title: "Yaşlandırma Raporu",
+        category: "Cari Hesap",
+        icon: "clock.badge.exclamationmark.fill",
+        desc: "Vadesi geçmiş alacakların 30-60-90+ gün bazında analizi.",
+        colorHex: "F59E0B",
+        headers: ["Ünvan", "0-30 Gün", "31-60 Gün", "61-90 Gün", "90+ Gün", "Toplam"]
+    ),
+    ReportItemInfo(
+        id: "5",
+        title: "Vadesi Geçmiş Alacaklar",
+        category: "Cari Hesap",
+        icon: "bell.badge.fill",
+        desc: "Ödeme süresi geçmiş tahsilatların detaylı listesi.",
+        colorHex: "EF4444",
+        headers: ["Müşteri", "Cari Bakiyesi", "Ort. Gecikme Günü", "Fatura / Evrak No", "Fatura Bakiyesi", "Gecikme (Gün)"]
+    ),
+    ReportItemInfo(
+        id: "6",
+        title: "Hareketsiz Cariler",
+        category: "Cari Hesap",
+        icon: "person.crop.circle.badge.minus",
+        desc: "Uzun süredir işlem yapılmayan pasif cari hesaplar.",
+        colorHex: "8E8E93",
+        headers: ["Ünvan", "Grup", "Telefon", "Son İşlem", "Gün"]
+    ),
+    
+    // --- STOK ---
+    ReportItemInfo(
+        id: "7",
+        title: "Stok Mevcudu",
+        category: "Stok",
+        icon: "shippingbox.fill",
+        desc: "Depodaki ürünlerin güncel miktar ve değer listesi.",
+        colorHex: "10B981",
+        headers: ["Stok Kodu", "Stok Adı", "Kategori", "Miktar", "Ort. Alış F.", "Ort. Satış F.", "Satış F."]
+    ),
+    ReportItemInfo(
+        id: "8",
+        title: "Stok Hareketleri",
+        category: "Stok",
+        icon: "arrow.left.arrow.right.square.fill",
+        desc: "Ürün giriş ve çıkışlarının tarihsel dökümü.",
+        colorHex: "0D9488",
+        headers: ["Tarih", "Stok Adı", "İşlem", "Giren", "Çıkan", "Birim Fiyat", "Kalan"]
+    ),
+    ReportItemInfo(
+        id: "9",
+        title: "Kritik Stok Seviyesi",
+        category: "Stok",
+        icon: "exclamationmark.triangle.fill",
+        desc: "Azalan ve tükenen ürünlerin acil sipariş uyarı listesi.",
+        colorHex: "EF4444",
+        headers: ["Stok Kodu", "Stok Adı", "Mevcut", "Min. Seviye", "Durum", "Satış Fiyatı"]
+    ),
+    ReportItemInfo(
+        id: "10",
+        title: "Ölü Stok Raporu",
+        category: "Stok",
+        icon: "archivebox.fill",
+        desc: "Aynı isim, barkod veya stok koduna sahip mükerrer stokların analizi.",
+        colorHex: "6B7280",
+        headers: ["Stok Adı", "Barkod", "Stok Kodu", "Mevcut Miktar", "Çakışma Nedeni"]
+    ),
+    ReportItemInfo(
+        id: "11",
+        title: "Stok Devir Hızı",
+        category: "Stok",
+        icon: "arrow.triangle.2.circlepath",
+        desc: "Ürünlerin sirkülasyon ve satış hızı performansı.",
+        colorHex: "8B5CF6",
+        headers: ["Stok Adı", "Mevcut Stok", "Toplam Satış (Çıkan)", "Stok Devir Hızı", "Kategori"]
+    ),
+    
+    // --- SATIŞ ---
+    ReportItemInfo(
+        id: "12",
+        title: "Satış Faturası Dökümü",
+        category: "Satış",
+        icon: "doc.text.fill",
+        desc: "Kesilen tüm satış faturalarının tarih bazlı listesi.",
+        colorHex: "00FF87",
+        headers: ["Fatura No", "Tarih", "Müşteri", "Ara Toplam", "KDV", "Genel Toplam"]
+    ),
+    ReportItemInfo(
+        id: "13",
+        title: "Bölge Bazlı Satış",
+        category: "Satış",
+        icon: "location.fill",
+        desc: "Şehir ve bölge bazında satış dağılımı.",
+        colorHex: "3B82F6",
+        headers: ["Şehir", "Müşteri Sayısı", "Toplam Satış", "Ortalama Satış"]
+    ),
+    ReportItemInfo(
+        id: "14",
+        title: "Bölgesel Satış Analizi",
+        category: "Satış",
+        icon: "globe.europe.africa.fill",
+        desc: "Coğrafi satış performansı ve bölgesel karşılaştırma.",
+        colorHex: "0061FF",
+        headers: ["Bölge", "Satış Tutarı", "Fatura Sayısı", "Ort. Fatura"]
+    ),
+    ReportItemInfo(
+        id: "15",
+        title: "En Çok Satan Ürünler",
+        category: "Satış",
+        icon: "star.fill",
+        desc: "Miktar ve ciro bazında lider ürünlerin sıralaması.",
+        colorHex: "F59E0B",
+        headers: ["Sıra", "Ürün Adı", "Mevcut Stok", "Satış Fiyatı", "Kategori"]
+    ),
+    
+    // --- KARLILIK ---
+    ReportItemInfo(
+        id: "16",
+        title: "Gelir Tablosu",
+        category: "Karlılık",
+        icon: "chart.line.uptrend.xyaxis",
+        desc: "Dönemsel gelir, gider ve net kâr özeti.",
+        colorHex: "10B981",
+        headers: ["Kalem", "Tutar"]
+    ),
+    ReportItemInfo(
+        id: "17",
+        title: "Ürün Karlılık Raporu",
+        category: "Karlılık",
+        icon: "chart.bar.fill",
+        desc: "Ürün bazında alış-satış marjı ve net kâr analizi.",
+        colorHex: "00FF87",
+        headers: ["Ürün Adı", "Alış Fiyatı", "Satış Fiyatı", "Kar", "Kar Marjı %"]
+    ),
+    ReportItemInfo(
+        id: "18",
+        title: "Müşteri Karlılık Analizi",
+        category: "Karlılık",
+        icon: "person.badge.plus",
+        desc: "Müşteri bazında sağlanan net kâr ve marj katkısı.",
+        colorHex: "8B5CF6",
+        headers: ["Müşteri", "Toplam Satış", "Tahmini Maliyet", "Net Kar", "Kar Marjı (%)", "Fatura Sayısı"]
+    ),
+    ReportItemInfo(
+        id: "19",
+        title: "Detaylı Gelir ve Maliyet Analizi",
+        category: "Karlılık",
+        icon: "tablecells.fill",
+        desc: "Tarih bazlı ürün satışlarının kime yapıldığı ve satır bazlı kâr analizi.",
+        colorHex: "0D9488",
+        headers: [
+            "Tarih", "Ürün Adı", "Müşteri (Kime)", "Miktar", "Satış Fiyatı",
+            "Tutar (Net/KDV)", "Tahsilat Yöntemi & Süresi", "En Son Tedarikçi",
+            "Alış Fiyatı & Değişim", "Maliyet", "Net Kar & Durum", "Marj", "Ödeme Yöntemi & Süresi"
+        ]
+    ),
+    
+    // --- FİNANS ---
+    ReportItemInfo(
+        id: "20",
+        title: "Kasa Hareketleri",
+        category: "Finans",
+        icon: "banknote.fill",
+        desc: "Nakit kasa giriş ve çıkışlarının detaylı dökümü.",
+        colorHex: "10B981",
+        headers: ["Tarih", "Kasa", "İşlem", "Giren", "Çıkan"]
+    ),
+    ReportItemInfo(
+        id: "21",
+        title: "Banka Hareketleri",
+        category: "Finans",
+        icon: "building.columns.fill",
+        desc: "Banka hesaplarındaki güncel bakiyeler ve döviz durumu.",
+        colorHex: "3B82F6",
+        headers: ["Banka Adı", "Hesap No", "Güncel Bakiye", "Döviz"]
+    ),
+    ReportItemInfo(
+        id: "22",
+        title: "Nakit Akış Tablosu",
+        category: "Finans",
+        icon: "waveform.path.ecg",
+        desc: "Nakit giriş ve çıkışlarının kümülatif bakiye takibi.",
+        colorHex: "0061FF",
+        headers: ["Tarih", "Açıklama", "Giren", "Çıkan", "Bakiye"]
+    ),
+    ReportItemInfo(
+        id: "23",
+        title: "Kapsamlı Gider Raporu",
+        category: "Finans",
+        icon: "arrow.down.right.circle.fill",
+        desc: "İşletme giderlerinin ve alış faturalarının kategorik dağılımı.",
+        colorHex: "EF4444",
+        headers: ["Kategori", "Tutar", "Adet"]
+    ),
+    ReportItemInfo(
+        id: "24",
+        title: "Banka/Kasa Nakit Durumu",
+        category: "Finans",
+        icon: "creditcard.and.123",
+        desc: "Tüm kasa ve banka hesaplarındaki anlık nakit varlıklar.",
+        colorHex: "00FF87",
+        headers: ["Hesap Adı", "Tür", "Bakiye", "Döviz"]
+    ),
+    ReportItemInfo(
+        id: "25",
+        title: "Aylık Tahsilat ve Ödeme Analizi",
+        category: "Finans",
+        icon: "calendar",
+        desc: "Aylık bazda nakit, kredi kartı, EFT ve çek akışı.",
+        colorHex: "8B5CF6",
+        headers: ["Ay/Yıl", "Nakit (Alınan)", "Nakit (Yönl.)", "K.Kartı (Alınan)", "K.Kartı (Yönl.)", "Havale (Alınan)", "Havale (Yönl.)", "Çek (Alınan)", "Çek (Yönl.)"]
+    ),
+    ReportItemInfo(
+        id: "26",
+        title: "Kredi Kartı Detay Raporu",
+        category: "Finans",
+        icon: "creditcard.fill",
+        desc: "Kredi kartı tahsilatları ve tedarikçilere yönlendirmeler.",
+        colorHex: "F59E0B",
+        headers: ["Tarih", "Kimden Alındı", "Banka/Kart", "Kime Yönlendirildi", "Tutar", "Durum"]
+    ),
+    ReportItemInfo(
+        id: "27",
+        title: "Nakit İşlem Detay Raporu",
+        category: "Finans",
+        icon: "dollarsign.circle.fill",
+        desc: "Sadece nakit olarak gerçekleşen tahsilat ve ödemeler.",
+        colorHex: "10B981",
+        headers: ["Tarih", "Cari Ünvan", "İşlem", "Açıklama", "Giren", "Çıkan"]
+    ),
+    ReportItemInfo(
+        id: "28",
+        title: "Çek Detay Raporu",
+        category: "Finans",
+        icon: "doc.plaintext.fill",
+        desc: "Portföydeki, tahsildeki ve ciro edilen çeklerin listesi.",
+        colorHex: "60A5FA",
+        headers: ["Vade", "Çek No", "Cari Ünvan", "Banka/Şube", "Tutar", "Durum"]
+    ),
+    ReportItemInfo(
+        id: "29",
+        title: "Havale / EFT Detay Raporu",
+        category: "Finans",
+        icon: "paperplane.fill",
+        desc: "Gelen ve giden tüm banka transferlerinin dökümü.",
+        colorHex: "3B82F6",
+        headers: ["Tarih", "Müşteri", "Banka/Hesap", "Dekont No", "Tutar", "Durum"]
+    ),
+    
+    // --- STRATEJİK ---
+    ReportItemInfo(
+        id: "30",
+        title: "Müşteri ABC Analizi",
+        category: "Stratejik",
+        icon: "line.3.horizontal.decrease.circle.fill",
+        desc: "Ciroya göre müşteri sınıflandırması (A: %80, B: %15, C: %5).",
+        colorHex: "8B5CF6",
+        headers: ["Müşteri", "Toplam Satış", "Yüzde", "Sınıf"]
+    ),
+    ReportItemInfo(
+        id: "31",
+        title: "Kar-Zarar Mukayesesi",
+        category: "Stratejik",
+        icon: "arrow.triangle.swap",
+        desc: "Yıllık, aylık ve haftalık bazda performans analizi.",
+        colorHex: "0061FF",
+        headers: ["Dönem", "Satış Tutarı", "Alış Tutarı", "Net Kar/Zarar"]
+    ),
+    ReportItemInfo(
+        id: "32",
+        title: "Müşteri Kayıp (Churn)",
+        category: "Stratejik",
+        icon: "person.fill.xmark",
+        desc: "Kayıp riski olan pasif müşterilerin tespiti.",
+        colorHex: "EF4444",
+        headers: ["Müşteri", "Son İşlem", "Geçen Gün", "Kayıp Riski"]
+    ),
+    ReportItemInfo(
+        id: "33",
+        title: "Fiyat Dalgalanma Raporu",
+        category: "Stratejik",
+        icon: "waveform.path.ecg.rectangle.fill",
+        desc: "Ürün alış/satış fiyat değişim trendleri.",
+        colorHex: "F59E0B",
+        headers: ["Ürün", "Min Fiyat", "Max Fiyat", "Ort Fiyat", "Fark %"]
+    ),
+    ReportItemInfo(
+        id: "34",
+        title: "Müşteri Sadakat (LTV)",
+        category: "Stratejik",
+        icon: "heart.fill",
+        desc: "Müşteri yaşam boyu değer ve sipariş sıklığı analizi.",
+        colorHex: "FF416C",
+        headers: ["Müşteri", "İlk Alışveriş", "Son Alışveriş", "Toplam Harcama", "Ortalama Sepet"]
+    ),
+    ReportItemInfo(
+        id: "35",
+        title: "Finansal Isı Haritası",
+        category: "Stratejik",
+        icon: "map.fill",
+        desc: "Günlük finansal aktivite ve nakit akış yoğunluğu.",
+        colorHex: "10B981",
+        isHeatmap: true,
+        headers: ["Tarih", "Satış", "Alış", "Kasa Giren", "Kasa Çıkan", "Net Akış"]
+    ),
+    ReportItemInfo(
+        id: "36",
+        title: "Tahsilat Süresi (DSO)",
+        category: "Stratejik",
+        icon: "speedometer",
+        desc: "Ortalama tahsilat hızı (gün) ve vade sapması.",
+        colorHex: "0D9488",
+        headers: ["Müşteri", "Ortalama Tahsilat Süresi (Gün)", "Toplam Alacak", "Durum"]
+    ),
+    ReportItemInfo(
+        id: "37",
+        title: "Bütçe / Hedef Takibi",
+        category: "Stratejik",
+        icon: "target",
+        desc: "Aylık ve yıllık satış hedeflerine ulaşma durumu.",
+        colorHex: "00FF87",
+        headers: ["Dönem", "Hedef", "Gerçekleşen", "Fark", "%"]
+    )
+]
+
+private let categories = ["Tümü", "Genel", "Cari Hesap", "Stok", "Satış", "Karlılık", "Finans", "Stratejik"]
+
 public struct RaporlarView: View {
-    @State private var searchQuery: String = ""
-    @State private var selectedFilter: String = "All" // "All" | "Weekly" | "Monthly" | "Yearly"
-    @State private var selectedReport: ReportItemInfo? = nil
+    @Environment(\.dismiss) private var dismiss
+    @State private var searchText: String = ""
+    @State private var selectedCategory: String = "Tümü"
+    @State private var selectedPeriod: String = "All" // "Weekly", "Monthly", "Yearly", "All"
     
-    // Cari Selection Overlay for 'Cari Hareket Dökümü'
+    // Cari Selection Overlay for "Cari Hareket Dökümü"
     @State private var isCariOverlayOpen: Bool = false
+    @State private var pendingReport: ReportItemInfo? = nil
     @State private var cariSearch: String = ""
-    @State private var selectedCariName: String = "Tüm Cariler"
-    
-    // Full 31 Reports Catalog (100% exact to RaporlarScreen.tsx)
-    private let allReports: [ReportItemInfo] = [
-        // 1. Genel Durum
-        ReportItemInfo(
-            title: "Genel Özet",
-            category: "Genel Durum",
-            description: "İşletmenin genel mali özetini gösterir.",
-            iconName: "chart.bar.doc.horizontal.fill",
-            headers: ["Rapor Kalemi", "Tutar / Değer"],
-            defaultRows: [
-                ["Toplam Alacaklar", "₺485.250,00"],
-                ["Toplam Borçlar", "₺192.400,00"],
-                ["Kasa ve Banka Mevcudu", "₺215.300,00"],
-                ["Toplam Stok Miktarı", "1.420 Adet"],
-                ["Stok Maliyet Değeri", "₺380.000,00"],
-                ["Net İşletme Sermayesi", "₺508.150,00"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        
-        // 2. Finans
-        ReportItemInfo(
-            title: "Aylık Tahsilat ve Ödeme Analizi",
-            category: "Finans",
-            description: "Ay bazlı ödeme türlerine göre tahsilat ve yönlendirme özeti.",
-            iconName: "calendar.badge.clock",
-            headers: ["Ay/Yıl", "Nakit (Alınan)", "Nakit (Yönl.)", "K.Kartı (Alınan)", "K.Kartı (Yönl.)", "Havale (Alınan)", "Havale (Yönl.)", "Çek (Alınan)", "Çek (Yönl.)"],
-            defaultRows: [
-                ["11/2026", "₺45.000,00", "₺12.000,00", "₺82.500,00", "₺15.000,00", "₺120.000,00", "₺60.000,00", "₺35.000,00", "₺10.000,00"],
-                ["10/2026", "₺52.000,00", "₺18.500,00", "₺76.000,00", "₺11.200,00", "₺98.000,00", "₺45.000,00", "₺50.000,00", "₺22.000,00"],
-                ["09/2026", "₺38.500,00", "₺9.400,00", "₺69.000,00", "₺8.500,00", "₺105.000,00", "₺52.000,00", "₺40.000,00", "₺15.000,00"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Kredi Kartı Detay Raporu",
-            category: "Finans",
-            description: "Kaydedilen ve yönlendirilen kredi kartı işlem detayları.",
-            iconName: "creditcard.fill",
-            headers: ["Tarih", "Kimden Alındı", "Banka/Kart", "Kime Yönlendirildi", "Tutar", "Durum"],
-            defaultRows: [
-                ["03.11.2026", "Akıncılar Çelik Ltd.", "Garanti POS", "Özdemir Sanayi", "₺14.500,00", "Yönlendirildi"],
-                ["02.11.2026", "Özdemir Makine", "Yapı Kredi", "-", "₺8.200,00", "Portföyde"],
-                ["01.11.2026", "Tekin Metal A.Ş.", "İş Bankası", "-", "₺22.000,00", "Tahsil Edildi"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Nakit İşlem Detay Raporu",
-            category: "Finans",
-            description: "Tüm nakit kasa hareketlerinin detaylı dökümü.",
-            iconName: "banknote.fill",
-            headers: ["Tarih", "Cari Ünvan", "İşlem", "Açıklama", "Giren", "Çıkan"],
-            defaultRows: [
-                ["04.11.2026 14:30", "Merkez Kasa", "Nakit Tahsilat", "Elden Satış Tahsilatı", "₺5.000,00", "₺0,00"],
-                ["03.11.2026 11:15", "Merkez Kasa", "Nakit Tediye", "Yemek & İkram Gideri", "₺0,00", "₺450,00"],
-                ["02.11.2026 16:45", "Şube Kasası", "Nakit Tahsilat", "Cari Fatura Tahsilatı", "₺12.000,00", "₺0,00"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Çek Detay Raporu",
-            category: "Finans",
-            description: "Portföydeki ve işlem görmüş çeklerin detayları.",
-            iconName: "doc.plaintext.fill",
-            headers: ["Vade", "Çek No", "Cari Ünvan", "Banka/Şube", "Tutar", "Durum"],
-            defaultRows: [
-                ["15.11.2026", "ÇK-10928", "Doruk İnşaat A.Ş.", "Garanti BBVA / Maslak", "₺35.000,00", "Portföyde"],
-                ["28.11.2026", "ÇK-10929", "Kuzey Çelik San.", "Akbank / Dudullu", "₺50.000,00", "Portföyde"],
-                ["05.12.2026", "ÇK-10930", "Yıldız Ticaret", "Yapı Kredi / İkitelli", "₺27.500,00", "Tahsile Verildi"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Havale / EFT Detay Raporu",
-            category: "Finans",
-            description: "Banka havale ve EFT işlemlerinin detaylı listesi.",
-            iconName: "building.columns.fill",
-            headers: ["Tarih", "Müşteri", "Banka/Hesap", "Dekont No", "Tutar", "Durum"],
-            defaultRows: [
-                ["03.11.2026", "Demir Grup Sanayi", "İş Bankası Ticari", "DK-10023", "₺45.000,00", "Onaylandı"],
-                ["02.11.2026", "Yılmazlar Nakliyat", "Garanti BBVA TL", "DK-10024", "₺6.800,00", "Onaylandı"],
-                ["01.11.2026", "Birlik Makine A.Ş.", "Akbank Şirket", "DK-10025", "₺80.000,00", "Onaylandı"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Gelir Tablosu",
-            category: "Finans",
-            description: "Dönemsel gelir ve gider özeti.",
-            iconName: "chart.pie.fill",
-            headers: ["Kalem", "Tutar"],
-            defaultRows: [
-                ["Brüt Satış Gelirleri", "₺1.850.000,00"],
-                ["Satış İndirimleri ve İadeler (-)", "₺42.500,00"],
-                ["Net Satışlar", "₺1.807.500,00"],
-                ["Satılan Malın Maliyeti (SMM) (-)", "₺1.310.000,00"],
-                ["BRÜT SATIŞ KÂRI", "₺497.500,00"],
-                ["Faaliyet Giderleri (-)", "₺145.000,00"],
-                ["FAALİYET KÂRI (EBIT)", "₺352.500,00"],
-                ["DÖNEM NET KÂRI", "₺320.500,00"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Nakit Akış Tablosu",
-            category: "Finans",
-            description: "Nakit giriş ve çıkışlarının takibi.",
-            iconName: "arrow.triangle.swap",
-            headers: ["Tarih", "Açıklama", "Giren", "Çıkan", "Bakiye"],
-            defaultRows: [
-                ["04.11.2026", "Akıncılar Fatura Tahsilatı", "₺48.500,00", "₺0,00", "₺215.300,00"],
-                ["03.11.2026", "Tedarikçi Mal Alımı Ödemesi", "₺0,00", "₺32.000,00", "₺166.800,00"],
-                ["02.11.2026", "Özdemir Makine Nakit Tahsilat", "₺15.000,00", "₺0,00", "₺198.800,00"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        
-        // 3. Cari Hesap
-        ReportItemInfo(
-            title: "Cari Bakiye Raporu",
-            category: "Cari Hesap",
-            description: "Müşteri ve tedarikçi bakiyeleri.",
-            iconName: "person.2.fill",
-            headers: ["Ünvan", "Şehir", "Borç", "Alacak", "Bakiye", "Durum"],
-            defaultRows: [
-                ["Akıncılar Çelik Ltd.", "İstanbul", "₺0,00", "₺142.500,00", "₺142.500,00", "Alacaklı (+)"],
-                ["Özdemir Makine San.", "Bursa", "₺35.200,00", "₺0,00", "₺35.200,00", "Borçlu (-)"],
-                ["Doruk İnşaat A.Ş.", "Ankara", "₺0,00", "₺88.000,00", "₺88.000,00", "Alacaklı (+)"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Cari Hareket Dökümü",
-            category: "Cari Hesap",
-            description: "Cari hesapların işlem detayları.",
-            iconName: "clock.arrow.circlepath",
-            headers: ["Tarih", "İşlem Türü", "Evrak No", "Açıklama", "Borç", "Alacak", "Bakiye"],
-            defaultRows: [
-                ["04.11.2026", "Satış Faturası", "MB-FTR-101", "Demir & Profil Satışı", "₺48.500,00", "₺0,00", "₺48.500,00"],
-                ["02.11.2026", "Banka Tahsilat", "EFT-8812", "Cari Hesap Tahsilatı", "₺0,00", "₺25.000,00", "₺23.500,00"],
-                ["28.10.2026", "Satış Faturası", "MB-FTR-098", "Kaynak Teli ve Sac", "₺32.000,00", "₺0,00", "₺55.500,00"]
-            ],
-            isHeatmap: false,
-            needsCari: true
-        ),
-        ReportItemInfo(
-            title: "Yaşlandırma Raporu",
-            category: "Cari Hesap",
-            description: "Borç/alacak yaşlandırma analizi.",
-            iconName: "hourglass",
-            headers: ["Ünvan", "0-30 Gün", "31-60 Gün", "61-90 Gün", "90+ Gün", "Toplam"],
-            defaultRows: [
-                ["Akıncılar Çelik Ltd.", "₺65.000,00", "₺45.000,00", "₺22.500,00", "₺10.000,00", "₺142.500,00"],
-                ["Doruk İnşaat A.Ş.", "₺40.000,00", "₺28.000,00", "₺15.000,00", "₺5.000,00", "₺88.000,00"],
-                ["Tekin Metal San.", "₺25.000,00", "₺18.000,00", "₺8.400,00", "₺0,00", "₺51.400,00"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Hareketsiz Cariler",
-            category: "Cari Hesap",
-            description: "İşlem görmeyen cari hesaplar.",
-            iconName: "person.fill.xmark",
-            headers: ["Ünvan", "Grup", "Telefon", "Son İşlem", "Gün"],
-            defaultRows: [
-                ["Asil Otomotiv Sanayi", "Müşteri", "0212 555 12 34", "12.04.2026", "206 Gün"],
-                ["Güneş Rulman Ltd.", "Müşteri", "0216 444 88 99", "24.05.2026", "164 Gün"],
-                ["Erler Civata Dağıtım", "Müşteri", "0224 333 11 22", "08.06.2026", "149 Gün"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Vadesi Geçmiş Alacaklar",
-            category: "Cari Hesap",
-            description: "Ödeme süresi geçmiş tahsilatlar.",
-            iconName: "bell.badge.fill",
-            headers: ["Müşteri", "Cari Bakiyesi", "Ort. Gecikme Günü", "Fatura / Evrak No", "Fatura Bakiyesi", "Gecikme (Gün)"],
-            defaultRows: [
-                ["Akıncılar Çelik Ltd.", "₺142.500,00", "28 Gün", "MB-FTR-082", "₺35.000,00", "32 Gün"],
-                ["Doruk İnşaat A.Ş.", "₺88.000,00", "19 Gün", "MB-FTR-089", "₺28.000,00", "24 Gün"],
-                ["Güneş Rulman Ltd.", "₺54.500,00", "45 Gün", "MB-FTR-074", "₺18.500,00", "52 Gün"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        
-        // 4. Stok
-        ReportItemInfo(
-            title: "Stok Mevcudu",
-            category: "Stok",
-            description: "Güncel stok miktarları ve değerleri.",
-            iconName: "cube.box.fill",
-            headers: ["Stok Kodu", "Stok Adı", "Kategori", "Miktar", "Ort. Alış F.", "Ort. Satış F.", "Satış F."],
-            defaultRows: [
-                ["STK-001", "Paslanmaz Çelik Sac 2mm", "Sac Grubu", "450 Adet", "₺480,00", "₺620,00", "₺650,00"],
-                ["STK-002", "Sanayi Profil Boru 40x40", "Profil", "820 Metre", "₺195,00", "₺260,00", "₺275,00"],
-                ["STK-003", "Gazaltı Kaynak Teli 1.2mm", "Kaynak", "150 Makara", "₺95,00", "₺130,00", "₺140,00"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Stok Hareketleri",
-            category: "Stok",
-            description: "Giriş-çıkış stok hareket dökümü.",
-            iconName: "arrow.left.arrow.right",
-            headers: ["Tarih", "Stok Adı", "İşlem", "Giren", "Çıkan", "Birim Fiyat", "Kalan"],
-            defaultRows: [
-                ["04.11.2026", "Paslanmaz Sac 2mm", "Satış Faturası", "0", "50", "₺650,00", "450"],
-                ["03.11.2026", "Profil Boru 40x40", "Satış Faturası", "0", "120", "₺275,00", "820"],
-                ["01.11.2026", "Kaynak Teli 1.2mm", "Alış Faturası", "100", "0", "₺95,00", "150"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Kritik Stok Seviyesi",
-            category: "Stok",
-            description: "Minimum seviyenin altındaki ürünler.",
-            iconName: "exclamationmark.triangle.fill",
-            headers: ["Stok Kodu", "Stok Adı", "Mevcut", "Min. Seviye", "Durum", "Satış Fiyatı"],
-            defaultRows: [
-                ["STK-008", "Kare Profil 50x50x3", "8 Adet", "25 Adet", "KRİTİK (-17)", "₺420,00"],
-                ["STK-014", "Elektrot 3.25mm Askaynak", "5 Paket", "20 Paket", "KRİTİK (-15)", "₺380,00"],
-                ["STK-022", "Kesici Taş 180x3 Karbosan", "12 Adet", "50 Adet", "KRİTİK (-38)", "₺65,00"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Ölü Stok Raporu",
-            category: "Stok",
-            description: "Çakışan veya hareketsiz stok kartları.",
-            iconName: "archivebox.fill",
-            headers: ["Stok Adı", "Barkod", "Stok Kodu", "Mevcut Miktar", "Çakışma Nedeni"],
-            defaultRows: [
-                ["Çelik Lama 30x5mm", "869000100234", "STK-112", "180 Metre", "6 Aydır Hareket Görmedi"],
-                ["T-Demiri 40x40", "869000100567", "STK-145", "65 Adet", "8 Aydır Hareket Görmedi"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Stok Devir Hızı",
-            category: "Stok",
-            description: "Stokların dönüşüm hızı analizi.",
-            iconName: "chart.line.uptrend.xyaxis",
-            headers: ["Stok Adı", "Mevcut Stok", "Toplam Satış (Çıkan)", "Stok Devir Hızı", "Kategori"],
-            defaultRows: [
-                ["Paslanmaz Sac 2mm", "450 Adet", "1.250 Adet", "2.78 / Yıl", "Sac Grubu"],
-                ["Profil Boru 40x40", "820 Metre", "3.400 Metre", "4.15 / Yıl", "Profil"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        
-        // 5. Satış
-        ReportItemInfo(
-            title: "Satış Faturası Dökümü",
-            category: "Satış",
-            description: "Kesilen satış faturalarının listesi.",
-            iconName: "doc.text.fill",
-            headers: ["Fatura No", "Tarih", "Müşteri", "Ara Toplam", "KDV", "Genel Toplam"],
-            defaultRows: [
-                ["MB-FTR-101", "04.11.2026", "Akıncılar Çelik Ltd.", "₺40.416,67", "₺8.083,33", "₺48.500,00"],
-                ["MB-FTR-098", "28.10.2026", "Doruk İnşaat A.Ş.", "₺26.666,67", "₺5.333,33", "₺32.000,00"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "En Çok Satan Ürünler",
-            category: "Satış",
-            description: "Satış adedine göre top listeler.",
-            iconName: "star.fill",
-            headers: ["Sıra", "Ürün Adı", "Mevcut Stok", "Satış Fiyatı", "Kategori"],
-            defaultRows: [
-                ["1", "Sanayi Profil Boru 40x40", "820 Metre", "₺275,00", "Profil"],
-                ["2", "Paslanmaz Çelik Sac 2mm", "450 Adet", "₺650,00", "Sac Grubu"],
-                ["3", "Gazaltı Kaynak Teli 1.2mm", "150 Makara", "₺140,00", "Kaynak"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        
-        // 6. Karlılık
-        ReportItemInfo(
-            title: "Ürün Karlılık Raporu",
-            category: "Karlılık",
-            description: "Ürün bazlı kar/zarar analizi.",
-            iconName: "tag.fill",
-            headers: ["Ürün Adı", "Alış Fiyatı", "Satış Fiyatı", "Kar", "Kar Marjı %"],
-            defaultRows: [
-                ["Paslanmaz Çelik Sac 2mm", "₺480,00", "₺650,00", "₺170,00", "%26.2"],
-                ["Sanayi Profil Boru 40x40", "₺195,00", "₺275,00", "₺80,00", "%29.1"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Müşteri Karlılık Analizi",
-            category: "Karlılık",
-            description: "Müşteri bazlı kar/zarar analizi.",
-            iconName: "person.crop.circle.badge.checkmark",
-            headers: ["Müşteri", "Toplam Satış", "Tahmini Maliyet", "Net Kar", "Kar Marjı (%)", "Fatura Sayısı"],
-            defaultRows: [
-                ["Akıncılar Çelik Ltd.", "₺840.000,00", "₺610.000,00", "₺230.000,00", "%27.4", "18 Fatura"],
-                ["Özdemir Makine San.", "₺480.000,00", "₺345.000,00", "₺135.000,00", "%28.1", "12 Fatura"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Detaylı Gelir ve Maliyet Analizi",
-            category: "Karlılık",
-            description: "Satır bazlı ürün maliyet ve kâr analizi.",
-            iconName: "tablecells",
-            headers: ["Tarih", "Ürün Adı", "Müşteri (Kime)", "Miktar", "Satış Fiyatı", "Tutar (Net/KDV)", "Tahsilat Yöntemi & Süresi", "En Son Tedarikçi", "Alış Fiyatı & Değişim", "Maliyet", "Net Kar & Durum", "Marj", "Ödeme Yöntemi & Süresi"],
-            defaultRows: [
-                ["04.11.2026", "Paslanmaz Sac 2mm", "Akıncılar Çelik Ltd.", "50 Adet", "₺650,00", "₺32.500 (+KDV)", "Nakit • 0 Gün", "Ereğli Demir Çelik", "₺480,00 (%0)", "₺24.000,00", "₺8.500 (Kâr)", "%26.2", "Vadeli • 30 Gün"],
-                ["03.11.2026", "Profil Boru 40x40", "Özdemir Makine", "120 Metre", "₺275,00", "₺33.000 (+KDV)", "Kredi Kartı • 1 Gün", "Borusan Mannesmann", "₺195,00 (+%4)", "₺23.400,00", "₺9.600 (Kâr)", "%29.1", "Peşin • 0 Gün"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        
-        // 7. Stratejik
-        ReportItemInfo(
-            title: "Müşteri ABC Analizi",
-            category: "Stratejik",
-            description: "Ciroya göre müşteri sınıflandırması.",
-            iconName: "chart.bar.xaxis",
-            headers: ["Müşteri", "Toplam Satış", "Yüzde", "Sınıf"],
-            defaultRows: [
-                ["Akıncılar Çelik Ltd.", "₺840.000,00", "%45.4", "A Sınıfı (Önemli)"],
-                ["Özdemir Makine San.", "₺480.000,00", "%25.9", "A Sınıfı (Önemli)"],
-                ["Doruk İnşaat A.Ş.", "₺320.000,00", "%17.3", "B Sınıfı (Orta)"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Kar-Zarar Mukayesesi",
-            category: "Stratejik",
-            description: "Yıllık, aylık ve haftalık bazda performans analizi.",
-            iconName: "arrow.left.arrow.right",
-            headers: ["Dönem", "Bu Yıl Ciro", "Geçen Yıl Ciro", "Değişim Tutarı", "Büyüme %"],
-            defaultRows: [
-                ["Ekim", "₺428.500,00", "₺320.000,00", "+₺108.500,00", "+%33.9"],
-                ["Eylül", "₺395.000,00", "₺290.000,00", "+₺105.000,00", "+%36.2"],
-                ["Ağustos", "₺360.000,00", "₺310.000,00", "+₺50.000,00", "+%16.1"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Müşteri Kayıp (Churn)",
-            category: "Stratejik",
-            description: "Kayıp riski olan pasif müşteriler.",
-            iconName: "person.crop.circle.badge.exclamationmark",
-            headers: ["Müşteri", "Son İşlem", "Geçen Gün", "Kayıp Riski"],
-            defaultRows: [
-                ["Asil Otomotiv Ltd.", "12.04.2026", "206 Gün", "YÜKSEK (Kayıp)"],
-                ["Güneş Rulman San.", "24.05.2026", "164 Gün", "YÜKSEK (Kayıp)"],
-                ["Erler Civata Dağıtım", "08.06.2026", "149 Gün", "ORTA (Riskli)"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Fiyat Dalgalanma Raporu",
-            category: "Stratejik",
-            description: "Ürün fiyat değişim trendleri.",
-            iconName: "waveform.path.ecg",
-            headers: ["Ürün", "Min Fiyat", "Max Fiyat", "Ort Fiyat", "Fark %"],
-            defaultRows: [
-                ["Paslanmaz Sac 2mm", "₺540,00", "₺650,00", "₺595,00", "+%20.3"],
-                ["Profil Boru 40x40", "₺220,00", "₺275,00", "₺247,50", "+%25.0"],
-                ["Kaynak Teli 1.2mm", "₺110,00", "₺140,00", "₺125,00", "+%27.2"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Müşteri Sadakat (LTV)",
-            category: "Stratejik",
-            description: "Müşteri yaşam boyu değer analizi.",
-            iconName: "crown.fill",
-            headers: ["Müşteri", "İlk Alışveriş", "Son Alışveriş", "Toplam Harcama", "Ortalama Sepet"],
-            defaultRows: [
-                ["Akıncılar Çelik Ltd.", "14.02.2024", "04.11.2026", "₺840.000,00", "₺46.666,67"],
-                ["Özdemir Makine San.", "18.06.2024", "03.11.2026", "₺480.000,00", "₺40.000,00"],
-                ["Doruk İnşaat A.Ş.", "10.09.2024", "28.10.2026", "₺320.000,00", "₺40.000,00"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Finansal Isı Haritası",
-            category: "Stratejik",
-            description: "Günlük finansal aktivite yoğunluğu.",
-            iconName: "square.grid.3x3.fill",
-            headers: ["Tarih", "Satış", "Alış", "Kasa Giren", "Kasa Çıkan", "Net Akış"],
-            defaultRows: [
-                ["04.11.2026", "₺24.500,00", "₺12.000,00", "₺5.000,00", "₺2.500,00", "+₺15.000,00"],
-                ["03.11.2026", "₺18.200,00", "₺15.000,00", "₺2.000,00", "₺1.800,00", "+₺3.400,00"],
-                ["02.11.2026", "₺12.000,00", "₺22.000,00", "₺4.000,00", "₺3.000,00", "-₺9.000,00"]
-            ],
-            isHeatmap: true,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Tahsilat Süresi (DSO)",
-            category: "Stratejik",
-            description: "Ortalama tahsilat hızı (gün).",
-            iconName: "speedometer",
-            headers: ["Müşteri", "Ortalama Tahsilat Süresi (Gün)", "Toplam Alacak", "Durum"],
-            defaultRows: [
-                ["Akıncılar Çelik Ltd.", "28 Gün", "₺142.500,00", "Normal (Vadesinde)"],
-                ["Doruk İnşaat A.Ş.", "34 Gün", "₺88.000,00", "Kabul Edilebilir"],
-                ["Güneş Rulman San.", "52 Gün", "₺54.500,00", "Gecikmeli (Riskli)"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        ),
-        ReportItemInfo(
-            title: "Bütçe / Hedef Takibi",
-            category: "Stratejik",
-            description: "Aylık hedeflere ulaşma durumu.",
-            iconName: "target",
-            headers: ["Dönem (Ay)", "Hedeflenen Ciro", "Gerçekleşen Satış", "Fark", "Başarı Oranı %"],
-            defaultRows: [
-                ["Kasım (Hedef)", "₺450.000,00", "₺95.000,00", "-₺355.000,00", "%21.1"],
-                ["Ekim 2026", "₺400.000,00", "₺428.500,00", "+₺28.500,00", "%107.1"],
-                ["Eylül 2026", "₺380.000,00", "₺395.000,00", "+₺15.000,00", "%103.9"]
-            ],
-            isHeatmap: false,
-            needsCari: false
-        )
-    ]
-    
-    private let categories = ["Genel Durum", "Finans", "Cari Hesap", "Stok", "Satış", "Karlılık", "Stratejik"]
-    
-    // Cariler for the overlay picker (cleaned from mock data)
-    private let sampleCariler: [String] = []
+    @State private var cariList: [CariKart] = []
+    @State private var selectedCariForNav: CariKart? = nil
+    @State private var navigateToCariReport: Bool = false
     
     public init() {}
     
-    public var filteredReports: [ReportItemInfo] {
+    private var filteredReports: [ReportItemInfo] {
         allReports.filter { r in
-            searchQuery.isEmpty ||
-                r.title.localizedCaseInsensitiveContains(searchQuery) ||
-                r.description.localizedCaseInsensitiveContains(searchQuery) ||
-                r.category.localizedCaseInsensitiveContains(searchQuery)
+            let matchCat = selectedCategory == "Tümü" || r.category == selectedCategory
+            let matchSearch = searchText.isEmpty ||
+                r.title.localizedCaseInsensitiveContains(searchText) ||
+                r.desc.localizedCaseInsensitiveContains(searchText)
+            return matchCat && matchSearch
         }
     }
     
     public var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.black.ignoresSafeArea()
-                
-                VStack(spacing: 12) {
-                    headerView
-                    dateFilterView
-                    searchBarView
-                    reportsListView
+        ZStack {
+            Color.black.ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(8)
+                            .background(Color.white.opacity(0.08))
+                            .clipShape(Circle())
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Raporlar & Analiz")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(.white)
+                        Text("Kurumsal İş Zekası (\(allReports.count) Rapor)")
+                            .font(.system(size: 11))
+                            .foregroundColor(Color(hex: "8E8E93"))
+                    }
+                    Spacer()
+                    Image(systemName: "chart.bar.doc.horizontal.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(Color(hex: "0061FF"))
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 10)
+                
+                // Date Period Filter Bar
+                HStack(spacing: 8) {
+                    periodBtn(id: "Weekly", label: "Bu Hafta")
+                    periodBtn(id: "Monthly", label: "Bu Ay")
+                    periodBtn(id: "Yearly", label: "Bu Yıl")
+                    periodBtn(id: "All", label: "Tümü")
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 10)
+                
+                // Search Bar
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(Color(hex: "8E8E93"))
+                    TextField("Rapor adı veya açıklama ara...", text: $searchText)
+                        .foregroundColor(.white)
+                        .font(.system(size: 13))
+                    if !searchText.isEmpty {
+                        Button { searchText = "" } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(Color(hex: "8E8E93"))
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(Color(hex: "121216"))
+                .cornerRadius(12)
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                .padding(.horizontal, 16)
+                .padding(.bottom, 10)
+                
+                // Category Chips
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(categories, id: \.self) { cat in
+                            let isSel = selectedCategory == cat
+                            Button {
+                                selectedCategory = cat
+                                HardwareService.shared.hapticSelection()
+                            } label: {
+                                Text(cat)
+                                    .font(.system(size: 12, weight: isSel ? .bold : .medium))
+                                    .foregroundColor(isSel ? .white : Color(hex: "8E8E93"))
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 7)
+                                    .background(isSel ? Color(hex: "0061FF") : Color(hex: "121216"))
+                                    .cornerRadius(20)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 20)
+                                            .stroke(isSel ? Color(hex: "0061FF") : Color.white.opacity(0.08), lineWidth: 1)
+                                    )
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+                .padding(.bottom, 12)
+                
+                // Reports Grid / List
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(spacing: 10) {
+                        ForEach(filteredReports) { rep in
+                            if rep.requiresCari {
+                                Button {
+                                    pendingReport = rep
+                                    Task { await loadCarilerForSelection() }
+                                    isCariOverlayOpen = true
+                                } label: {
+                                    reportRowContent(rep: rep)
+                                }
+                            } else {
+                                NavigationLink(
+                                    destination: RaporDetayInteractiveView(
+                                        report: rep,
+                                        dateFilter: selectedPeriod,
+                                        cariName: nil,
+                                        selectedCari: nil
+                                    ).enableSwipeBack()
+                                ) {
+                                    reportRowContent(rep: rep)
+                                }
+                            }
+                        }
+                        Spacer().frame(height: 100)
+                    }
+                    .padding(.horizontal, 16)
+                }
+                
+                // Hidden programmatic link for Cari Hareket Dökümü after selection
+                NavigationLink(
+                    destination: Group {
+                        if let rep = pendingReport {
+                            RaporDetayInteractiveView(
+                                report: rep,
+                                dateFilter: selectedPeriod,
+                                cariName: selectedCariForNav?.unvan,
+                                selectedCari: selectedCariForNav
+                            ).enableSwipeBack()
+                        }
+                    },
+                    isActive: $navigateToCariReport
+                ) {
+                    EmptyView()
+                }
+                .hidden()
             }
-            .navigationBarHidden(true)
-            .sheet(isPresented: $isCariOverlayOpen) {
-                cariSelectionSheet
-            }
+        }
+        .navigationBarHidden(true)
+        .sheet(isPresented: $isCariOverlayOpen) {
+            renderCariSelectionSheet()
         }
     }
     
-    // MARK: - Header
-    private var headerView: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Raporlar & Analiz")
-                    .font(.system(size: 24, weight: .heavy))
-                    .foregroundColor(.white)
-                    .tracking(-0.5)
-                Text("Gelişmiş işletme analitiği ve PDF raporlama")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(Color(hex: "94A3B8"))
-            }
-            Spacer()
+    private func loadCarilerForSelection() async {
+        let fetched: [CariKart] = (try? await SupabaseService.shared.fetch(from: "cariler")) ?? DataStore.shared.cariler
+        await MainActor.run {
+            self.cariList = fetched.filter { !$0.isDeleted }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 6)
     }
     
-    // MARK: - Date Filter Buttons [Tümü | Haftalık | Aylık | Yıllık]
-    private var dateFilterView: some View {
-        HStack(spacing: 8) {
-            filterBtn(title: "Tümü", key: "All")
-            filterBtn(title: "Haftalık", key: "Weekly")
-            filterBtn(title: "Aylık", key: "Monthly")
-            filterBtn(title: "Yıllık", key: "Yearly")
-        }
-        .padding(.horizontal, 16)
-    }
-    
-    private func filterBtn(title: String, key: String) -> some View {
-        let isSel = selectedFilter == key
+    private func periodBtn(id: String, label: String) -> some View {
+        let isSel = selectedPeriod == id
         return Button {
-            withAnimation(.easeInOut(duration: 0.15)) { selectedFilter = key }
+            selectedPeriod = id
+            HardwareService.shared.hapticSelection()
         } label: {
-            Text(title)
-                .font(.system(size: 12, weight: isSel ? .bold : .medium))
+            Text(label)
+                .font(.system(size: 11, weight: isSel ? .bold : .medium))
                 .foregroundColor(isSel ? .white : Color(hex: "8E8E93"))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
                 .background(isSel ? Color(hex: "2563EB") : Color(hex: "121216"))
                 .cornerRadius(8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(isSel ? Color(hex: "2563EB") : Color.white.opacity(0.06), lineWidth: 1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(isSel ? Color(hex: "3B82F6") : Color.white.opacity(0.06), lineWidth: 1)
+                )
         }
     }
     
-    // MARK: - Search Bar
-    private var searchBarView: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 16))
-                .foregroundColor(Color(hex: "94A3B8"))
-            
-            TextField("Rapor adı veya açıklama ara...", text: $searchQuery)
-                .font(.system(size: 14))
-                .foregroundColor(.white)
-            
-            if !searchQuery.isEmpty {
-                Button { searchQuery = "" } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundColor(Color(hex: "94A3B8"))
-                }
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Color(hex: "121216"))
-        .cornerRadius(12)
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08), lineWidth: 1))
-        .padding(.horizontal, 16)
-    }
-    
-    // MARK: - Reports List Grouped by Categories
-    private var reportsListView: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 20) {
-                ForEach(categories, id: \.self) { cat in
-                    let catReports = filteredReports.filter { $0.category == cat }
-                    if !catReports.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(cat)
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(Color(hex: "60A5FA"))
-                                .padding(.horizontal, 4)
-                            
-                            VStack(spacing: 8) {
-                                ForEach(catReports) { r in
-                                    if r.needsCari {
-                                        Button {
-                                            selectedReport = r
-                                            isCariOverlayOpen = true
-                                        } label: {
-                                            reportRow(r: r)
-                                        }
-                                        .buttonStyle(.plain)
-                                    } else {
-                                        NavigationLink(destination: RaporDetayInteractiveView(report: r, dateFilter: selectedFilter, cariName: nil)) {
-                                            reportRow(r: r)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                Spacer().frame(height: 110)
-            }
-            .padding(.horizontal, 16)
-        }
-    }
-    
-    private func reportRow(r: ReportItemInfo) -> some View {
-        HStack(spacing: 12) {
+    private func reportRowContent(rep: ReportItemInfo) -> some View {
+        HStack(spacing: 14) {
             ZStack {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(hex: "0061FF").opacity(0.15))
-                    .frame(width: 40, height: 40)
-                Image(systemName: r.iconName)
-                    .font(.system(size: 18))
-                    .foregroundColor(Color(hex: "60A5FA"))
+                    .fill(Color(hex: rep.colorHex).opacity(0.15))
+                    .frame(width: 44, height: 44)
+                Image(systemName: rep.icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(Color(hex: rep.colorHex))
             }
             
-            VStack(alignment: .leading, spacing: 3) {
-                Text(r.title)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                
-                Text(r.description)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(rep.title)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                    Spacer()
+                    Text(rep.category)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(Color(hex: rep.colorHex))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color(hex: rep.colorHex).opacity(0.15))
+                        .cornerRadius(4)
+                }
+                Text(rep.desc)
                     .font(.system(size: 11))
                     .foregroundColor(Color(hex: "8E8E93"))
                     .lineLimit(2)
+                    .multilineTextAlignment(.leading)
             }
-            
-            Spacer()
             
             Image(systemName: "chevron.right")
                 .font(.system(size: 12, weight: .bold))
@@ -656,56 +650,82 @@ public struct RaporlarView: View {
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.08), lineWidth: 1))
     }
     
-    // MARK: - Cari Selection Sheet for Cari Hareket Dökümü
-    private var cariSelectionSheet: some View {
+    @ViewBuilder
+    private func renderCariSelectionSheet() -> some View {
+        let filteredCariler = cariList.filter {
+            cariSearch.isEmpty ||
+            $0.unvan.localizedCaseInsensitiveContains(cariSearch) ||
+            ($0.cariKodu ?? "").localizedCaseInsensitiveContains(cariSearch)
+        }
+        
         NavigationStack {
             ZStack {
-                Color(hex: "0A0A0A").ignoresSafeArea()
-                
+                Color(hex: "09090B").ignoresSafeArea()
                 VStack(spacing: 12) {
-                    // Search bar
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass").foregroundColor(Color(hex: "64748B"))
-                        TextField("Cari ara...", text: $cariSearch)
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(Color(hex: "8E8E93"))
+                        TextField("Cari hesap ara...", text: $cariSearch)
                             .foregroundColor(.white)
                     }
-                    .padding(12)
-                    .background(Color(hex: "161616"))
-                    .cornerRadius(12)
-                    .padding(.horizontal, 16)
+                    .padding(10)
+                    .background(Color(hex: "121216"))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+                    .padding(.top, 10)
                     
-                    if sampleCariler.isEmpty {
-                        VStack(spacing: 8) {
-                            Text("Kayıtlı cari hesabı bulunamadı.")
-                                .font(.system(size: 13))
-                                .foregroundColor(Color(hex: "8E8E93"))
-                                .padding(.top, 24)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .center)
-                    } else {
-                        List {
-                            ForEach(sampleCariler.filter { cariSearch.isEmpty || $0.localizedCaseInsensitiveContains(cariSearch) }, id: \.self) { c in
-                                Button {
-                                    selectedCariName = c
-                                    isCariOverlayOpen = false
-                                } label: {
-                                    HStack {
-                                        Text(c)
-                                            .font(.system(size: 14, weight: .semibold))
-                                            .foregroundColor(.white)
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
-                                            .font(.system(size: 12))
-                                            .foregroundColor(Color(hex: "64748B"))
-                                    }
-                                    .padding(.vertical, 4)
-                                }
-                                .listRowBackground(Color(hex: "121216"))
+                    List {
+                        Button {
+                            selectedCariForNav = nil
+                            isCariOverlayOpen = false
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                navigateToCariReport = true
                             }
+                        } label: {
+                            HStack {
+                                Image(systemName: "person.3.fill")
+                                    .foregroundColor(Color(hex: "10B981"))
+                                Text("Tüm Cari Hesaplar")
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 14, weight: .bold))
+                                Spacer()
+                                Image(systemName: "arrow.right.circle.fill")
+                                    .foregroundColor(Color(hex: "10B981"))
+                            }
+                            .padding(.vertical, 4)
                         }
-                        .listStyle(.plain)
-                        .scrollContentBackground(.hidden)
+                        .listRowBackground(Color(hex: "121216"))
+                        
+                        ForEach(filteredCariler) { c in
+                            Button {
+                                selectedCariForNav = c
+                                isCariOverlayOpen = false
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                    navigateToCariReport = true
+                                }
+                            } label: {
+                                HStack {
+                                    Image(systemName: "building.2.fill")
+                                        .foregroundColor(Color(hex: "3B82F6"))
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(c.unvan)
+                                            .foregroundColor(.white)
+                                            .font(.system(size: 14, weight: .semibold))
+                                        Text(AppFormatters.money(c.bakiye))
+                                            .foregroundColor(Color(hex: "8E8E93"))
+                                            .font(.system(size: 11))
+                                    }
+                                    Spacer()
+                                    Image(systemName: "arrow.right.circle.fill")
+                                        .foregroundColor(Color(hex: "60A5FA"))
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            .listRowBackground(Color(hex: "121216"))
+                        }
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
             }
             .navigationTitle("Cari Hesap Seçiniz")
@@ -720,17 +740,20 @@ public struct RaporlarView: View {
     }
 }
 
-// MARK: - Interactive Report Detail View (100% exact to RaporDetayScreen.tsx)
+// MARK: - Interactive Report Detail View (Masaüstü RaporListViewModel & QuestPDF Birebir Eşleşme)
 public struct RaporDetayInteractiveView: View {
-    @Environment(\.presentationMode) var presentationMode
+    @Environment(\.dismiss) private var dismiss
     public let report: ReportItemInfo
     public let dateFilter: String
     public let cariName: String?
+    public let selectedCari: CariKart?
     
-    @State private var showPDFModal: Bool = false
-    @State private var generatedPDFData: Data? = nil
+    @State private var currentFilter: String
+    @State private var pdfPreviewItem: PDFPreviewItem? = nil
+    @State private var activeHeaders: [String]
     @State private var liveRows: [[String]] = []
     @State private var isLoadingData: Bool = false
+    @State private var isGeneratingPDF: Bool = false
     
     // Heatmap data structure
     struct DailyFlow: Identifiable {
@@ -744,24 +767,29 @@ public struct RaporDetayInteractiveView: View {
         var net: Double { (satis + kasaIn) - (alis + kasaOut) }
     }
     
-    private static func generateInitialDays() -> [DailyFlow] {
-        var result: [DailyFlow] = []
-        for i in 1...30 {
-            let s: Double = Double(15000 + (i * 1234) % 30000)
-            let a: Double = Double(8000 + (i * 987) % 25000)
-            let ki: Double = Double(3000 + (i * 456) % 10000)
-            let ko: Double = Double(2000 + (i * 321) % 8000)
-            result.append(DailyFlow(day: "\(i)", date: "\(String(format: "%02d", i)).10.2026", satis: s, alis: a, kasaIn: ki, kasaOut: ko))
-        }
-        return result
-    }
-    
-    @State private var days: [DailyFlow] = Self.generateInitialDays()
-    
+    @State private var days: [DailyFlow] = []
     @State private var selectedDay: DailyFlow? = nil
+    
+    public init(report: ReportItemInfo, dateFilter: String, cariName: String?, selectedCari: CariKart? = nil) {
+        self.report = report
+        self.dateFilter = dateFilter
+        self.cariName = cariName
+        self.selectedCari = selectedCari
+        _currentFilter = State(initialValue: dateFilter)
+        _activeHeaders = State(initialValue: report.headers)
+    }
     
     public var activeRows: [[String]] {
         liveRows
+    }
+    
+    private var filterDisplayLabel: String {
+        switch currentFilter {
+        case "Weekly": return "Bu Hafta"
+        case "Monthly": return "Bu Ay"
+        case "Yearly": return "Bu Yıl"
+        default: return "Tüm Zamanlar"
+        }
     }
     
     public var body: some View {
@@ -772,7 +800,7 @@ public struct RaporDetayInteractiveView: View {
                 // Top Navigation Bar
                 HStack {
                     Button {
-                        presentationMode.wrappedValue.dismiss()
+                        dismiss()
                     } label: {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 18, weight: .bold))
@@ -786,7 +814,7 @@ public struct RaporDetayInteractiveView: View {
                             .foregroundColor(.white)
                             .lineLimit(1)
                         HStack(spacing: 4) {
-                            Text("Dönem: \(dateFilter == "All" ? "Tüm Zamanlar" : dateFilter)")
+                            Text("Dönem: \(filterDisplayLabel)")
                             if let c = cariName {
                                 Text("• \(c)")
                             }
@@ -798,11 +826,11 @@ public struct RaporDetayInteractiveView: View {
                     
                     Spacer()
                     
-                    if isLoadingData {
+                    if isLoadingData || isGeneratingPDF {
                         ProgressView().tint(.white).padding(.trailing, 4)
                     }
                     
-                    // PDF Aç Butonu
+                    // PDF Aç Butonu (QuestPDF Önizleme)
                     Button {
                         openPDF()
                     } label: {
@@ -817,8 +845,9 @@ public struct RaporDetayInteractiveView: View {
                         .background(Color(hex: "0061FF"))
                         .cornerRadius(8)
                     }
+                    .disabled(isGeneratingPDF)
                     
-                    // Share / PDF Button
+                    // Share / PDF Button (QuestPDF Paylaşım)
                     Button {
                         shareReport()
                     } label: {
@@ -833,18 +862,27 @@ public struct RaporDetayInteractiveView: View {
                         .background(Color(hex: "2563EB"))
                         .cornerRadius(8)
                     }
+                    .disabled(isGeneratingPDF)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 
+                // Dönem Seçici (Rapor İçinden de Değiştirilebilir)
+                HStack(spacing: 6) {
+                    detailPeriodChip(id: "Weekly", label: "Bu Hafta")
+                    detailPeriodChip(id: "Monthly", label: "Bu Ay")
+                    detailPeriodChip(id: "Yearly", label: "Bu Yıl")
+                    detailPeriodChip(id: "All", label: "Tümü")
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+                
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 16) {
-                        // If Heatmap Report: Show 3 KPI Cards + 30 Cells Grid + Day Detail Card
                         if report.isHeatmap {
                             renderHeatmapSection()
                         }
                         
-                        // Full Dynamic Table (headers + rows)
                         renderTableSection()
                         
                         Spacer().frame(height: 50)
@@ -862,49 +900,90 @@ public struct RaporDetayInteractiveView: View {
                 await loadLiveReportData()
             }
         }
-        .sheet(isPresented: $showPDFModal) {
-            if let data = generatedPDFData {
-                PDFViewerModal(
-                    title: report.title,
-                    pdfData: data,
-                    fileName: "\(report.title.replacingOccurrences(of: " ", with: "_"))_\(dateFilter).pdf"
-                )
-            }
+        .sheet(item: $pdfPreviewItem) { item in
+            PDFViewerModal(
+                title: item.title,
+                pdfData: item.data,
+                fileName: item.fileName
+            )
+        }
+    }
+    
+    private func detailPeriodChip(id: String, label: String) -> some View {
+        let isSel = currentFilter == id
+        return Button {
+            currentFilter = id
+            Task { await loadLiveReportData() }
+        } label: {
+            Text(label)
+                .font(.system(size: 11, weight: isSel ? .bold : .medium))
+                .foregroundColor(isSel ? .white : Color(hex: "8E8E93"))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(isSel ? Color(hex: "2563EB") : Color(hex: "121216"))
+                .cornerRadius(8)
         }
     }
     
     // MARK: - Live Database Data Loader
     private func loadLiveReportData() async {
-        isLoadingData = true
-        defer { isLoadingData = false }
-        
-        let calculated = await ReportCalculationService.shared.calculateReport(
-            report: report,
-            dateFilter: dateFilter,
-            cariName: cariName
+        await MainActor.run { isLoadingData = true }
+        let res = await ReportCalculationService.shared.calculateReportData(
+            for: report.title,
+            filter: currentFilter,
+            selectedCari: selectedCari
         )
         
+        var computedDays: [DailyFlow] = []
+        if report.isHeatmap {
+            let faturalar: [Fatura] = (try? await SupabaseService.shared.fetch(from: "faturalar")) ?? DataStore.shared.faturalar
+            let kasaHar: [KasaHareket] = (try? await SupabaseService.shared.fetch(from: "kasa_hareketler")) ?? []
+            let cal = Calendar.current
+            let today = cal.startOfDay(for: Date())
+            for i in (0..<30).reversed() {
+                if let d = cal.date(byAdding: .day, value: -i, to: today) {
+                    let isoP = AppFormatters.isoDate.string(from: d)
+                    let trP = AppFormatters.shortDate.string(from: d)
+                    let dayNum = "\(cal.component(.day, from: d))"
+                    let s = faturalar.filter { ($0.faturaTuru.localizedCaseInsensitiveContains("satış") || $0.faturaTuru.localizedCaseInsensitiveContains("satis")) && ($0.tarih.hasPrefix(isoP) || $0.tarih.hasPrefix(trP)) }.reduce(0.0) { $0 + $1.genelToplam }
+                    let a = faturalar.filter { ($0.faturaTuru.localizedCaseInsensitiveContains("alış") || $0.faturaTuru.localizedCaseInsensitiveContains("alis")) && ($0.tarih.hasPrefix(isoP) || $0.tarih.hasPrefix(trP)) }.reduce(0.0) { $0 + $1.genelToplam }
+                    let ki = kasaHar.filter { $0.tarih.hasPrefix(isoP) || $0.tarih.hasPrefix(trP) }.reduce(0.0) { $0 + $1.giren }
+                    let ko = kasaHar.filter { $0.tarih.hasPrefix(isoP) || $0.tarih.hasPrefix(trP) }.reduce(0.0) { $0 + $1.cikan }
+                    computedDays.append(DailyFlow(day: dayNum, date: trP, satis: s, alis: a, kasaIn: ki, kasaOut: ko))
+                }
+            }
+        }
+        
         await MainActor.run {
-            self.liveRows = calculated.rows
+            if !res.headers.isEmpty {
+                self.activeHeaders = res.headers
+            }
+            self.liveRows = res.rows
+            if report.isHeatmap {
+                self.days = computedDays
+            }
+            self.isLoadingData = false
         }
     }
     
-    // MARK: - Heatmap Section
+    // MARK: - Heatmap Section (100% Live Data)
     @ViewBuilder
     private func renderHeatmapSection() -> some View {
+        let posCount = days.filter { $0.net > 0 }.count
+        let negCount = days.filter { $0.net < 0 }.count
+        let totalNet = days.reduce(0.0) { $0 + $1.net }
+        
         VStack(alignment: .leading, spacing: 12) {
-            // 3 KPI Cards
             HStack(spacing: 8) {
-                kpi(title: "Pozitif Günler", val: "19 Gün", color: Color(hex: "10B981"))
-                kpi(title: "Negatif Günler", val: "11 Gün", color: Color(hex: "EF4444"))
-                kpi(title: "Net Nakit Akışı", val: "+₺184.200", color: Color(hex: "3B82F6"))
+                kpi(title: "Pozitif Günler", val: "\(posCount) Gün", color: Color(hex: "10B981"))
+                kpi(title: "Negatif Günler", val: "\(negCount) Gün", color: Color(hex: "EF4444"))
+                kpi(title: "Net Nakit Akışı", val: AppFormatters.money(totalNet), color: Color(hex: "3B82F6"))
             }
             
             Text("Son 30 Günlük Yoğunluk Hücreleri")
                 .font(.system(size: 13, weight: .bold))
                 .foregroundColor(.white)
             
-            // 5 columns x 6 rows Grid
             let columns = Array(repeating: GridItem(.flexible(), spacing: 6), count: 6)
             LazyVGrid(columns: columns, spacing: 6) {
                 ForEach(days) { day in
@@ -917,7 +996,7 @@ public struct RaporDetayInteractiveView: View {
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(.white)
                             let kVal = Int(abs(day.net) / 1000)
-                            Text(day.net >= 0 ? "+\(kVal)k" : "-\(kVal)k")
+                            Text(day.net == 0 ? "0" : (day.net > 0 ? "+\(kVal)k" : "-\(kVal)k"))
                                 .font(.system(size: 8))
                                 .foregroundColor(day.net >= 0 ? Color(hex: "10B981") : Color(hex: "EF4444"))
                         }
@@ -933,7 +1012,6 @@ public struct RaporDetayInteractiveView: View {
                 }
             }
             
-            // Selected Day Card
             if let sel = selectedDay {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
@@ -968,12 +1046,12 @@ public struct RaporDetayInteractiveView: View {
     }
     
     private func heatmapCellBg(day: DailyFlow) -> Color {
+        if day.net == 0 { return Color.white.opacity(0.04) }
         let ratio = min(abs(day.net) / 30000.0, 1.0)
         let opacity = 0.2 + (ratio * 0.6)
         let baseColor = day.net >= 0 ? Color(hex: "10B981") : Color(hex: "EF4444")
         return baseColor.opacity(opacity)
     }
-
 
     // MARK: - Table Section (Headers + Dynamic Live Rows)
     @ViewBuilder
@@ -984,7 +1062,7 @@ public struct RaporDetayInteractiveView: View {
                     .font(.system(size: 13, weight: .bold))
                     .foregroundColor(.white)
                 Spacer()
-                Text("Dinamik Canlı Veri")
+                Text("QuestPDF & Canlı Veri")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(Color(hex: "00FF87"))
             }
@@ -993,11 +1071,11 @@ public struct RaporDetayInteractiveView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     // Header Row
                     HStack(spacing: 0) {
-                        ForEach(report.headers, id: \.self) { h in
+                        ForEach(activeHeaders, id: \.self) { h in
                             Text(h)
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(Color(hex: "8E8E93"))
-                                .frame(width: 130, alignment: .leading)
+                                .frame(width: 135, alignment: .leading)
                                 .padding(.vertical, 8)
                                 .padding(.horizontal, 6)
                         }
@@ -1007,21 +1085,28 @@ public struct RaporDetayInteractiveView: View {
                     
                     Divider().background(Color.white.opacity(0.1))
                     
-                    // Dynamic Rows
-                    ForEach(Array(activeRows.enumerated()), id: \.offset) { rowIndex, row in
-                        HStack(spacing: 0) {
-                            ForEach(Array(row.enumerated()), id: \.offset) { colIndex, cell in
-                                Text(cell)
-                                    .font(.system(size: 12, weight: colIndex == 0 ? .semibold : .regular))
-                                    .foregroundColor(cellColor(cell: cell, colIndex: colIndex))
-                                    .frame(width: 130, alignment: .leading)
-                                    .padding(.vertical, 8)
-                                    .padding(.horizontal, 6)
+                    if activeRows.isEmpty {
+                        Text(isLoadingData ? "Veriler yükleniyor..." : "Seçili dönemde kayıt bulunamadı.")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color(hex: "8E8E93"))
+                            .padding(.vertical, 20)
+                            .padding(.horizontal, 8)
+                    } else {
+                        ForEach(Array(activeRows.enumerated()), id: \.offset) { rowIndex, row in
+                            HStack(spacing: 0) {
+                                ForEach(Array(row.enumerated()), id: \.offset) { colIndex, cell in
+                                    Text(cell)
+                                        .font(.system(size: 12, weight: colIndex == 0 ? .semibold : .regular))
+                                        .foregroundColor(cellColor(cell: cell, colIndex: colIndex))
+                                        .frame(width: 135, alignment: .leading)
+                                        .padding(.vertical, 8)
+                                        .padding(.horizontal, 6)
+                                }
                             }
+                            .background(rowIndex % 2 == 0 ? Color.clear : Color.white.opacity(0.02))
+                            
+                            Divider().background(Color.white.opacity(0.04))
                         }
-                        .background(rowIndex % 2 == 0 ? Color.clear : Color.white.opacity(0.02))
-                        
-                        Divider().background(Color.white.opacity(0.04))
                     }
                 }
             }
@@ -1033,9 +1118,9 @@ public struct RaporDetayInteractiveView: View {
     }
     
     private func cellColor(cell: String, colIndex: Int) -> Color {
-        if cell.contains("+") || cell.contains("Borçlu") || cell.contains("Kâr") {
+        if cell.contains("+") || cell.contains("Borçlu") || cell.contains("Kâr") || cell.contains("Yuksek Kar") {
             return Color(hex: "10B981")
-        } else if cell.contains("-") || cell.contains("Alacaklı") || cell.contains("Zarar") || cell.contains("Kritik") || cell.contains("Risk") {
+        } else if cell.contains("-") || cell.contains("Alacaklı") || cell.contains("ZARAR") || cell.contains("Kritik") || cell.contains("Risk") {
             return Color(hex: "EF4444")
         }
         return .white
@@ -1044,7 +1129,7 @@ public struct RaporDetayInteractiveView: View {
     private func kpi(title: String, val: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.system(size: 9, weight: .semibold)).foregroundColor(Color(hex: "8E8E93"))
-            Text(val).font(.system(size: 13, weight: .heavy)).foregroundColor(color)
+            Text(val).font(.system(size: 13, weight: .heavy)).foregroundColor(color).lineLimit(1).minimumScaleFactor(0.7)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1056,18 +1141,18 @@ public struct RaporDetayInteractiveView: View {
     private func openPDF() {
         #if canImport(UIKit)
         Task { @MainActor in
-            if let pdfData = await PDFService.shared.fetchOrGenerateReportPDF(
+            isGeneratingPDF = true
+            let pdfData = await ReportCalculationService.shared.generateDesktopReportPDF(
+                for: report.title,
+                filter: currentFilter,
+                selectedCari: selectedCari
+            )
+            isGeneratingPDF = false
+            self.pdfPreviewItem = PDFPreviewItem(
                 title: report.title,
-                category: report.category,
-                headers: report.headers,
-                rows: activeRows,
-                dateFilter: dateFilter,
-                cariName: cariName,
-                isHeatmap: report.isHeatmap
-            ) {
-                self.generatedPDFData = pdfData
-                self.showPDFModal = true
-            }
+                data: pdfData,
+                fileName: "\(report.title)_\(currentFilter).pdf"
+            )
         }
         #endif
     }
@@ -1075,33 +1160,17 @@ public struct RaporDetayInteractiveView: View {
     private func shareReport() {
         #if canImport(UIKit)
         Task { @MainActor in
-            if let pdfData = await PDFService.shared.fetchOrGenerateReportPDF(
-                title: report.title,
-                category: report.category,
-                headers: report.headers,
-                rows: activeRows,
-                dateFilter: dateFilter,
-                cariName: cariName,
-                isHeatmap: report.isHeatmap
-            ) {
-                let safeName = report.title.replacingOccurrences(of: " ", with: "_")
-                let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(safeName)_\(dateFilter).pdf")
-                do {
-                    try pdfData.write(to: tempURL)
-                    let av = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
-                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                       let rootVC = windowScene.windows.first?.rootViewController {
-                        if let popover = av.popoverPresentationController {
-                            popover.sourceView = rootVC.view
-                            popover.sourceRect = CGRect(x: rootVC.view.bounds.midX, y: rootVC.view.bounds.midY, width: 0, height: 0)
-                            popover.permittedArrowDirections = []
-                        }
-                        rootVC.present(av, animated: true)
-                    }
-                } catch {
-                    print("PDF paylaşım hatası: \(error)")
-                }
-            }
+            isGeneratingPDF = true
+            let pdfData = await ReportCalculationService.shared.generateDesktopReportPDF(
+                for: report.title,
+                filter: currentFilter,
+                selectedCari: selectedCari
+            )
+            isGeneratingPDF = false
+            PDFService.shared.sharePDF(
+                data: pdfData,
+                fileName: "\(report.title)_\(currentFilter).pdf"
+            )
         }
         #endif
     }

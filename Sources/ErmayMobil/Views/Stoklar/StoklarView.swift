@@ -62,6 +62,8 @@ public struct StoklarView: View {
     @State private var showDeleteConfirm: Bool = false
     @State private var showShareSheet: Bool = false
     @State private var shareContent: String = ""
+    @State private var pdfPreviewItem: PDFPreviewItem? = nil
+    @State private var isGeneratingPDF: Bool = false
     
     // Groups & Units
     @State private var gruplar: [String] = ["Genel", "Rulman", "Sızdırmazlık", "Madeni Yağ", "Bağlantı"]
@@ -94,11 +96,10 @@ public struct StoklarView: View {
     }
     
     public var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.black.ignoresSafeArea()
-                
-                ScrollView(showsIndicators: false) {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            
+            ScrollView(showsIndicators: false) {
                     VStack(spacing: 16) {
                         
                         // =========================================================================
@@ -555,12 +556,41 @@ public struct StoklarView: View {
                     await loadLiveStoklar()
                 }
             }
-        }
+            .sheet(item: $pdfPreviewItem) { item in
+                #if canImport(UIKit)
+                PDFViewerModal(title: item.title, pdfData: item.data, fileName: item.fileName)
+                #endif
+            }
     }
     
     private func loadLiveStoklar() async {
         await dataStore.loadStoklarCacheFirst(forceCloudRefresh: true)
         self.stoklar = dataStore.stoklar
+    }
+    
+    private func loadStokHareketler(for stok: StokKart) async {
+        let fetched: [StokHareket] = (try? await SupabaseService.shared.fetch(from: "stok_hareketler")) ?? []
+        let filtered = fetched.filter { $0.stokId == stok.id || $0.stokAdi == stok.stokAdi || ($0.stokKodu != nil && $0.stokKodu == stok.stokKodu) }
+            .sorted { ($0.tarih ?? "") < ($1.tarih ?? "") }
+        var running = 0.0
+        var items: [StokHareketItem] = []
+        for h in filtered {
+            let isG = h.giren > 0 || (h.cikan == 0 && !(h.islemTuru ?? "").localizedCaseInsensitiveContains("çıkış") && !(h.islemTuru ?? "").localizedCaseInsensitiveContains("satış"))
+            let m = max(h.miktar, max(h.giren, h.cikan))
+            running += isG ? m : -m
+            items.append(StokHareketItem(
+                id: h.id,
+                tarih: String((h.tarih ?? "-").prefix(10)),
+                islemTuru: h.islemTuru ?? (isG ? "GİRİŞ" : "ÇIKIŞ"),
+                aciklama: h.aciklama ?? h.cariUnvan ?? "-",
+                miktar: m,
+                kalanMiktar: running,
+                isGiris: isG
+            ))
+        }
+        await MainActor.run {
+            self.hareketler = items.reversed()
+        }
     }
     
     // MARK: - Helper Views
@@ -632,6 +662,9 @@ public struct StoklarView: View {
         editAcilisBakiye = String(item.mevcutMiktar)
         
         hareketler = []
+        Task {
+            await loadStokHareketler(for: item)
+        }
     }
     
     private func handleCreateNew() {
@@ -652,27 +685,41 @@ public struct StoklarView: View {
     
     private func handleSaveStok() {
         guard !editStokAdi.isEmpty else { return }
-        if let sel = selectedStok, let idx = stoklar.firstIndex(where: { $0.id == sel.id }) {
-            stoklar[idx].stokAdi = editStokAdi
-            stoklar[idx].stokKodu = editStokKodu
-            stoklar[idx].grupAdi = editKategori
-            stoklar[idx].birim = editBirim
-            stoklar[idx].alisFiyati = Double(editAlisFiyati) ?? 0
-            stoklar[idx].satisFiyati = Double(editSatisFiyati) ?? 0
-            stoklar[idx].kdvOrani = Double(editKdv) ?? 20
+        if var sel = selectedStok {
+            sel.stokAdi = editStokAdi
+            sel.stokKodu = editStokKodu
+            sel.grupAdi = editKategori
+            sel.birim = editBirim
+            sel.alisFiyati = Double(editAlisFiyati.replacingOccurrences(of: ",", with: ".")) ?? 0
+            sel.satisFiyati = Double(editSatisFiyati.replacingOccurrences(of: ",", with: ".")) ?? 0
+            sel.kdvOrani = Double(editKdv.replacingOccurrences(of: ",", with: ".")) ?? 20
+            if let idx = stoklar.firstIndex(where: { $0.id == sel.id }) {
+                stoklar[idx] = sel
+            }
+            selectedStok = sel
+            Task {
+                await DataStore.shared.saveStok(sel, isUpdate: true)
+                await loadLiveStoklar()
+            }
         } else {
+            let newId = String(IdGenerator.generateMobileRecordId())
             let newItem = StokKart(
-                id: UUID().uuidString,
-                stokKodu: editStokKodu,
+                id: newId,
+                stokKodu: editStokKodu.isEmpty ? "STK-\(Int.random(in: 100...999))" : editStokKodu,
                 stokAdi: editStokAdi,
                 grupAdi: editKategori,
                 birim: editBirim,
-                alisFiyati: Double(editAlisFiyati) ?? 0,
-                satisFiyati: Double(editSatisFiyati) ?? 0,
-                kdvOrani: Double(editKdv) ?? 20,
-                mevcutMiktar: Double(editAcilisBakiye) ?? 0
+                alisFiyati: Double(editAlisFiyati.replacingOccurrences(of: ",", with: ".")) ?? 0,
+                satisFiyati: Double(editSatisFiyati.replacingOccurrences(of: ",", with: ".")) ?? 0,
+                kdvOrani: Double(editKdv.replacingOccurrences(of: ",", with: ".")) ?? 20,
+                mevcutMiktar: Double(editAcilisBakiye.replacingOccurrences(of: ",", with: ".")) ?? 0
             )
             stoklar.insert(newItem, at: 0)
+            selectedStok = newItem
+            Task {
+                await DataStore.shared.saveStok(newItem, isUpdate: false)
+                await loadLiveStoklar()
+            }
         }
     }
     
@@ -691,22 +738,57 @@ public struct StoklarView: View {
             .padding(.horizontal, 20)
             
             Button {
-                let m = Double(manualMiktar) ?? 1.0
+                let m = Double(manualMiktar.replacingOccurrences(of: ",", with: ".")) ?? 1.0
+                let f = Double(manualFiyat.replacingOccurrences(of: ",", with: ".")) ?? 0.0
                 let isG = manualIslemTur == "GİRİŞ"
                 let currentBal = selectedStok?.mevcutMiktar ?? 0.0
                 let newBal = isG ? (currentBal + m) : (currentBal - m)
+                let todayStr = AppFormatters.isoDate.string(from: Date())
+                let desc = manualAciklama.isEmpty ? "Manuel \(manualIslemTur)" : manualAciklama
                 
                 let newHareket = StokHareketItem(
-                    tarih: "03.11.2026",
+                    tarih: AppFormatters.shortDate.string(from: Date()),
                     islemTuru: manualIslemTur,
-                    aciklama: manualAciklama.isEmpty ? "Manuel \(manualIslemTur)" : manualAciklama,
+                    aciklama: desc,
                     miktar: m,
                     kalanMiktar: newBal,
                     isGiris: isG
                 )
                 hareketler.insert(newHareket, at: 0)
-                if let sel = selectedStok, let idx = stoklar.firstIndex(where: { $0.id == sel.id }) {
-                    stoklar[idx].mevcutMiktar = newBal
+                if var sel = selectedStok {
+                    sel.mevcutMiktar = newBal
+                    selectedStok = sel
+                    if let idx = stoklar.firstIndex(where: { $0.id == sel.id }) {
+                        stoklar[idx] = sel
+                    }
+                    Task {
+                        var hPayload: [String: Any] = [
+                            "id": IdGenerator.generateMobileRecordId(),
+                            "uuid": UUID().uuidString,
+                            "tenant_id": SupabaseService.shared.tenantId,
+                            "stok_adi": sel.stokAdi,
+                            "stok_kodu": sel.stokKodu ?? "",
+                            "islem_turu": manualIslemTur,
+                            "hareket_turu": manualIslemTur,
+                            "miktar": m,
+                            "giren": isG ? m : 0.0,
+                            "cikan": !isG ? m : 0.0,
+                            "birim": sel.birim ?? "Adet",
+                            "birim_fiyat": f,
+                            "fiyat": f,
+                            "toplam_tutar": m * f,
+                            "aciklama": desc,
+                            "tarih": todayStr,
+                            "is_deleted": false
+                        ]
+                        if let sIdInt = Int(sel.id) {
+                            hPayload["stok_id"] = sIdInt
+                        }
+                        if let hData = try? JSONSerialization.data(withJSONObject: hPayload) {
+                            try? await SupabaseService.shared.insertRaw(into: "stok_hareketler", data: hData)
+                        }
+                        await DataStore.shared.saveStok(sel, isUpdate: true)
+                    }
                 }
                 showManualIslemModal = false
             } label: {
@@ -728,18 +810,16 @@ public struct StoklarView: View {
     
     private func exportReport() {
         #if canImport(UIKit)
-        let report = """
-        STOK ENVANTER RAPORU
-        --------------------
-        Ürün: \(selectedStok?.stokAdi ?? "Tüm Stoklar")
-        Mevcut Miktar: \(selectedStok?.mevcutMiktar ?? 0)
-        Alış Fiyatı: \(selectedStok?.alisFiyati ?? 0) ₺
-        Satış Fiyatı: \(selectedStok?.satisFiyati ?? 0) ₺
-        """
-        let av = UIActivityViewController(activityItems: [report], applicationActivities: nil)
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootVC = windowScene.windows.first?.rootViewController {
-            rootVC.present(av, animated: true)
+        Task { @MainActor in
+            isGeneratingPDF = true
+            let listToExport = selectedStok != nil ? [selectedStok!] : filteredStoklar
+            let data = await PDFService.shared.fetchOrGenerateStokListPDF(stoklar: listToExport)
+            isGeneratingPDF = false
+            pdfPreviewItem = PDFPreviewItem(
+                title: "Stok Envanter Raporu",
+                data: data,
+                fileName: "Toplu_Stok_Raporu.pdf"
+            )
         }
         #endif
     }

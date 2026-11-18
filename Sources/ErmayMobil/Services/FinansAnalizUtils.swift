@@ -31,11 +31,10 @@ public final class FinansAnalizUtils {
         let toplamVarlik = toplamNakit + cekPortfoyBakiye + toplamAlacak
         let netPozisyon = toplamVarlik - toplamBorc
         
-        let nakitOrani = toplamBorc > 0 ? (toplamNakit / toplamBorc) : 1.5
+        let nakitOrani = toplamBorc > 0 ? (toplamNakit / toplamBorc) : (toplamNakit > 0 ? 1.5 : 1.0)
         
-        // Likidite puanı hesaplama algoritması (0-100)
         var puan = 50
-        if netPozisyon > 0 { puan += 20 } else { puan -= 25 }
+        if netPozisyon > 0 { puan += 20 } else if netPozisyon < 0 { puan -= 25 }
         if nakitOrani >= 1.0 { puan += 20 } else if nakitOrani >= 0.5 { puan += 10 } else { puan -= 15 }
         if toplamAlacak > toplamBorc { puan += 10 }
         
@@ -59,28 +58,64 @@ public final class FinansAnalizUtils {
             durumMetni = "Yüksek likidite riski! Borç yükümlülükleri hazır değerlerin çok üzerinde. Acil nakit planlaması gerekmektedir."
         }
         
+        let tahsilatPerf = (toplamNakit + toplamAlacak) > 0 ? ((toplamNakit / (toplamNakit + toplamAlacak)) * 100.0) : 0.0
+        
         return FinansalKarne(
             likiditePuani: clampedPuan,
             nakitOrani: nakitOrani,
             toplamVarlik: toplamVarlik,
             toplamYukumluluk: toplamBorc,
             netPozisyon: netPozisyon,
-            tahsilatPerformansi: 82.5,
+            tahsilatPerformansi: tahsilatPerf,
             genelDurumMetni: durumMetni,
             durumSeviyesi: durum
         )
     }
     
     public static func hesapFinansTrend(aylikFaturalar: [Fatura], kasaHareketler: [KasaHareket]) -> [FinansTrendNoktasi] {
-        let aylar = ["Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas"]
-        let defaultGelirler = [120000.0, 145000.0, 160000.0, 135000.0, 184500.0, 95000.0]
-        let defaultGiderler = [75000.0, 82000.0, 91000.0, 68000.0, 72300.0, 42000.0]
-        
+        let ayAdlari = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"]
+        let cal = Calendar.current
+        let now = Date()
         var sonuclar: [FinansTrendNoktasi] = []
-        for i in 0..<aylar.count {
-            let gel = defaultGelirler[i]
-            let gid = defaultGiderler[i]
-            sonuclar.append(FinansTrendNoktasi(donem: aylar[i], gelir: gel, gider: gid, net: gel - gid))
+        
+        for i in (0..<6).reversed() {
+            guard let targetDate = cal.date(byAdding: .month, value: -i, to: now) else { continue }
+            let yil = cal.component(.year, from: targetDate)
+            let ay = cal.component(.month, from: targetDate)
+            let prefix1 = String(format: "%04d-%02d", yil, ay)
+            let suffix2 = String(format: ".%02d.%04d", ay, yil)
+            
+            var gelir = 0.0
+            var gider = 0.0
+            
+            for f in aylikFaturalar {
+                if f.tarih.hasPrefix(prefix1) || f.tarih.hasSuffix(suffix2) {
+                    if f.faturaTuru.localizedCaseInsensitiveContains("satış") || f.faturaTuru.localizedCaseInsensitiveContains("satis") {
+                        gelir += f.genelToplam
+                    } else if f.faturaTuru.localizedCaseInsensitiveContains("alış") || f.faturaTuru.localizedCaseInsensitiveContains("alis") {
+                        gider += f.genelToplam
+                    }
+                }
+            }
+            
+            for kh in kasaHareketler {
+                if kh.tarih.hasPrefix(prefix1) || kh.tarih.hasSuffix(suffix2) {
+                    if kh.giren > 0 || kh.cikan > 0 {
+                        gelir += kh.giren
+                        gider += kh.cikan
+                    } else {
+                        let up = kh.islemTuru.uppercased()
+                        if up.contains("TAHSİLAT") || up.contains("TAHSILAT") || up.contains("GİRİŞ") || up.contains("GIRIS") {
+                            gelir += kh.tutar
+                        } else {
+                            gider += kh.tutar
+                        }
+                    }
+                }
+            }
+            
+            let label = ayAdlari[max(0, min(11, ay - 1))]
+            sonuclar.append(FinansTrendNoktasi(donem: label, gelir: gelir, gider: gider, net: gelir - gider))
         }
         return sonuclar
     }
@@ -100,7 +135,6 @@ public final class FinansAnalizUtils {
         if toplamTutar > 0 {
             return Int(toplamGunAğırlıklı / toplamTutar)
         }
-        return 30
+        return 0
     }
 }
-

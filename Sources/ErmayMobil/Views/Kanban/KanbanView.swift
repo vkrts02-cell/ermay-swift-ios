@@ -23,11 +23,10 @@ public struct KanbanView: View {
     }
     
     public var body: some View {
-        NavigationStack {
-            ZStack {
-                Color(hex: "0A0A0A").ignoresSafeArea()
-                
-                VStack(spacing: 0) {
+        ZStack {
+            Color(hex: "0A0A0A").ignoresSafeArea()
+            
+            VStack(spacing: 0) {
                     headerView
                     
                     if filteredGorevler.isEmpty {
@@ -85,7 +84,6 @@ public struct KanbanView: View {
                     await loadGorevler()
                 }
             }
-        }
     }
     
     // MARK: - Header
@@ -312,16 +310,13 @@ public struct YeniGorevModalView: View {
     @State private var baslik: String = ""
     @State private var aciklama: String = ""
     @State private var oncelik: String = "Normal" // 'Düşük' | 'Normal' | 'Acil'
-    @State private var sonTarih: String = "2026-11-15"
+    @State private var sonTarih: String = AppFormatters.isoDate.string(from: Date())
     @State private var bitisTarihi: String = ""
     @State private var personelAd: String = "Yönetici"
     @State private var personelId: Int = 1
     
-    private let personeller = [
-        (id: 1, ad: "Yönetici"),
-        (id: 2, ad: "Ahmet Yılmaz"),
-        (id: 3, ad: "Mehmet Kaya"),
-        (id: 4, ad: "Ayşe Demir")
+    @State private var personeller: [(id: Int, ad: String)] = [
+        (id: 1, ad: "Yönetici")
     ]
     
     public var body: some View {
@@ -480,7 +475,7 @@ public struct YeniGorevModalView: View {
                                 oncelik: oncelik,
                                 sonTarih: sonTarih,
                                 bitisTarihi: bitisTarihi.isEmpty ? nil : bitisTarihi,
-                                olusturmaTarihi: "2026-11-04"
+                                olusturmaTarihi: AppFormatters.isoDate.string(from: Date())
                             )
                             onSave(y)
                             dismiss()

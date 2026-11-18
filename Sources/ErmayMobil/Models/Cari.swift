@@ -287,6 +287,10 @@ public struct CariHareket: Identifiable, Codable, Hashable {
         case borc
         case alacak
         case bakiye
+        case vadeTarihi = "vade_tarihi"
+        case faturaId = "fatura_id"
+        case cariUnvan = "cari_unvan"
+        case tenantId = "tenant_id"
         case syncGuid = "sync_guid"
         case uuid
     }
@@ -336,6 +340,7 @@ public struct CariHareket: Identifiable, Codable, Hashable {
         }
         
         self.tarih = try? c.decode(String.self, forKey: .tarih)
+        self.cariUnvan = try? c.decode(String.self, forKey: .cariUnvan)
         self.belgeNo = (try? c.decode(String.self, forKey: .belgeNo)) ?? (try? c.decode(String.self, forKey: .evrakNo))
         self.islemTuru = try? c.decode(String.self, forKey: .islemTuru)
         self.aciklama = try? c.decode(String.self, forKey: .aciklama)
@@ -374,7 +379,8 @@ public struct CariHareket: Identifiable, Codable, Hashable {
         }
         let finalUuid = syncGuid ?? (Int(id) == nil ? id : UUID().uuidString)
         try container.encode(finalUuid, forKey: .uuid)
-        try container.encode(SupabaseService.shared.tenantId, forKey: .syncGuid)
+        try container.encode(SupabaseService.shared.tenantId, forKey: .tenantId)
+        try container.encodeIfPresent(cariUnvan, forKey: .cariUnvan)
         
         if let cid = cariId, let intCid = Int(cid) {
             try container.encode(intCid, forKey: .cariId)

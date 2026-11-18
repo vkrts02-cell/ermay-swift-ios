@@ -3,6 +3,11 @@ import SwiftUI
 // MARK: - Universal SwiftUI Edge Swipe-Back Modifier (HIGH-IOS-04 Safe Localized Gesture)
 public struct SwipeBackModifier: ViewModifier {
     @Environment(\.dismiss) private var dismiss
+    private let onBack: (() -> Void)?
+    
+    public init(onBack: (() -> Void)? = nil) {
+        self.onBack = onBack
+    }
     
     public func body(content: Content) -> some View {
         content
@@ -11,7 +16,11 @@ public struct SwipeBackModifier: ViewModifier {
                     .onEnded { value in
                         // Detect left edge swipe (starting at x < 65) moving right by at least 60px
                         if value.startLocation.x < 65 && value.translation.width > 60 && abs(value.translation.height) < 90 {
-                            dismiss()
+                            if let onBack = onBack {
+                                onBack()
+                            } else {
+                                dismiss()
+                            }
                         }
                     }
             )
@@ -19,7 +28,7 @@ public struct SwipeBackModifier: ViewModifier {
 }
 
 extension View {
-    public func enableSwipeBack() -> some View {
-        self.modifier(SwipeBackModifier())
+    public func enableSwipeBack(onBack: (() -> Void)? = nil) -> some View {
+        self.modifier(SwipeBackModifier(onBack: onBack))
     }
 }

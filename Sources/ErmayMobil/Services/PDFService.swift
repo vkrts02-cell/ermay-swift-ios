@@ -23,26 +23,59 @@ public final class PDFService {
         return generateFaturaPDF(fatura: fatura, firma: firma)
     }
     
+    private func toDotNetIsoDate(_ raw: String?) -> String {
+        guard let s = raw, !s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            return f.string(from: Date())
+        }
+        if let d = AppFormatters.parseDate(String(s.prefix(10))) ?? AppFormatters.parseDate(s) {
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            return f.string(from: d)
+        }
+        return "\(String(s.prefix(10)))T00:00:00"
+    }
+
+    private func currentLogoPayload() -> (logoBase64: String?, showLogo: Bool) {
+        let show = UserDefaults.standard.object(forKey: "pdf_show_logo_raporlar") as? Bool ?? true
+        if let b64 = UserDefaults.standard.string(forKey: "company_logo_base64"), !b64.isEmpty {
+            return (b64, show)
+        }
+        return (nil, false)
+    }
+
     private func fetchCloudFaturaPdf(fatura: Fatura, kalemler: [FaturaKalem]) async -> Data? {
         guard let url = URL(string: "\(cloudPdfUrl)/generate/fatura") else { return nil }
         
         let fId = Int(fatura.id) ?? 1
         let cId = Int(fatura.cariId ?? "0") ?? 0
+        let isoTarih = toDotNetIsoDate(fatura.tarih)
+        let isoVade = toDotNetIsoDate(fatura.vadeTarihi ?? fatura.tarih)
         
-        let faturaDict: [String: Any] = [
+        var faturaDict: [String: Any] = [
             "Id": fId,
             "FaturaNo": fatura.faturaNo,
             "FaturaTuru": fatura.faturaTuru,
+            "Tur": fatura.faturaTuru,
             "CariId": cId,
             "CariUnvan": fatura.cariUnvan ?? "Perakende Müşteri",
-            "Tarih": fatura.tarih,
-            "VadeTarihi": fatura.vadeTarihi ?? "",
+            "Tarih": isoTarih,
+            "VadeTarihi": isoVade,
             "AraToplam": fatura.araToplam,
             "KdvToplam": fatura.kdvToplami,
+            "ToplamKDV": fatura.kdvToplami,
             "IskontoToplam": fatura.iskontoToplami,
             "GenelToplam": fatura.genelToplam,
             "Aciklama": fatura.aciklama ?? ""
         ]
+        if let cari = DataStore.shared.cariler.first(where: { $0.id == fatura.cariId || $0.unvan == fatura.cariUnvan }) {
+            faturaDict["Adres"] = cari.adres ?? ""
+            faturaDict["VergiNo"] = cari.vergiNo ?? ""
+            faturaDict["VergiDairesi"] = cari.vergiDairesi ?? ""
+        }
         
         let detaylarArray: [[String: Any]] = kalemler.enumerated().map { idx, k in
             let stId = Int(k.stokId ?? "") ?? (idx + 1)
@@ -53,18 +86,24 @@ public final class PDFService {
                 "StokKodu": k.stokKodu ?? "STK-\(idx + 1)",
                 "StokAdi": k.stokAdi,
                 "Miktar": k.miktar,
-                "Birim": k.birim,
+                "Birim": k.birim ?? "Adet",
                 "BirimFiyat": k.birimFiyat,
+                "KDVOrani": k.kdvOrani,
                 "KdvOrani": k.kdvOrani,
-                "ToplamTutar": k.toplamTutar
+                "ToplamTutar": k.toplamTutar,
+                "Tutar": k.toplamTutar
             ]
         }
         
-        let payload: [String: Any] = [
+        let logoInfo = currentLogoPayload()
+        var payload: [String: Any] = [
             "Fatura": faturaDict,
             "Detaylar": detaylarArray,
-            "ShowLogo": false
+            "ShowLogo": logoInfo.showLogo
         ]
+        if let b64 = logoInfo.logoBase64 {
+            payload["LogoBytes"] = b64
+        }
         
         return await postToCloudRun(url: url, payload: payload)
     }
@@ -93,8 +132,8 @@ public final class PDFService {
             "TeklifNo": teklif.teklifNo,
             "CariId": cId,
             "CariUnvan": teklif.cariUnvan ?? (cari?.unvan ?? "Müşteri"),
-            "Tarih": teklif.tarih,
-            "GecerlilikTarihi": teklif.gecerlilikTarihi ?? "",
+            "Tarih": toDotNetIsoDate(teklif.tarih),
+            "GecerlilikTarihi": toDotNetIsoDate(teklif.gecerlilikTarihi ?? teklif.tarih),
             "AraToplam": teklif.araToplam,
             "KdvToplam": teklif.kdvToplami,
             "GenelToplam": teklif.genelToplam,
@@ -110,18 +149,23 @@ public final class PDFService {
                 "StokKodu": k.stokKodu ?? "STK-\(idx + 1)",
                 "StokAdi": k.stokAdi,
                 "Miktar": k.miktar,
-                "Birim": k.birim,
+                "Birim": k.birim ?? "Adet",
                 "BirimFiyat": k.birimFiyat,
                 "KdvOrani": k.kdvOrani,
-                "ToplamTutar": k.toplamTutar
+                "ToplamTutar": k.toplamTutar,
+                "Tutar": k.toplamTutar
             ]
         }
         
+        let logoInfo = currentLogoPayload()
         var payload: [String: Any] = [
             "Teklif": teklifDict,
             "Detaylar": detaylarArray,
-            "ShowLogo": false
+            "ShowLogo": logoInfo.showLogo
         ]
+        if let b64 = logoInfo.logoBase64 {
+            payload["LogoBytes"] = b64
+        }
         
         if let c = cari {
             payload["Cari"] = [
@@ -162,8 +206,8 @@ public final class PDFService {
             "SiparisTuru": siparis.siparisTuru,
             "CariId": cId,
             "CariUnvan": siparis.cariUnvan ?? (cari?.unvan ?? "Müşteri"),
-            "Tarih": siparis.tarih,
-            "TeslimTarihi": siparis.teslimTarihi ?? "",
+            "Tarih": toDotNetIsoDate(siparis.tarih),
+            "TeslimTarihi": toDotNetIsoDate(siparis.teslimTarihi ?? siparis.tarih),
             "AraToplam": siparis.araToplam,
             "KdvToplam": siparis.kdvToplami,
             "GenelToplam": siparis.genelToplam,
@@ -179,18 +223,23 @@ public final class PDFService {
                 "StokKodu": k.stokKodu ?? "STK-\(idx + 1)",
                 "StokAdi": k.stokAdi,
                 "Miktar": k.miktar,
-                "Birim": k.birim,
+                "Birim": k.birim ?? "Adet",
                 "BirimFiyat": k.birimFiyat,
                 "KdvOrani": k.kdvOrani,
-                "ToplamTutar": k.toplamTutar
+                "ToplamTutar": k.toplamTutar,
+                "Tutar": k.toplamTutar
             ]
         }
         
+        let logoInfo = currentLogoPayload()
         var payload: [String: Any] = [
             "Siparis": siparisDict,
             "Detaylar": detaylarArray,
-            "ShowLogo": false
+            "ShowLogo": logoInfo.showLogo
         ]
+        if let b64 = logoInfo.logoBase64 {
+            payload["LogoBytes"] = b64
+        }
         
         if let c = cari {
             payload["Cari"] = [
@@ -246,7 +295,7 @@ public final class PDFService {
             var dict: [String: Any] = [
                 "Id": idx + 1,
                 "CariId": cId,
-                "Tarih": h.tarih ?? ISO8601DateFormatter().string(from: Date()),
+                "Tarih": toDotNetIsoDate(h.tarih),
                 "IslemTuru": h.islemTuru ?? "İşlem",
                 "Aciklama": h.aciklama ?? "-",
                 "Borc": h.borc,
@@ -263,11 +312,15 @@ public final class PDFService {
             return dict
         }
         
+        let logoInfo = currentLogoPayload()
         var requestPayload: [String: Any] = [
             "Cari": cariDict,
             "Hareketler": hareketlerArray,
-            "ShowLogo": false
+            "ShowLogo": logoInfo.showLogo
         ]
+        if let b64 = logoInfo.logoBase64 {
+            requestPayload["LogoBytes"] = b64
+        }
         
         if detayli {
             var detayDict: [String: [[String: Any]]] = [:]
@@ -347,6 +400,225 @@ public final class PDFService {
         )
     }
     
+    public func fetchRemoteGenericTablePDF(
+        title: String,
+        headers: [String],
+        rows: [[String]],
+        subtitle: String? = nil
+    ) async -> Data? {
+        return await fetchCloudGenericReportPdf(
+            title: title,
+            headers: headers,
+            rows: rows,
+            subtitle: subtitle ?? "Tüm Zamanlar"
+        )
+    }
+
+    public func fetchRemoteConsolidatedReportPDF(
+        title: String,
+        sections: [[String: Any]]
+    ) async -> Data? {
+        guard let url = URL(string: "\(cloudPdfUrl)/generate/consolidated") else { return nil }
+        let logoInfo = currentLogoPayload()
+        var payload: [String: Any] = [
+            "Title": title,
+            "Sections": sections,
+            "ShowLogo": logoInfo.showLogo
+        ]
+        if let b64 = logoInfo.logoBase64 {
+            payload["LogoBytes"] = b64
+        }
+        return await postToCloudRun(url: url, payload: payload)
+    }
+
+    public func fetchRemoteBudgetReportPDF(
+        title: String,
+        annual: [[String: Any]],
+        monthly: [[String: Any]],
+        weekly: [[String: Any]]
+    ) async -> Data? {
+        guard let url = URL(string: "\(cloudPdfUrl)/generate/budget") else { return nil }
+        let logoInfo = currentLogoPayload()
+        var payload: [String: Any] = [
+            "Title": title,
+            "Annual": annual,
+            "Monthly": monthly,
+            "Weekly": weekly,
+            "ShowLogo": logoInfo.showLogo
+        ]
+        if let b64 = logoInfo.logoBase64 {
+            payload["LogoBytes"] = b64
+        }
+        return await postToCloudRun(url: url, payload: payload)
+    }
+
+    public func fetchOrGenerateStokListPDF(stoklar: [StokKart]) async -> Data {
+        if let url = URL(string: "\(cloudPdfUrl)/generate/stok-list") {
+            let logoInfo = currentLogoPayload()
+            let stokArr: [[String: Any]] = stoklar.enumerated().map { idx, s in
+                [
+                    "Id": Int(s.id) ?? (idx + 1),
+                    "StokKodu": s.stokKodu ?? "",
+                    "StokAdi": s.stokAdi,
+                    "Barkod": s.barkod ?? "",
+                    "Grup": s.grupAdi ?? "",
+                    "Kategori": s.grupAdi ?? "",
+                    "Birim": s.birim ?? "Adet",
+                    "Miktar": s.mevcutMiktar,
+                    "AlisFiyati": s.alisFiyati,
+                    "OrtalamaAlisFiyati": s.alisFiyati,
+                    "OrtalamaSatisFiyati": s.satisFiyati,
+                    "SatisFiyati": s.satisFiyati
+                ]
+            }
+            var payload: [String: Any] = [
+                "Stoklar": stokArr,
+                "ShowLogo": logoInfo.showLogo
+            ]
+            if let b64 = logoInfo.logoBase64 {
+                payload["LogoBytes"] = b64
+            }
+            if let data = await postToCloudRun(url: url, payload: payload) {
+                return data
+            }
+        }
+        let headers = ["Kod", "Stok Adı", "Grup", "Birim", "Miktar", "Alış F.", "Satış F.", "T. Maliyet"]
+        let rows: [[String]] = stoklar.map { s in
+            [
+                s.stokKodu ?? "-",
+                s.stokAdi,
+                s.grupAdi ?? "-",
+                s.birim ?? "Adet",
+                String(format: "%.2f", s.mevcutMiktar),
+                AppFormatters.money(s.alisFiyati),
+                AppFormatters.money(s.satisFiyati),
+                AppFormatters.money(s.mevcutMiktar * s.alisFiyati)
+            ]
+        }
+        return generateGenericReportPDF(title: "TOPLU STOK RAPORU", subtitle: AppFormatters.shortDate.string(from: Date()), headers: headers, rows: rows)
+    }
+
+    public func fetchOrGenerateStokHareketPDF(stok: StokKart, hareketler: [StokHareket]) async -> Data {
+        if let url = URL(string: "\(cloudPdfUrl)/generate/stok-hareket") {
+            let logoInfo = currentLogoPayload()
+            let stokDict: [String: Any] = [
+                "Id": Int(stok.id) ?? 1,
+                "StokKodu": stok.stokKodu ?? "",
+                "StokAdi": stok.stokAdi,
+                "Birim": stok.birim ?? "Adet",
+                "Miktar": stok.mevcutMiktar,
+                "AlisFiyati": stok.alisFiyati,
+                "SatisFiyati": stok.satisFiyati
+            ]
+            let harArr: [[String: Any]] = hareketler.enumerated().map { idx, h in
+                let isGiris = h.giren > 0 || (h.cikan == 0 && !(h.islemTuru ?? "").localizedCaseInsensitiveContains("çıkış") && !(h.islemTuru ?? "").localizedCaseInsensitiveContains("satış"))
+                return [
+                    "Id": Int(h.id) ?? (idx + 1),
+                    "StokId": Int(stok.id) ?? 1,
+                    "Tarih": toDotNetIsoDate(h.tarih),
+                    "IslemTuru": h.islemTuru ?? (isGiris ? "GİRİŞ" : "ÇIKIŞ"),
+                    "Aciklama": h.aciklama ?? h.cariUnvan ?? "-",
+                    "Miktar": h.miktar,
+                    "Giren": isGiris ? max(h.giren, h.miktar) : 0.0,
+                    "Cikan": !isGiris ? max(h.cikan, h.miktar) : 0.0,
+                    "Fiyat": h.birimFiyat
+                ]
+            }
+            var payload: [String: Any] = [
+                "Stok": stokDict,
+                "Hareketler": harArr,
+                "ShowLogo": logoInfo.showLogo
+            ]
+            if let b64 = logoInfo.logoBase64 {
+                payload["LogoBytes"] = b64
+            }
+            if let data = await postToCloudRun(url: url, payload: payload) {
+                return data
+            }
+        }
+        let headers = ["Tarih", "İşlem Türü", "Açıklama", "Giren", "Çıkan", "Fiyat"]
+        let rows: [[String]] = hareketler.map { h in
+            let isGiris = h.giren > 0 || (h.cikan == 0 && !(h.islemTuru ?? "").localizedCaseInsensitiveContains("çıkış") && !(h.islemTuru ?? "").localizedCaseInsensitiveContains("satış"))
+            return [
+                String((h.tarih ?? "-").prefix(10)),
+                h.islemTuru ?? (isGiris ? "GİRİŞ" : "ÇIKIŞ"),
+                h.aciklama ?? h.cariUnvan ?? "-",
+                isGiris ? String(format: "%.2f", max(h.giren, h.miktar)) : "-",
+                !isGiris ? String(format: "%.2f", max(h.cikan, h.miktar)) : "-",
+                AppFormatters.money(h.birimFiyat)
+            ]
+        }
+        return generateGenericReportPDF(title: "STOK HAREKET RAPORU", subtitle: "\(stok.stokKodu ?? "") - \(stok.stokAdi)", headers: headers, rows: rows)
+    }
+
+    public func fetchOrGenerateFaturaListPDF(faturalar: [Fatura], startDate: Date = Date(), endDate: Date = Date()) async -> Data {
+        if let url = URL(string: "\(cloudPdfUrl)/generate/fatura-list") {
+            let logoInfo = currentLogoPayload()
+            let fArr: [[String: Any]] = faturalar.enumerated().map { idx, f in
+                [
+                    "Id": Int(f.id) ?? (idx + 1),
+                    "FaturaNo": f.faturaNo,
+                    "Tur": f.faturaTuru,
+                    "FaturaTuru": f.faturaTuru,
+                    "Tarih": toDotNetIsoDate(f.tarih),
+                    "CariUnvan": f.cariUnvan ?? "-",
+                    "AraToplam": f.araToplam,
+                    "ToplamKDV": f.kdvToplami,
+                    "GenelToplam": f.genelToplam
+                ]
+            }
+            let isoF = DateFormatter()
+            isoF.locale = Locale(identifier: "en_US_POSIX")
+            isoF.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            var payload: [String: Any] = [
+                "Faturalar": fArr,
+                "StartDate": isoF.string(from: startDate),
+                "EndDate": isoF.string(from: endDate),
+                "ShowLogo": logoInfo.showLogo
+            ]
+            if let b64 = logoInfo.logoBase64 {
+                payload["LogoBytes"] = b64
+            }
+            if let data = await postToCloudRun(url: url, payload: payload) {
+                return data
+            }
+        }
+        let headers = ["Fatura No", "Tarih", "Cari Hesap", "Tür", "Tutar"]
+        let rows: [[String]] = faturalar.map { f in
+            [f.faturaNo, String(f.tarih.prefix(10)), f.cariUnvan ?? "-", f.faturaTuru, AppFormatters.money(f.genelToplam)]
+        }
+        return generateGenericReportPDF(title: "FATURA LİSTESİ", subtitle: AppFormatters.shortDate.string(from: Date()), headers: headers, rows: rows)
+    }
+
+    public func sharePDF(data: Data, fileName: String) {
+        let safeFileName = fileName
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "\\", with: "_")
+            .replacingOccurrences(of: ":", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
+        let finalName = safeFileName.lowercased().hasSuffix(".pdf") ? safeFileName : "\(safeFileName).pdf"
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(finalName)
+        do {
+            try data.write(to: tempURL, options: .atomic)
+            let av = UIActivityViewController(activityItems: [tempURL], applicationActivities: nil)
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController ?? windowScene.windows.first?.rootViewController {
+                var topVC = rootVC
+                while let presented = topVC.presentedViewController {
+                    topVC = presented
+                }
+                if let popover = av.popoverPresentationController {
+                    popover.sourceView = topVC.view
+                    popover.sourceRect = CGRect(x: topVC.view.bounds.midX, y: topVC.view.bounds.midY, width: 0, height: 0)
+                    popover.permittedArrowDirections = []
+                }
+                topVC.present(av, animated: true)
+            }
+        } catch {
+            print("[PDFService] PDF paylaşım hatası: \(error)")
+        }
+    }
+
     private func fetchCloudGenericReportPdf(
         title: String,
         headers: [String],
@@ -354,14 +626,23 @@ public final class PDFService {
         subtitle: String
     ) async -> Data? {
         guard let url = URL(string: "\(cloudPdfUrl)/generate/generic") else { return nil }
-        
-        let payload: [String: Any] = [
+        let logoInfo = currentLogoPayload()
+        var safeRows = rows
+        if safeRows.isEmpty && !headers.isEmpty {
+            var emptyRow = Array(repeating: "-", count: headers.count)
+            emptyRow[0] = "Kayıt bulunamadı"
+            safeRows = [emptyRow]
+        }
+        var payload: [String: Any] = [
             "Title": title.uppercased(with: Locale(identifier: "tr_TR")),
             "Headers": headers,
-            "Rows": rows,
+            "Rows": safeRows,
             "Subtitle": subtitle,
-            "ShowLogo": false
+            "ShowLogo": logoInfo.showLogo
         ]
+        if let b64 = logoInfo.logoBase64 {
+            payload["LogoBytes"] = b64
+        }
         
         return await postToCloudRun(url: url, payload: payload)
     }
@@ -376,14 +657,18 @@ public final class PDFService {
         firma: FirmaProfili = FirmaProfili.varsayilan
     ) async -> Data? {
         guard let url = URL(string: "\(cloudPdfUrl)/generate/makbuz") else { return nil }
-        let payload: [String: Any] = [
+        let logoInfo = currentLogoPayload()
+        var payload: [String: Any] = [
             "MakbuzTipi": makbuzTipi ?? "Tahsilat",
             "CariUnvan": cariUnvan ?? "Cari",
-            "Tarih": tarih,
+            "Tarih": toDotNetIsoDate(tarih),
             "Tutar": tutar,
             "Aciklama": aciklama ?? "",
-            "ShowLogo": false
+            "ShowLogo": logoInfo.showLogo
         ]
+        if let b64 = logoInfo.logoBase64 {
+            payload["LogoBytes"] = b64
+        }
         if let cloud = await postToCloudRun(url: url, payload: payload) {
             return cloud
         }
@@ -404,24 +689,26 @@ public final class PDFService {
             return nil
         }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = httpBody
-        request.timeoutInterval = 10.0
-        
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            if let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200, data.count > 500 {
-                if let prefix = String(data: data.prefix(5), encoding: .ascii), prefix.hasPrefix("%PDF") {
-                    print("[PDFService] Cloud QuestPDF başarıyla üretildi: \(url.lastPathComponent) (\(data.count) bytes).")
-                    return data
+        for attempt in 1...2 {
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = httpBody
+            request.timeoutInterval = attempt == 1 ? 20.0 : 30.0
+            
+            do {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                if let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200, data.count > 500 {
+                    if let prefix = String(data: data.prefix(5), encoding: .ascii), prefix.hasPrefix("%PDF") {
+                        print("[PDFService] Cloud QuestPDF başarıyla üretildi: \(url.lastPathComponent) (\(data.count) bytes).")
+                        return data
+                    }
+                } else if let httpRes = response as? HTTPURLResponse {
+                    print("[PDFService] Cloud QuestPDF status code: \(httpRes.statusCode)")
                 }
-            } else if let httpRes = response as? HTTPURLResponse {
-                print("[PDFService] Cloud QuestPDF status code: \(httpRes.statusCode)")
+            } catch {
+                print("[PDFService] Cloud QuestPDF hatası (deneme \(attempt)): \(error.localizedDescription)")
             }
-        } catch {
-            print("[PDFService] Cloud QuestPDF hatası: \(error.localizedDescription)")
         }
         return nil
     }
@@ -556,6 +843,21 @@ public final class PDFService {
         return generateFaturaPDF(fatura: dummyFatura, firma: firma)
     }
     
+    public func generateGenericReportPDF(
+        title: String,
+        subtitle: String,
+        headers: [String],
+        rows: [[String]]
+    ) -> Data {
+        return generateReportPDF(
+            title: title,
+            category: "Rapor",
+            headers: headers,
+            rows: rows,
+            dateFilter: subtitle
+        ) ?? Data()
+    }
+
     public func generateReportPDF(
         title: String,
         category: String,
@@ -567,94 +869,127 @@ public final class PDFService {
         firma: FirmaProfili = FirmaProfili.varsayilan
     ) -> Data? {
         let pdfMetaData = [
-            kCGPDFContextCreator: "Ermay Muhasebe Mobil",
-            kCGPDFContextAuthor: firma.firmaAdi,
-            kCGPDFContextTitle: "\(title) - Rapor"
+            kCGPDFContextCreator: "VK Ön Muhasebe Yönetim Sistemi (QuestPDF)",
+            kCGPDFContextAuthor: "VK Ön Muhasebe",
+            kCGPDFContextTitle: "\(title)"
         ]
         let format = UIGraphicsPDFRendererFormat()
         format.documentInfo = pdfMetaData as [String: Any]
         
-        let pageWidth: CGFloat = 595.2 // A4 portrait
-        let pageHeight: CGFloat = 841.8
+        let isLandscape = headers.count >= 6
+        let pageWidth: CGFloat = isLandscape ? 841.8 : 595.2
+        let pageHeight: CGFloat = isLandscape ? 595.2 : 841.8
         let pageRect = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
         
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
         
         let data = renderer.pdfData { (context) in
-            context.beginPage()
-            
-            let titleFont = UIFont.boldSystemFont(ofSize: 16)
-            let subTitleFont = UIFont.systemFont(ofSize: 9)
-            let headerFont = UIFont.boldSystemFont(ofSize: 9)
-            let cellFont = UIFont.systemFont(ofSize: 8.5)
-            
-            // Üst Başlık & Firma Bilgileri
-            let headerBg = CGRect(x: 30, y: 28, width: 535, height: 60)
-            UIColor(red: 15/255, green: 23/255, blue: 42/255, alpha: 1.0).setFill()
-            UIBezierPath(roundedRect: headerBg, cornerRadius: 8).fill()
-            
-            let brandAttributes: [NSAttributedString.Key: Any] = [.font: titleFont, .foregroundColor: UIColor.white]
-            (firma.firmaAdi as NSString).draw(at: CGPoint(x: 42, y: 38), withAttributes: brandAttributes)
-            
-            let brandSub = "\(firma.unvan) • \(firma.telefon ?? "")"
-            (brandSub as NSString).draw(at: CGPoint(x: 42, y: 62), withAttributes: [.font: subTitleFont, .foregroundColor: UIColor(white: 0.8, alpha: 1.0)])
-            
-            let dateStr = "Tarih: \(ISO8601DateFormatter().string(from: Date()).prefix(10))\nDönem: \(dateFilter == "All" ? "Tüm Zamanlar" : dateFilter)"
-            let dateRect = CGRect(x: 380, y: 38, width: 175, height: 40)
-            (dateStr as NSString).draw(in: dateRect, withAttributes: [.font: subTitleFont, .foregroundColor: UIColor(white: 0.85, alpha: 1.0)])
-            
-            // Rapor Başlığı & Kategori
-            var startY: CGFloat = 100
-            let rTitle = title.uppercased()
-            (rTitle as NSString).draw(at: CGPoint(x: 32, y: startY), withAttributes: [.font: UIFont.boldSystemFont(ofSize: 14), .foregroundColor: UIColor(red: 37/255, green: 99/255, blue: 235/255, alpha: 1.0)])
-            
-            var metaText = "Kategori: \(category)"
-            if let c = cariName, !c.isEmpty {
-                metaText += " | Filtre: \(c)"
-            }
-            (metaText as NSString).draw(at: CGPoint(x: 32, y: startY + 20), withAttributes: [.font: subTitleFont, .foregroundColor: UIColor.darkGray])
-            
-            startY += 40
-            
-            // Tablo Çizimi
-            let tableLeft: CGFloat = 30
-            let tableWidth: CGFloat = 535
+            let margin: CGFloat = 28.35 // 1 cm QuestPDF exact margin
+            let tableWidth = pageWidth - (margin * 2)
             let colCount = max(headers.count, 1)
             let colWidth = tableWidth / CGFloat(colCount)
             
-            // Header Satırı
-            let thRect = CGRect(x: tableLeft, y: startY, width: tableWidth, height: 22)
-            UIColor(red: 241/255, green: 245/255, blue: 249/255, alpha: 1.0).setFill()
-            UIBezierPath(roundedRect: thRect, cornerRadius: 4).fill()
+            let titleColor = UIColor(red: 30/255, green: 58/255, blue: 138/255, alpha: 1.0) // #1E3A8A
+            let lineColor = UIColor(red: 37/255, green: 99/255, blue: 235/255, alpha: 1.0)  // #2563EB
+            let subColor = UIColor(red: 71/255, green: 85/255, blue: 105/255, alpha: 1.0)   // #475569
+            let metaColor = UIColor(red: 100/255, green: 116/255, blue: 139/255, alpha: 1.0)// #64748B
+            let rowAltBg = UIColor(red: 248/255, green: 250/255, blue: 252/255, alpha: 1.0) // #F8FAFC
+            let borderColor = UIColor(red: 226/255, green: 232/255, blue: 240/255, alpha: 1.0) // #E2E8F0
             
-            for (idx, h) in headers.enumerated() {
-                let colX = tableLeft + (CGFloat(idx) * colWidth) + 4
-                (h as NSString).draw(at: CGPoint(x: colX, y: startY + 5), withAttributes: [.font: headerFont, .foregroundColor: UIColor(red: 15/255, green: 23/255, blue: 42/255, alpha: 1.0)])
+            let titleFont = UIFont.boldSystemFont(ofSize: 16)
+            let subFont = UIFont.systemFont(ofSize: 9)
+            let metaFont = UIFont.systemFont(ofSize: 8)
+            let metaBoldFont = UIFont.boldSystemFont(ofSize: 8)
+            let headerFont = UIFont.boldSystemFont(ofSize: 8)
+            let cellFont = UIFont.systemFont(ofSize: 8)
+            
+            let nowFmt = DateFormatter()
+            nowFmt.dateFormat = "dd.MM.yyyy HH:mm"
+            let nowStr = nowFmt.string(from: Date())
+            
+            var pageNum = 0
+            var currentY: CGFloat = 0
+            
+            let beginNewPage = {
+                context.beginPage()
+                pageNum += 1
+                currentY = margin
+                
+                let rTitle = title.uppercased(with: Locale(identifier: "tr_TR"))
+                (rTitle as NSString).draw(at: CGPoint(x: margin, y: currentY), withAttributes: [.font: titleFont, .foregroundColor: titleColor])
+                let subText = dateFilter == "All" ? "Tüm Zamanlar" : dateFilter
+                (subText as NSString).draw(at: CGPoint(x: margin, y: currentY + 20), withAttributes: [.font: subFont, .foregroundColor: subColor])
+                
+                let meta1 = "Tarih: \(nowStr)"
+                let meta2 = "Kayıt Sayısı: \(rows.count) Satır"
+                let m1Size = (meta1 as NSString).size(withAttributes: [.font: metaFont])
+                let m2Size = (meta2 as NSString).size(withAttributes: [.font: metaBoldFont])
+                (meta1 as NSString).draw(at: CGPoint(x: pageWidth - margin - m1Size.width, y: currentY + 2), withAttributes: [.font: metaFont, .foregroundColor: metaColor])
+                (meta2 as NSString).draw(at: CGPoint(x: pageWidth - margin - m2Size.width, y: currentY + 14), withAttributes: [.font: metaBoldFont, .foregroundColor: titleColor])
+                
+                currentY += 36
+                lineColor.setStroke()
+                let accentLine = UIBezierPath()
+                accentLine.move(to: CGPoint(x: margin, y: currentY))
+                accentLine.addLine(to: CGPoint(x: pageWidth - margin, y: currentY))
+                accentLine.lineWidth = 1.5
+                accentLine.stroke()
+                
+                currentY += 10
+                
+                // Table Header (#1E3A8A background, white bold text)
+                let thRect = CGRect(x: margin, y: currentY, width: tableWidth, height: 22)
+                titleColor.setFill()
+                UIBezierPath(rect: thRect).fill()
+                for (idx, h) in headers.enumerated() {
+                    let colX = margin + (CGFloat(idx) * colWidth) + 6
+                    (h as NSString).draw(
+                        in: CGRect(x: colX, y: currentY + 6, width: colWidth - 12, height: 14),
+                        withAttributes: [.font: headerFont, .foregroundColor: UIColor.white]
+                    )
+                }
+                currentY += 22
+                
+                // Footer
+                let footerY = pageHeight - margin - 12
+                borderColor.setStroke()
+                let fLine = UIBezierPath()
+                fLine.move(to: CGPoint(x: margin, y: footerY - 4))
+                fLine.addLine(to: CGPoint(x: pageWidth - margin, y: footerY - 4))
+                fLine.lineWidth = 0.5
+                fLine.stroke()
+                ("VK Ön Muhasebe Yönetim Sistemi" as NSString).draw(at: CGPoint(x: margin, y: footerY), withAttributes: [.font: UIFont.systemFont(ofSize: 7), .foregroundColor: metaColor])
+                let pStr = "Sayfa \(pageNum)"
+                let pSize = (pStr as NSString).size(withAttributes: [.font: UIFont.systemFont(ofSize: 7)])
+                (pStr as NSString).draw(at: CGPoint(x: pageWidth - margin - pSize.width, y: footerY), withAttributes: [.font: UIFont.systemFont(ofSize: 7), .foregroundColor: metaColor])
             }
-            startY += 26
             
-            // Satırlar
-            for (_, row) in rows.prefix(35).enumerated() {
-                let rowRect = CGRect(x: tableLeft, y: startY, width: tableWidth, height: 18)
-                UIColor.white.setFill()
+            beginNewPage()
+            
+            for (rowIndex, row) in rows.enumerated() {
+                if currentY + 20 > pageHeight - margin - 24 {
+                    beginNewPage()
+                }
+                let rowRect = CGRect(x: margin, y: currentY, width: tableWidth, height: 19)
+                (rowIndex % 2 == 0 ? UIColor.white : rowAltBg).setFill()
                 UIBezierPath(rect: rowRect).fill()
                 
-                for (colIdx, val) in row.enumerated() {
-                    let colX = tableLeft + (CGFloat(colIdx) * colWidth) + 4
+                for (colIdx, val) in row.enumerated() where colIdx < colCount {
+                    let colX = margin + (CGFloat(colIdx) * colWidth) + 6
                     (val as NSString).draw(
-                        in: CGRect(x: colX, y: startY + 2, width: colWidth - 8, height: 16),
-                        withAttributes: [.font: cellFont, .foregroundColor: UIColor(red: 51/255, green: 65/255, blue: 85/255, alpha: 1.0)]
+                        in: CGRect(x: colX, y: currentY + 4, width: colWidth - 12, height: 14),
+                        withAttributes: [.font: cellFont, .foregroundColor: UIColor.black]
                     )
                 }
                 
-                UIColor(white: 0.9, alpha: 1.0).setStroke()
+                borderColor.setStroke()
                 let line = UIBezierPath()
-                line.move(to: CGPoint(x: tableLeft, y: startY + 18))
-                line.addLine(to: CGPoint(x: tableLeft + tableWidth, y: startY + 18))
+                line.move(to: CGPoint(x: margin, y: currentY + 19))
+                line.addLine(to: CGPoint(x: margin + tableWidth, y: currentY + 19))
                 line.lineWidth = 0.5
                 line.stroke()
                 
-                startY += 19
+                currentY += 19
             }
         }
         return data

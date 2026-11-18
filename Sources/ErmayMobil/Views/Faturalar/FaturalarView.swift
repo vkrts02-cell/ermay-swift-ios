@@ -11,25 +11,36 @@ public struct FaturalarView: View {
     // Sheets
     @State private var activeFaturaSheet: String? = nil // "SATIS", "ALIS"
     @State private var selectedFaturaForDetail: Fatura? = nil
+    @State private var pdfPreviewItem: PDFPreviewItem? = nil
+    @State private var isGeneratingPDF: Bool = false
     
     public init() {}
     
     public var filteredFaturalar: [Fatura] {
         let sourceList = !dataStore.faturalar.isEmpty ? dataStore.faturalar : faturalar
+        let startD = AppFormatters.parseDate(startDateStr)
+        let endD = AppFormatters.parseDate(endDateStr)
         return sourceList.filter { f in
-            searchText.isEmpty ||
+            let textMatch = searchText.isEmpty ||
                 f.faturaNo.localizedCaseInsensitiveContains(searchText) ||
                 (f.cariUnvan?.localizedCaseInsensitiveContains(searchText) ?? false) ||
                 f.faturaTuru.localizedCaseInsensitiveContains(searchText)
+            if !textMatch { return false }
+            if let sd = startD, let ed = endD, let fd = AppFormatters.parseDate(String(f.tarih.prefix(10))) ?? AppFormatters.parseDate(f.tarih) {
+                let fDay = Calendar.current.startOfDay(for: fd)
+                if fDay < Calendar.current.startOfDay(for: sd) || fDay > Calendar.current.startOfDay(for: ed) {
+                    return false
+                }
+            }
+            return true
         }
     }
     
     public var body: some View {
-        NavigationStack {
-            ZStack {
-                AppTheme.background.ignoresSafeArea()
-                
-                VStack(spacing: 12) {
+        ZStack {
+            AppTheme.background.ignoresSafeArea()
+            
+            VStack(spacing: 12) {
                     // Header Bar (Exact match to FaturalarScreen.tsx)
                     HStack {
                         Text("Faturalar")
@@ -140,10 +151,31 @@ public struct FaturalarView: View {
                         }
                         
                         Button {
-                            // PDF export action
+                            #if canImport(UIKit)
+                            Task { @MainActor in
+                                isGeneratingPDF = true
+                                let sDate = AppFormatters.parseDate(startDateStr) ?? Date()
+                                let eDate = AppFormatters.parseDate(endDateStr) ?? Date()
+                                let data = await PDFService.shared.fetchOrGenerateFaturaListPDF(
+                                    faturalar: filteredFaturalar,
+                                    startDate: sDate,
+                                    endDate: eDate
+                                )
+                                isGeneratingPDF = false
+                                pdfPreviewItem = PDFPreviewItem(
+                                    title: "Fatura Listesi",
+                                    data: data,
+                                    fileName: "Fatura_Listesi.pdf"
+                                )
+                            }
+                            #endif
                         } label: {
                             HStack(spacing: 4) {
-                                Image(systemName: "arrow.down.doc.fill")
+                                if isGeneratingPDF {
+                                    ProgressView().tint(.white).scaleEffect(0.7)
+                                } else {
+                                    Image(systemName: "arrow.down.doc.fill")
+                                }
                                 Text("PDF")
                             }
                             .font(.system(size: 11, weight: .bold))
@@ -153,6 +185,7 @@ public struct FaturalarView: View {
                             .background(Color(hex: "0061FF"))
                             .cornerRadius(8)
                         }
+                        .disabled(isGeneratingPDF)
                     }
                     .padding(.horizontal)
                     
@@ -209,6 +242,11 @@ public struct FaturalarView: View {
                 FaturaDetailView(fatura: f)
                     .enableSwipeBack()
             }
+            .sheet(item: $pdfPreviewItem) { item in
+                #if canImport(UIKit)
+                PDFViewerModal(title: item.title, pdfData: item.data, fileName: item.fileName)
+                #endif
+            }
             .task {
                 await loadFaturalar()
             }
@@ -217,7 +255,6 @@ public struct FaturalarView: View {
                     await loadFaturalar()
                 }
             }
-        }
     }
     
     private func loadFaturalar() async {

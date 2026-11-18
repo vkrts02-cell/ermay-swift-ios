@@ -20,12 +20,12 @@ public struct KasaSayimView: View {
         BanknotItem(id: 5, deger: 5, adet: 0)
     ]
     @State private var madeniToplam: String = "0"
-    @State private var sistemKasaBakiyesi: Double = 45850.50
+    @State private var sistemKasaBakiyesi: Double = 0.0
     @State private var isFinalizing: Bool = false
     @State private var showSavedAlert: Bool = false
     @Environment(\.dismiss) private var dismiss
     
-    public init(sistemBakiye: Double = 45850.50) {
+    public init(sistemBakiye: Double = 0.0) {
         _sistemKasaBakiyesi = State(initialValue: sistemBakiye)
     }
     

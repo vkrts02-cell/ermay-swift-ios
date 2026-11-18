@@ -27,14 +27,14 @@ public struct AyarlarView: View {
     @State private var isTestingPing: Bool = false
     
     // 2. Firma Profili & Logo
-    @State private var firmaUnvan: String = "ERMAY MÜHENDİSLİK SAN. VE TİC. LTD. ŞTİ."
+    @State private var firmaUnvan: String = ""
     @State private var firmaYetkili: String = "vkrts"
-    @State private var firmaTelefon: String = "+90 532 123 4567"
-    @State private var firmaVergiDairesi: String = "Büyükçekmece"
-    @State private var firmaVergiNo: String = "3620129845"
-    @State private var firmaEposta: String = "muhasebe@ermay.com"
-    @State private var firmaWebSitesi: String = "https://www.ermay.com"
-    @State private var firmaAdres: String = "Sanayi Mah. 1205. Sok. No:14 Esenyurt / İstanbul"
+    @State private var firmaTelefon: String = ""
+    @State private var firmaVergiDairesi: String = ""
+    @State private var firmaVergiNo: String = ""
+    @State private var firmaEposta: String = ""
+    @State private var firmaWebSitesi: String = ""
+    @State private var firmaAdres: String = ""
     @State private var hasCompanyLogo: Bool = true
     
     // Logo Belge Gösterim Bayrakları (Masaüstü & Mobil Birebir)
@@ -118,15 +118,40 @@ public struct AyarlarView: View {
             }
         }
         .navigationBarHidden(true)
+        .enableSwipeBack {
+            if currentCategory != nil {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    currentCategory = nil
+                }
+            } else {
+                dismiss()
+            }
+        }
         .onAppear {
             self.dbUrl = SupabaseService.shared.baseUrl
             self.secretKey = SupabaseService.shared.anonKey
             self.activeYear = SupabaseService.shared.activeFiscalYear
             self.availableYears = SupabaseService.shared.availableFiscalYears
+            self.logoRaporlar = UserDefaults.standard.object(forKey: "pdf_show_logo_raporlar") as? Bool ?? true
             Task {
                 await SupabaseService.shared.fetchFiscalYears()
                 self.activeYear = SupabaseService.shared.activeFiscalYear
                 self.availableYears = SupabaseService.shared.availableFiscalYears
+                if let profiller: [FirmaProfili] = try? await SupabaseService.shared.fetch(from: "firma_profili"),
+                   let p = profiller.first {
+                    await MainActor.run {
+                        self.firmaUnvan = p.unvan.isEmpty ? p.firmaAdi : p.unvan
+                        self.firmaTelefon = p.telefon ?? ""
+                        self.firmaVergiDairesi = p.vergiDairesi ?? ""
+                        self.firmaVergiNo = p.vergiNo ?? ""
+                        self.firmaEposta = p.email ?? ""
+                        self.firmaWebSitesi = p.web ?? ""
+                        self.firmaAdres = p.adres ?? ""
+                        if let b64 = p.logoData, !b64.isEmpty {
+                            UserDefaults.standard.set(b64, forKey: "company_logo_base64")
+                        }
+                    }
+                }
             }
         }
         .alert(alertMessage, isPresented: $showAlert) {
@@ -473,7 +498,23 @@ public struct AyarlarView: View {
             }
             
             saveButton(title: "Firma Profilini & Logoyu Kaydet") {
-                alertMessage = "Firma profili, logo tercihleri ve baskı ayarları kaydedildi."
+                UserDefaults.standard.set(logoRaporlar, forKey: "pdf_show_logo_raporlar")
+                let profil = FirmaProfili(
+                    id: 1,
+                    firmaAdi: firmaUnvan,
+                    unvan: firmaUnvan,
+                    vergiDairesi: firmaVergiDairesi,
+                    vergiNo: firmaVergiNo,
+                    telefon: firmaTelefon,
+                    email: firmaEposta,
+                    web: firmaWebSitesi,
+                    adres: firmaAdres,
+                    logoData: UserDefaults.standard.string(forKey: "company_logo_base64")
+                )
+                Task {
+                    try? await SupabaseService.shared.update(table: "firma_profili", id: "1", item: profil)
+                }
+                alertMessage = "Firma profili, logo tercihleri ve baskı ayarları Supabase bulutuna kaydedildi."
                 showAlert = true
             }
         }
