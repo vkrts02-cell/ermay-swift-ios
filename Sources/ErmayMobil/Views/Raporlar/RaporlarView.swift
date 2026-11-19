@@ -503,21 +503,20 @@ public struct RaporlarView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(categories, id: \.self) { cat in
-                            let isSel = selectedCategory == cat
                             Button {
                                 selectedCategory = cat
                                 HardwareService.shared.hapticSelection()
                             } label: {
                                 Text(cat)
-                                    .font(.system(size: 12, weight: isSel ? .bold : .medium))
-                                    .foregroundColor(isSel ? .white : Color(hex: "8E8E93"))
+                                    .font(.system(size: 12, weight: selectedCategory == cat ? .bold : .medium))
+                                    .foregroundColor(selectedCategory == cat ? .white : Color(hex: "8E8E93"))
                                     .padding(.horizontal, 14)
                                     .padding(.vertical, 7)
-                                    .background(isSel ? Color(hex: "0061FF") : Color(hex: "121216"))
+                                    .background(selectedCategory == cat ? Color(hex: "0061FF") : Color(hex: "121216"))
                                     .cornerRadius(20)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 20)
-                                            .stroke(isSel ? Color(hex: "0061FF") : Color.white.opacity(0.08), lineWidth: 1)
+                                            .stroke(selectedCategory == cat ? Color(hex: "0061FF") : Color.white.opacity(0.08), lineWidth: 1)
                                     )
                             }
                         }

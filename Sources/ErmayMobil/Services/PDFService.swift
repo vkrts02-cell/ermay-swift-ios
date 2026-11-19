@@ -71,7 +71,8 @@ public final class PDFService {
             "GenelToplam": fatura.genelToplam,
             "Aciklama": fatura.aciklama ?? ""
         ]
-        if let cari = DataStore.shared.cariler.first(where: { $0.id == fatura.cariId || $0.unvan == fatura.cariUnvan }) {
+        let carilerList = await MainActor.run { DataStore.shared.cariler }
+        if let cari = carilerList.first(where: { $0.id == fatura.cariId || $0.unvan == fatura.cariUnvan }) {
             faturaDict["Adres"] = cari.adres ?? ""
             faturaDict["VergiNo"] = cari.vergiNo ?? ""
             faturaDict["VergiDairesi"] = cari.vergiDairesi ?? ""

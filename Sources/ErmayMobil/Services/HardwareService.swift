@@ -63,6 +63,15 @@ public final class HardwareService: NSObject, ObservableObject {
         }
         #endif
     }
+
+    public nonisolated func hapticSelection() {
+        #if canImport(UIKit)
+        DispatchQueue.main.async {
+            let generator = UISelectionFeedbackGenerator()
+            generator.selectionChanged()
+        }
+        #endif
+    }
     
     // MARK: - Add Contact to iOS Address Book
     public func addCariToContacts(cari: CariKart) async -> Bool {
