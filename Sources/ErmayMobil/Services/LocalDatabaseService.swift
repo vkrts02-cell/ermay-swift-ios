@@ -258,6 +258,56 @@ public actor LocalDatabaseService {
         return results
     }
     
+    private nonisolated func fetchPendingOfflineBlobs() -> [String] {
+        guard let db = db else { return [] }
+        var pendingBlobs: [String] = []
+        var qStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "SELECT id, payload FROM offline_queue WHERE status != 'completed';", -1, &qStmt, nil) == SQLITE_OK {
+            while sqlite3_step(qStmt) == SQLITE_ROW {
+                if let idStr = columnString(qStmt, 0) { pendingBlobs.append(idStr) }
+                if let payloadStr = columnString(qStmt, 1) { pendingBlobs.append(payloadStr) }
+            }
+        }
+        sqlite3_finalize(qStmt)
+        return pendingBlobs
+    }
+
+    private nonisolated func isReferencedByPendingOfflineQueue(_ key: String, pendingBlobs: [String]) -> Bool {
+        guard !key.isEmpty, !pendingBlobs.isEmpty else { return false }
+        return pendingBlobs.contains { blob in
+            blob.localizedCaseInsensitiveContains(key)
+        }
+    }
+
+    /// Removes local cache rows that no longer exist in the cloud snapshot (e.g. deleted on PC),
+    /// while strictly preserving any local records referenced by pending offline_queue items.
+    private nonisolated func pruneRemovedRowsPreservingOfflineQueue(table: String, incomingUuids: Set<String>, pendingBlobs: [String]) {
+        guard let db = db else { return }
+        let normalizedIncoming = Set(incomingUuids.map { $0.lowercased() })
+
+        var existingUuids: [String] = []
+        var sStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "SELECT uuid FROM \(table);", -1, &sStmt, nil) == SQLITE_OK {
+            while sqlite3_step(sStmt) == SQLITE_ROW {
+                if let u = columnString(sStmt, 0) { existingUuids.append(u) }
+            }
+        }
+        sqlite3_finalize(sStmt)
+
+        var delStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "DELETE FROM \(table) WHERE uuid = ?;", -1, &delStmt, nil) == SQLITE_OK {
+            for existing in existingUuids {
+                if normalizedIncoming.contains(existing.lowercased()) { continue }
+                if isReferencedByPendingOfflineQueue(existing, pendingBlobs: pendingBlobs) { continue }
+                sqlite3_reset(delStmt)
+                sqlite3_clear_bindings(delStmt)
+                bindText(delStmt, 1, existing)
+                sqlite3_step(delStmt)
+            }
+        }
+        sqlite3_finalize(delStmt)
+    }
+
     // MARK: - Async CRUD: Cariler
     public func upsertCariler(_ list: [CariKart], replaceAll: Bool = false) throws {
         lock.lock()
@@ -265,8 +315,10 @@ public actor LocalDatabaseService {
         guard let db = db else { return }
         let encoder = JSONEncoder()
         execSQLSync("BEGIN TRANSACTION;")
+        let pendingBlobs = fetchPendingOfflineBlobs()
         if replaceAll {
-            execSQLSync("DELETE FROM cariler;")
+            let incomingUuids = Set(list.map { ($0.syncGuid?.isEmpty == false ? $0.syncGuid! : $0.id) })
+            pruneRemovedRowsPreservingOfflineQueue(table: "cariler", incomingUuids: incomingUuids, pendingBlobs: pendingBlobs)
         }
         let sql = """
         INSERT OR REPLACE INTO cariler (uuid, id, tenant_id, cari_kodu, unvan, cari_turu, yetkili, telefon, gsm, vergi_no, is_deleted, json_data)
@@ -275,9 +327,10 @@ public actor LocalDatabaseService {
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
             for item in list {
+                let safeUuid = (item.syncGuid?.isEmpty == false ? item.syncGuid! : item.id)
+                if isReferencedByPendingOfflineQueue(safeUuid, pendingBlobs: pendingBlobs) { continue }
                 guard let data = try? encoder.encode(item),
                       let jsonStr = String(data: data, encoding: .utf8) else { continue }
-                let safeUuid = (item.syncGuid?.isEmpty == false ? item.syncGuid! : item.id)
                 sqlite3_reset(stmt)
                 sqlite3_clear_bindings(stmt)
                 bindText(stmt, 1, safeUuid)
@@ -332,8 +385,10 @@ public actor LocalDatabaseService {
         guard let db = db else { return }
         let encoder = JSONEncoder()
         execSQLSync("BEGIN TRANSACTION;")
+        let pendingBlobs = fetchPendingOfflineBlobs()
         if replaceAll {
-            execSQLSync("DELETE FROM stoklar;")
+            let incomingUuids = Set(list.map { ($0.syncGuid?.isEmpty == false ? $0.syncGuid! : $0.id) })
+            pruneRemovedRowsPreservingOfflineQueue(table: "stoklar", incomingUuids: incomingUuids, pendingBlobs: pendingBlobs)
         }
         let sql = """
         INSERT OR REPLACE INTO stoklar (uuid, id, tenant_id, stok_kodu, stok_adi, barkod, grup_adi, mevcut_miktar, is_deleted, json_data)
@@ -342,9 +397,10 @@ public actor LocalDatabaseService {
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
             for item in list {
+                let safeUuid = (item.syncGuid?.isEmpty == false ? item.syncGuid! : item.id)
+                if isReferencedByPendingOfflineQueue(safeUuid, pendingBlobs: pendingBlobs) { continue }
                 guard let data = try? encoder.encode(item),
                       let jsonStr = String(data: data, encoding: .utf8) else { continue }
-                let safeUuid = (item.syncGuid?.isEmpty == false ? item.syncGuid! : item.id)
                 sqlite3_reset(stmt)
                 sqlite3_clear_bindings(stmt)
                 bindText(stmt, 1, safeUuid)
@@ -397,8 +453,10 @@ public actor LocalDatabaseService {
         guard let db = db else { return }
         let encoder = JSONEncoder()
         execSQLSync("BEGIN TRANSACTION;")
+        let pendingBlobs = fetchPendingOfflineBlobs()
         if replaceAll {
-            execSQLSync("DELETE FROM faturalar;")
+            let incomingUuids = Set(list.map { ($0.syncGuid?.isEmpty == false ? $0.syncGuid! : $0.id) })
+            pruneRemovedRowsPreservingOfflineQueue(table: "faturalar", incomingUuids: incomingUuids, pendingBlobs: pendingBlobs)
         }
         let sql = """
         INSERT OR REPLACE INTO faturalar (uuid, id, tenant_id, fatura_no, fatura_turu, cari_unvan, tarih, is_deleted, json_data)
@@ -407,9 +465,10 @@ public actor LocalDatabaseService {
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
             for item in list {
+                let safeUuid = (item.syncGuid?.isEmpty == false ? item.syncGuid! : item.id)
+                if isReferencedByPendingOfflineQueue(safeUuid, pendingBlobs: pendingBlobs) { continue }
                 guard let data = try? encoder.encode(item),
                       let jsonStr = String(data: data, encoding: .utf8) else { continue }
-                let safeUuid = (item.syncGuid?.isEmpty == false ? item.syncGuid! : item.id)
                 sqlite3_reset(stmt)
                 sqlite3_clear_bindings(stmt)
                 bindText(stmt, 1, safeUuid)

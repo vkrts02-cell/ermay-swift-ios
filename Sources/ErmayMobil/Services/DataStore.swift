@@ -61,7 +61,7 @@ public final class DataStore: ObservableObject {
         
         do {
             let cloudCariler = try await SupabaseService.shared.fetchCariler()
-            try await LocalDatabaseService.shared.upsertCariler(cloudCariler, replaceAll: false)
+            try await LocalDatabaseService.shared.upsertCariler(cloudCariler, replaceAll: true)
             self.cariler = try await LocalDatabaseService.shared.fetchCariler()
             self.lastSyncDate = Date()
         } catch {
@@ -87,7 +87,7 @@ public final class DataStore: ObservableObject {
         
         do {
             let cloudStoklar = try await SupabaseService.shared.fetchStoklar()
-            try await LocalDatabaseService.shared.upsertStoklar(cloudStoklar, replaceAll: false)
+            try await LocalDatabaseService.shared.upsertStoklar(cloudStoklar, replaceAll: true)
             self.stoklar = try await LocalDatabaseService.shared.fetchStoklar()
             self.lastSyncDate = Date()
         } catch {
@@ -112,7 +112,7 @@ public final class DataStore: ObservableObject {
         
         do {
             let cloudFaturalar: [Fatura] = try await SupabaseService.shared.fetch(from: "faturalar", orderBy: "tarih.desc", limit: 5000)
-            try await LocalDatabaseService.shared.upsertFaturalar(cloudFaturalar, replaceAll: false)
+            try await LocalDatabaseService.shared.upsertFaturalar(cloudFaturalar, replaceAll: true)
             self.faturalar = try await LocalDatabaseService.shared.fetchFaturalar()
             self.lastSyncDate = Date()
         } catch {

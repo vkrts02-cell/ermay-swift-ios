@@ -560,8 +560,10 @@ public final class TransactionService: @unchecked Sendable {
             mali_yil: Calendar.current.component(.year, from: Date()),
             detaylar: req.items.map { it in
                 let sIdInt: Int? = it.stokId != nil ? Int(it.stokId!) : nil
+                // Each invoice line item MUST have its own unique UUID distinct from stok_uuid
+                // so selling the same product twice or across multiple invoices never collides on fatura_detaylar.uuid.
                 return AtomicFaturaDetayData(
-                    uuid: it.syncGuid ?? UUID().uuidString,
+                    uuid: UUID().uuidString.lowercased(),
                     stok_id: sIdInt,
                     stok_uuid: it.syncGuid,
                     stok_kodu: it.stokKodu,
