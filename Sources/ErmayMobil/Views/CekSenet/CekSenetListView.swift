@@ -390,9 +390,10 @@ struct YeniCekFormView: View {
                             icon: "checkmark.circle.fill",
                             color: AppTheme.success
                         ) {
-                            let tutarNum = Double(tutar) ?? 0.0
+                            let cleanTutar = tutar.replacingOccurrences(of: ",", with: ".")
+                            let tutarNum = Double(cleanTutar) ?? 0.0
                             let df = DateFormatter()
-                            df.dateFormat = "dd.MM.yyyy"
+                            df.dateFormat = "yyyy-MM-dd"
                             let c = Cek(
                                 id: UUID().uuidString,
                                 cekNo: cekNo,

@@ -163,7 +163,7 @@ private struct CariHareketStrictPayload: Encodable {
     let tenant_id: String
     let uuid: String
     var device_id: String = "iPhone-App"
-    var mali_yil: Int = Calendar.current.component(.year, from: Date())
+    var mali_yil: Int = Int(SupabaseService.shared.activeFiscalYear) ?? Calendar.current.component(.year, from: Date())
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -557,7 +557,7 @@ public final class TransactionService: @unchecked Sendable {
             odenen: isPaid ? grandTotal : 0.0,
             aciklama: req.aciklama,
             cihaz_rolu: "Mobil",
-            mali_yil: Calendar.current.component(.year, from: Date()),
+            mali_yil: Int(SupabaseService.shared.activeFiscalYear) ?? Calendar.current.component(.year, from: Date()),
             detaylar: req.items.map { it in
                 let sIdInt: Int? = it.stokId != nil ? Int(it.stokId!) : nil
                 // Each invoice line item MUST have its own unique UUID distinct from stok_uuid

@@ -282,7 +282,8 @@ struct EftGonderimView: View {
                             icon: "paperplane.fill",
                             color: AppTheme.primary
                         ) {
-                            let tutarNum = Double(tutar) ?? 0.0
+                            let cleanTutar = tutar.replacingOccurrences(of: ",", with: ".")
+                            let tutarNum = Double(cleanTutar) ?? 0.0
                             let df = DateFormatter()
                             df.dateFormat = "dd.MM.yyyy"
                             let bhId = IdGenerator.generateMobileRecordId()

@@ -25,9 +25,15 @@ public struct CariDetailView: View {
     @State private var pdfPreviewItem: PDFPreviewItem? = nil
     @State private var isGeneratingPDF: Bool = false
     
-    // Canlı Cari Hareketler
+    // Canlı Cari Hareketler, Faturalar ve Çek/Senetler
     @State private var hareketler: [CariHareket] = []
     @State private var isLoadingHareketler: Bool = false
+    @State private var activeListTab: Int = 0 // 0: Hareketler, 1: Faturalar, 2: Çek / Senetler
+    @State private var cariFaturalar: [Fatura] = []
+    @State private var cariCekler: [Cek] = []
+    @State private var gecikenBorcToplam: Double = 0.0
+    @State private var performansSkoru: String = "A+"
+    @State private var performansMetni: String = "Zamanında Öder / Gecikme Yok"
     
     public init(cari: CariKart, onUpdate: ((CariKart) -> Void)? = nil, onDelete: ((CariKart) -> Void)? = nil) {
         _currentCari = State(initialValue: cari)
@@ -44,7 +50,7 @@ public struct CariDetailView: View {
                     renderHeaderBar()
                     renderMainCard()
                     renderActionGrid()
-                    renderHareketler()
+                    renderTabbedLists()
                     renderIletisim()
                     renderFinansal()
                     renderRiskDurum()
@@ -54,7 +60,7 @@ public struct CariDetailView: View {
                 .padding(.horizontal, 16)
             }
             .refreshable {
-                await loadLiveHareketler()
+                await loadAllCariDetails()
             }
             
             // PDF Hazırlanıyor HUD
@@ -78,14 +84,14 @@ public struct CariDetailView: View {
         .navigationBarHidden(true)
         .onAppear {
             Task {
-                await loadLiveHareketler()
+                await loadAllCariDetails()
             }
         }
         .sheet(isPresented: $showSatisForm) {
-            FaturaFormView(initialTur: "Satış")
+            FaturaFormView(initialTur: "Satış", initialCari: currentCari)
         }
         .sheet(isPresented: $showAlisForm) {
-            FaturaFormView(initialTur: "Alış")
+            FaturaFormView(initialTur: "Alış", initialCari: currentCari)
         }
         // Masaüstü Birebir: Tahsilat, Ödeme, Alacak Dekontu, Borç Dekontu Formu
         .sheet(isPresented: $showTransactionModal) {
@@ -221,6 +227,50 @@ public struct CariDetailView: View {
             .padding(.vertical, 10)
             .background(Color.white.opacity(0.04))
             .cornerRadius(12)
+            
+            // Geciken Borç & Performans Skoru (Masaüstü Birebir)
+            HStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "clock.badge.exclamationmark")
+                        .foregroundColor(gecikenBorcToplam > 0 ? Color(hex: "EF4444") : Color(hex: "10B981"))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Geciken Borç")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(Color(hex: "8E8E93"))
+                        Text(AppFormatters.money(gecikenBorcToplam))
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(gecikenBorcToplam > 0 ? Color(hex: "EF4444") : .white)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+                .background(Color.white.opacity(0.04))
+                .cornerRadius(10)
+                
+                HStack(spacing: 6) {
+                    Text(performansSkoru)
+                        .font(.system(size: 13, weight: .black))
+                        .foregroundColor(performansSkoru.hasPrefix("A") ? Color(hex: "10B981") : (performansSkoru == "B" ? Color(hex: "F59E0B") : Color(hex: "EF4444")))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.white.opacity(0.08))
+                        .cornerRadius(6)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Ödeme Skoru")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(Color(hex: "8E8E93"))
+                        Text(performansMetni)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+                .background(Color.white.opacity(0.04))
+                .cornerRadius(10)
+            }
         }
         .padding(16)
         .background(Color(hex: "121216"))
@@ -272,6 +322,10 @@ public struct CariDetailView: View {
                 actionGridBtn(title: "Det. Ekstre", iconName: "doc.text.magnifyingglass", color: Color(hex: "1E293B")) {
                     exportEkstre(detayli: true)
                 }
+                // WhatsApp Ekstre Gönder
+                actionGridBtn(title: "WhatsApp", iconName: "message.fill", color: Color(hex: "25D366")) {
+                    shareViaWhatsApp()
+                }
                 // Excel (CSV)
                 actionGridBtn(title: "Excel (CSV)", iconName: "tablecells.fill", color: Color(hex: "1E293B")) {
                     exportExcel()
@@ -289,63 +343,175 @@ public struct CariDetailView: View {
     }
     
     @ViewBuilder
-    private func renderHareketler() -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Cari Hareketler (Son İşlemler)")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(.white)
-                Spacer()
-                if isLoadingHareketler {
-                    ProgressView().tint(.white).scaleEffect(0.8)
-                } else {
-                    Text("\(hareketler.count) Kayıt")
-                        .font(.system(size: 11))
-                        .foregroundColor(Color(hex: "8E8E93"))
-                }
+    private func renderTabbedLists() -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Tab Selector
+            HStack(spacing: 6) {
+                tabSelectorBtn(title: "Hareketler (\(hareketler.count))", index: 0)
+                tabSelectorBtn(title: "Faturalar (\(cariFaturalar.count))", index: 1)
+                tabSelectorBtn(title: "Çek/Senet (\(cariCekler.count))", index: 2)
             }
             
-            VStack(spacing: 0) {
-                if hareketler.isEmpty && !isLoadingHareketler {
-                    Text("Henüz hareket kaydı bulunmuyor.")
-                        .font(.system(size: 12))
-                        .foregroundColor(Color(hex: "64748B"))
-                        .padding(.vertical, 16)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                } else {
-                    ForEach(Array(hareketler.enumerated()), id: \.element.id) { idx, h in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("\(h.islemTuru ?? "İşlem") • \(h.aciklama ?? "")")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                Text("\(String((h.tarih ?? "-").prefix(10))) • \(h.belgeNo ?? "")")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(Color(hex: "8E8E93"))
-                            }
-                            
-                            Spacer()
-                            
-                            let isBorc = h.borc > 0
-                            let val = isBorc ? h.borc : h.alacak
-                            Text("\(isBorc ? "-" : "+")\(AppFormatters.money(val))")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(isBorc ? Color(hex: "EF4444") : Color(hex: "10B981"))
-                        }
-                        .padding(.vertical, 10)
-                        
-                        if idx < hareketler.count - 1 {
-                            Divider().background(Color.white.opacity(0.06))
-                        }
-                    }
-                }
+            if activeListTab == 0 {
+                renderHareketlerContent()
+            } else if activeListTab == 1 {
+                renderFaturalarContent()
+            } else {
+                renderCekSenetContent()
             }
         }
         .padding(16)
         .background(Color(hex: "121216"))
         .cornerRadius(20)
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.08), lineWidth: 1))
+    }
+    
+    private func tabSelectorBtn(title: String, index: Int) -> some View {
+        let isSel = activeListTab == index
+        return Button {
+            activeListTab = index
+        } label: {
+            Text(title)
+                .font(.system(size: 11, weight: isSel ? .bold : .medium))
+                .foregroundColor(isSel ? .white : Color(hex: "8E8E93"))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(isSel ? Color(hex: "2563EB") : Color.white.opacity(0.05))
+                .cornerRadius(8)
+        }
+    }
+    
+    @ViewBuilder
+    private func renderHareketlerContent() -> some View {
+        VStack(spacing: 0) {
+            if hareketler.isEmpty && !isLoadingHareketler {
+                Text("Henüz hareket kaydı bulunmuyor.")
+                    .font(.system(size: 12))
+                    .foregroundColor(Color(hex: "64748B"))
+                    .padding(.vertical, 16)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            } else {
+                ForEach(Array(hareketler.enumerated()), id: \.element.id) { idx, h in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(h.islemTuru ?? "İşlem") • \(h.aciklama ?? "")")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                            Text("\(String((h.tarih ?? "-").prefix(10))) • \(h.belgeNo ?? "")")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(hex: "8E8E93"))
+                        }
+                        
+                        Spacer()
+                        
+                        let isBorc = h.borc > 0
+                        let val = isBorc ? h.borc : h.alacak
+                        Text("\(isBorc ? "-" : "+")\(AppFormatters.money(val))")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(isBorc ? Color(hex: "EF4444") : Color(hex: "10B981"))
+                    }
+                    .padding(.vertical, 10)
+                    
+                    if idx < hareketler.count - 1 {
+                        Divider().background(Color.white.opacity(0.06))
+                    }
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func renderFaturalarContent() -> some View {
+        VStack(spacing: 0) {
+            if cariFaturalar.isEmpty {
+                Text("Bu cariye ait fatura bulunamadı.")
+                    .font(.system(size: 12))
+                    .foregroundColor(Color(hex: "64748B"))
+                    .padding(.vertical, 16)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            } else {
+                ForEach(Array(cariFaturalar.enumerated()), id: \.element.id) { idx, f in
+                    let isAlis = f.faturaTuru.localizedCaseInsensitiveContains("alış") || f.faturaTuru.localizedCaseInsensitiveContains("alis")
+                    let vDate = AppFormatters.isoDate.date(from: f.vadeTarihi ?? "") ?? (AppFormatters.shortDate.date(from: f.vadeTarihi ?? "") ?? Date())
+                    let days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: Date()), to: Calendar.current.startOfDay(for: vDate)).day ?? 0
+                    
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(f.faturaNo) • \(isAlis ? "Alış Faturası" : "Satış Faturası")")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.white)
+                            Text("\(String(f.tarih.prefix(10))) • Vade: \(String((f.vadeTarihi ?? "-").prefix(10)))")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(hex: "8E8E93"))
+                        }
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(AppFormatters.money(f.genelToplam))
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(isAlis ? Color(hex: "D97706") : Color(hex: "10B981"))
+                            
+                            Text(days < 0 ? "\(abs(days)) GÜN GECİKTİ" : (days == 0 ? "BUGÜN" : "\(days) Gün Kaldı"))
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(days < 0 ? Color(hex: "EF4444") : Color(hex: "10B981"))
+                        }
+                    }
+                    .padding(.vertical, 10)
+                    
+                    if idx < cariFaturalar.count - 1 {
+                        Divider().background(Color.white.opacity(0.06))
+                    }
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func renderCekSenetContent() -> some View {
+        VStack(spacing: 0) {
+            if cariCekler.isEmpty {
+                Text("Bu cariye ait bekleyen çek / senet bulunamadı.")
+                    .font(.system(size: 12))
+                    .foregroundColor(Color(hex: "64748B"))
+                    .padding(.vertical, 16)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            } else {
+                ForEach(Array(cariCekler.enumerated()), id: \.element.id) { idx, c in
+                    let vDate = AppFormatters.isoDate.date(from: c.vadeTarihi) ?? (AppFormatters.shortDate.date(from: c.vadeTarihi) ?? Date())
+                    let days = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: Date()), to: Calendar.current.startOfDay(for: vDate)).day ?? 0
+                    
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(c.cekSenetNo) • \(c.banka ?? (c.borclu ?? "Evrak"))")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.white)
+                            Text("Vade: \(String(c.vadeTarihi.prefix(10))) • \(c.durum)")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(hex: "8E8E93"))
+                        }
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(AppFormatters.money(c.tutar))
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(Color(hex: "3B82F6"))
+                            
+                            Text(days < 0 ? "\(abs(days)) GÜN GECİKTİ" : (days == 0 ? "BUGÜN" : "\(days) Gün Kaldı"))
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(days < 0 ? Color(hex: "EF4444") : Color(hex: "10B981"))
+                        }
+                    }
+                    .padding(.vertical, 10)
+                    
+                    if idx < cariCekler.count - 1 {
+                        Divider().background(Color.white.opacity(0.06))
+                    }
+                }
+            }
+        }
     }
     
     @ViewBuilder
@@ -520,26 +686,116 @@ public struct CariDetailView: View {
         }
     }
     
-    // MARK: - Live Supabase Hareketler Çekimi
-    private func loadLiveHareketler() async {
+    // MARK: - Live Supabase Hareketler & Detaylar Çekimi
+    private func loadAllCariDetails() async {
         isLoadingHareketler = true
         do {
             let fetched = try await SupabaseService.shared.fetchCariHareketler(cariId: currentCari.id)
-            await MainActor.run {
-                if !fetched.isEmpty {
-                    self.hareketler = fetched
-                } else if self.hareketler.isEmpty {
-                    // Canlıda henüz kayıt yoksa temiz gösterim
-                    self.hareketler = []
+            
+            // Faturalar
+            let faturalar = DataStore.shared.faturalar.filter { f in
+                !f.isDeleted && (f.cariId == currentCari.id || (f.cariUnvan ?? "").localizedCaseInsensitiveContains(currentCari.unvan))
+            }.sorted { $0.tarih > $1.tarih }
+            
+            // Çek & Senetler
+            var cekList: [Cek] = []
+            if let intId = Int(currentCari.id) {
+                let fetchedCekler: [Cek] = (try? await SupabaseService.shared.fetch(from: "cekler", filters: ["cari_id": "eq.\(intId)"])) ?? []
+                let fetchedSenetler: [Cek] = (try? await SupabaseService.shared.fetch(from: "senetler", filters: ["cari_id": "eq.\(intId)"])) ?? []
+                cekList = fetchedCekler + fetchedSenetler
+            }
+            
+            // Geciken Borç & Performans Skoru Hesaplama (Masaüstü Birebir)
+            let today = Calendar.current.startOfDay(for: Date())
+            var overdueSum: Double = 0.0
+            var overdueFaturalar: [Fatura] = []
+            
+            for f in faturalar {
+                let isAlis = f.faturaTuru.localizedCaseInsensitiveContains("alış") || f.faturaTuru.localizedCaseInsensitiveContains("alis")
+                // Müşteri için satış faturaları borç oluşturur
+                if !isAlis {
+                    let vDate = AppFormatters.isoDate.date(from: f.vadeTarihi ?? "") ?? (AppFormatters.shortDate.date(from: f.vadeTarihi ?? "") ?? Date())
+                    let days = Calendar.current.dateComponents([.day], from: today, to: Calendar.current.startOfDay(for: vDate)).day ?? 0
+                    if days < 0 {
+                        overdueSum += f.genelToplam
+                        overdueFaturalar.append(f)
+                    }
                 }
+            }
+            
+            let score: String
+            let desc: String
+            if overdueFaturalar.isEmpty {
+                score = "A+"
+                desc = "Zamanında Öder / Gecikme Yok"
+            } else {
+                var totalDelayDays = 0
+                for f in overdueFaturalar {
+                    let vDate = AppFormatters.isoDate.date(from: f.vadeTarihi ?? "") ?? (AppFormatters.shortDate.date(from: f.vadeTarihi ?? "") ?? Date())
+                    let days = abs(Calendar.current.dateComponents([.day], from: today, to: Calendar.current.startOfDay(for: vDate)).day ?? 0)
+                    totalDelayDays += days
+                }
+                let avgDelay = Double(totalDelayDays) / Double(overdueFaturalar.count)
+                if avgDelay <= 5 {
+                    score = "A"
+                    desc = "Güvenilir (Ort. \(Int(avgDelay)) gün gecikmeli)"
+                } else if avgDelay <= 15 {
+                    score = "B"
+                    desc = "Standart (Ort. \(Int(avgDelay)) gün gecikmeli)"
+                } else if avgDelay <= 30 {
+                    score = "C"
+                    desc = "Riskli (Ort. \(Int(avgDelay)) gün gecikmeli)"
+                } else {
+                    score = "F"
+                    desc = "Kritik (Ort. \(Int(avgDelay)) gün gecikmeli)"
+                }
+            }
+            
+            await MainActor.run {
+                self.hareketler = fetched
+                self.cariFaturalar = faturalar
+                self.cariCekler = cekList
+                self.gecikenBorcToplam = overdueSum
+                self.performansSkoru = score
+                self.performansMetni = desc
                 self.isLoadingHareketler = false
             }
         } catch {
-            print("[CariDetail] Hareketler çekilemedi: \(error)")
+            print("[CariDetail] Detaylar çekilemedi: \(error)")
             await MainActor.run {
                 self.isLoadingHareketler = false
             }
         }
+    }
+    
+    // MARK: - WhatsApp ile Ekstre Gönderme
+    private func shareViaWhatsApp() {
+        let phone = (currentCari.gsm ?? currentCari.telefon ?? "").filter { $0.isNumber }
+        var formattedPhone = phone
+        if formattedPhone.hasPrefix("0") {
+            formattedPhone = "90" + formattedPhone.dropFirst()
+        } else if !formattedPhone.hasPrefix("90") && !formattedPhone.isEmpty {
+            formattedPhone = "90" + formattedPhone
+        }
+        
+        let bakiyeTuruMetin = currentCari.bakiyeTuru == "B" ? "Borç" : "Alacak"
+        let bakiyeStr = AppFormatters.money(currentCari.bakiye)
+        var msg = "Sayın \(currentCari.unvan),\n\(currentCari.cariKodu ?? "") nolu cari hesabınızın güncel bakiyesi: \(bakiyeStr) (\(bakiyeTuruMetin)).\n"
+        if gecikenBorcToplam > 0 {
+            msg += "Geciken Toplam Borç Tutarı: \(AppFormatters.money(gecikenBorcToplam))\n"
+        }
+        msg += "İyi çalışmalar dileriz."
+        
+        let encodedMsg = msg.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let urlStr = !formattedPhone.isEmpty ? "whatsapp://send?phone=\(formattedPhone)&text=\(encodedMsg)" : "whatsapp://send?text=\(encodedMsg)"
+        
+        #if canImport(UIKit)
+        if let url = URL(string: urlStr), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        } else if let webUrl = URL(string: "https://api.whatsapp.com/send?phone=\(formattedPhone)&text=\(encodedMsg)") {
+            UIApplication.shared.open(webUrl)
+        }
+        #endif
     }
     
     // MARK: - PDF Ekstre Üretimi & Önizleme (QuestPDF Destekli)

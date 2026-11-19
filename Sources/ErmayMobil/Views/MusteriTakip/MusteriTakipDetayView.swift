@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 #if canImport(UIKit)
 import UIKit
 import WebKit
@@ -24,19 +25,26 @@ public struct MusteriTakipDetayView: View {
     // Görüşme Formu State
     @State private var gorusmeBaslik: String = ""
     @State private var gorusmeIcerik: String = ""
+    @State private var gorusmeTarih: Date = Date()
     
     // Fiyat Formu State
     @State private var fiyatBaslik: String = ""
     @State private var fiyatTutar: String = ""
     @State private var fiyatParaBirimi: String = "₺"
     @State private var fiyatAciklama: String = ""
+    @State private var fiyatTarih: Date = Date()
     
-    // Görsel Formu State
+    // Görsel & Evrak Formu State
     @State private var gorselBaslik: String = ""
+    @State private var gorselTarih: Date = Date()
+    @State private var selectedPhotoItem: PhotosPickerItem? = nil
+    @State private var previewImage: UIImage? = nil
+    @State private var showFullScreenImage: Bool = false
     
     // Not Formu State
     @State private var notBaslik: String = ""
     @State private var notIcerik: String = ""
+    @State private var notTarih: Date = Date()
     
     private let etiketSecenekleri = ["Sıcak Müşteri", "Teklif Aşamasında", "Önemli", "Yeni İletişim", "Takipte"]
     private let renkSecenekleri = ["#0A84FF", "#30D158", "#BF5AF2", "#FF9F0A", "#FF453A", "#64D2FF", "#FF375F"]
@@ -48,12 +56,41 @@ public struct MusteriTakipDetayView: View {
         _klasorRenk = State(initialValue: klasor.renk ?? "#0A84FF")
     }
     
+    private func touchKlasorSonIslemTarihi() {
+        let nowIso = ISO8601DateFormatter().string(from: Date())
+        Task {
+            let payload: [String: Any] = ["son_islem_tarihi": nowIso]
+            if let data = try? JSONSerialization.data(withJSONObject: payload) {
+                _ = try? await SupabaseService.shared.updateRaw(table: "musteri_takip_klasorler", id: String(klasor.id), data: data)
+            }
+        }
+    }
+    
+    private func formatDisplayDate(_ str: String, includeTime: Bool = false) -> String {
+        let clean = str.trimmingCharacters(in: .whitespacesAndNewlines)
+        if clean.contains("-") {
+            let parts = clean.replacingOccurrences(of: "T", with: " ").split(separator: " ")
+            if let dPart = parts.first {
+                let ymd = dPart.split(separator: "-")
+                if ymd.count == 3 {
+                    let formattedDate = "\(ymd[2]).\(ymd[1]).\(ymd[0])"
+                    if includeTime && parts.count > 1 {
+                        let timeStr = String(parts[1].prefix(5))
+                        return "\(formattedDate) \(timeStr)"
+                    }
+                    return formattedDate
+                }
+            }
+        }
+        return clean
+    }
+    
     public var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // 1. Header Bar (Exact to MusteriTakipDetayScreen.tsx)
+                // 1. Header Bar
                 HStack(spacing: 10) {
                     Button {
                         presentationMode.wrappedValue.dismiss()
@@ -87,7 +124,7 @@ public struct MusteriTakipDetayView: View {
                     
                     Spacer()
                     
-                    // PDF / Rapor Butonu (Sağ Üst)
+                    // PDF / Rapor Butonu
                     Button {
                         generateAndShareCRMReport()
                     } label: {
@@ -98,24 +135,25 @@ public struct MusteriTakipDetayView: View {
                                 Image(systemName: "arrow.down.doc.fill")
                                     .font(.system(size: 12))
                                     .foregroundColor(Color(hex: "FF453A"))
-                                Text("PDF")
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundColor(Color(hex: "FF453A"))
                             }
+                            Text("PDF")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(Color(hex: "FF453A"))
                         }
                         .padding(.horizontal, 8)
                         .padding(.vertical, 5)
                         .background(Color(hex: "FF453A").opacity(0.12))
                         .cornerRadius(8)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "FF453A").opacity(0.3), lineWidth: 1))
                     }
                     
-                    // Etiket / Renk Düzenle Butonu
+                    // Etiket / Renk Değiştir Butonu
                     Button {
                         isEtiketModalOpen = true
                     } label: {
                         HStack(spacing: 5) {
-                            Circle().fill(Color(hex: klasorRenk)).frame(width: 7, height: 7)
+                            Circle()
+                                .fill(Color(hex: klasorRenk))
+                                .frame(width: 8, height: 8)
                             Text(klasorEtiket)
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundColor(.white)
@@ -157,7 +195,7 @@ public struct MusteriTakipDetayView: View {
                             EmptyView()
                         }
                         
-                        // 4. BİREBİR İSTENEN BUTON: MÜŞTERİ CRM RAPORU OLUŞTUR VE PAYLAŞ
+                        // Müşteri CRM Raporu Oluştur Butonu
                         Button {
                             generateAndShareCRMReport()
                         } label: {
@@ -179,14 +217,13 @@ public struct MusteriTakipDetayView: View {
                             .background(
                                 LinearGradient(
                                     colors: [Color(hex: "2563EB"), Color(hex: "1D4ED8")],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
                                 )
                             )
                             .cornerRadius(14)
-                            .shadow(color: Color(hex: "2563EB").opacity(0.35), radius: 8, y: 4)
                         }
-                        .padding(.top, 8)
+                        .padding(.top, 10)
                         
                         Spacer().frame(height: 50)
                     }
@@ -197,6 +234,32 @@ public struct MusteriTakipDetayView: View {
         .navigationBarHidden(true)
         .sheet(isPresented: $isEtiketModalOpen) {
             etiketSheet()
+        }
+        .fullScreenCover(isPresented: $showFullScreenImage) {
+            if let img = previewImage {
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Button {
+                                showFullScreenImage = false
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.white)
+                                    .padding(16)
+                            }
+                        }
+                        Spacer()
+                        Image(uiImage: img)
+                            .resizable()
+                            .scaledToFit()
+                            .padding()
+                        Spacer()
+                    }
+                }
+            }
         }
         .task {
             await loadDetaylar()
@@ -241,25 +304,38 @@ public struct MusteriTakipDetayView: View {
                 inputField(label: "Görüşme Başlığı", text: $gorusmeBaslik, placeholder: "Örn: Sözleşme Şartları...")
                 inputField(label: "Görüşme Detayı & Alınan Kararlar", text: $gorusmeIcerik, placeholder: "Konuşulan konular ve anlaşılan şartlar...")
                 
+                // DatePicker (Tarih Seçici)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Görüşme Tarihi").font(.system(size: 11, weight: .semibold)).foregroundColor(Color(hex: "8E8E93"))
+                    DatePicker("", selection: $gorusmeTarih, displayedComponents: [.date, .hourAndMinute])
+                        .datePickerStyle(.compact)
+                        .colorScheme(.dark)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(6)
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(8)
+                }
+                
                 Button {
                     guard !gorusmeBaslik.isEmpty || !gorusmeIcerik.isEmpty else { return }
-                    let formatter = DateFormatter()
-                    formatter.dateFormat = "dd.MM.yyyy HH:mm"
+                    let isoTarih = ISO8601DateFormatter().string(from: gorusmeTarih)
                     let newD = MusteriTakipDetay(
-                        id: Int.random(in: 1000...9999),
+                        id: IdGenerator.generateMobileRecordId(),
                         klasorId: klasor.id,
                         cariId: klasor.cariId,
                         baslik: gorusmeBaslik.isEmpty ? "Müşteri Görüşmesi" : gorusmeBaslik,
                         icerik: gorusmeIcerik,
                         tip: "Gorusme",
-                        tarih: formatter.string(from: Date())
+                        tarih: isoTarih
                     )
                     gorusmeler.insert(newD, at: 0)
                     Task {
                         _ = try? await SupabaseService.shared.insert(into: "musteri_takip_detaylar", item: newD)
+                        touchKlasorSonIslemTarihi()
                     }
                     gorusmeBaslik = ""
                     gorusmeIcerik = ""
+                    gorusmeTarih = Date()
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "plus")
@@ -276,7 +352,7 @@ public struct MusteriTakipDetayView: View {
             
             // Liste
             ForEach(gorusmeler) { g in
-                itemCard(title: g.baslik, subtitle: g.icerik ?? "", date: g.tarih, color: Color(hex: "0A84FF")) {
+                itemCard(title: g.baslik, subtitle: g.icerik ?? "", date: formatDisplayDate(g.tarih, includeTime: true), color: Color(hex: "0A84FF")) {
                     gorusmeler.removeAll { $0.id == g.id }
                     Task {
                         _ = try? await SupabaseService.shared.delete(table: "musteri_takip_detaylar", id: String(g.id))
@@ -291,9 +367,9 @@ public struct MusteriTakipDetayView: View {
         VStack(spacing: 12) {
             formCard {
                 Text("Özel Fiyat Teklifi Ekle").font(.system(size: 12, weight: .bold)).foregroundColor(.white)
-                inputField(label: "Ürün / Hizmet Başlığı", text: $fiyatBaslik, placeholder: "Örn: Rulman 6204")
+                inputField(label: "Ürün / Hizmet Başlığı (İsteğe Bağlı)", text: $fiyatBaslik, placeholder: "Örn: Rulman 6204 veya Fiyat Teklifi")
                 HStack(spacing: 8) {
-                    inputField(label: "Fiyat Tutarı", text: $fiyatTutar, placeholder: "0.00")
+                    inputField(label: "Fiyat Tutarı", text: $fiyatTutar, placeholder: "0,00")
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Birim").font(.system(size: 11, weight: .semibold)).foregroundColor(Color(hex: "8E8E93"))
                         Picker("Birim", selection: $fiyatParaBirimi) {
@@ -305,30 +381,48 @@ public struct MusteriTakipDetayView: View {
                         .cornerRadius(8)
                     }
                 }
+                
+                // DatePicker (Tarih Seçici)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Teklif Tarihi").font(.system(size: 11, weight: .semibold)).foregroundColor(Color(hex: "8E8E93"))
+                    DatePicker("", selection: $fiyatTarih, displayedComponents: .date)
+                        .datePickerStyle(.compact)
+                        .colorScheme(.dark)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(6)
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(8)
+                }
+                
                 inputField(label: "Teklif Açıklaması", text: $fiyatAciklama, placeholder: "Örn: 50 adet ve üzeri")
                 
                 Button {
-                    guard !fiyatBaslik.isEmpty else { return }
-                    let formatter = DateFormatter()
-                    formatter.dateFormat = "dd.MM.yyyy"
+                    let cleanTutarStr = fiyatTutar.replacingOccurrences(of: ",", with: ".").trimmingCharacters(in: .whitespacesAndNewlines)
+                    let parsedFiyat = Double(cleanTutarStr) ?? 0.0
+                    guard !fiyatBaslik.isEmpty || parsedFiyat > 0 else { return }
+                    
+                    let isoTarih = ISO8601DateFormatter().string(from: fiyatTarih)
+                    let safeBaslik = fiyatBaslik.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Fiyat Teklifi" : fiyatBaslik
                     let newF = MusteriTakipDetay(
-                        id: Int.random(in: 1000...9999),
+                        id: IdGenerator.generateMobileRecordId(),
                         klasorId: klasor.id,
                         cariId: klasor.cariId,
-                        baslik: fiyatBaslik,
+                        baslik: safeBaslik,
                         icerik: fiyatAciklama,
                         tip: "Fiyat",
-                        fiyatBilgisi: Double(fiyatTutar) ?? 0,
+                        fiyatBilgisi: parsedFiyat,
                         paraBirimi: fiyatParaBirimi,
-                        tarih: formatter.string(from: Date())
+                        tarih: isoTarih
                     )
                     fiyatlar.insert(newF, at: 0)
                     Task {
                         _ = try? await SupabaseService.shared.insert(into: "musteri_takip_detaylar", item: newF)
+                        touchKlasorSonIslemTarihi()
                     }
                     fiyatBaslik = ""
                     fiyatTutar = ""
                     fiyatAciklama = ""
+                    fiyatTarih = Date()
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "plus")
@@ -356,7 +450,7 @@ public struct MusteriTakipDetayView: View {
                         Text(icerik).font(.system(size: 12)).foregroundColor(Color(hex: "E2E8F0"))
                     }
                     HStack {
-                        Text(f.tarih).font(.system(size: 10)).foregroundColor(Color(hex: "8E8E93"))
+                        Text(formatDisplayDate(f.tarih)).font(.system(size: 10)).foregroundColor(Color(hex: "8E8E93"))
                         Spacer()
                         Button {
                             fiyatlar.removeAll { $0.id == f.id }
@@ -376,51 +470,137 @@ public struct MusteriTakipDetayView: View {
         }
     }
     
-    // MARK: - Evrak Sekmesi
+    // MARK: - Evrak & Görseller Sekmesi (PhotosPicker & Küçük Resim Galerisi)
     private func renderGorsellerTab() -> some View {
         VStack(spacing: 12) {
             formCard {
                 Text("Evrak / Fotoğraf Ekle").font(.system(size: 12, weight: .bold)).foregroundColor(.white)
-                inputField(label: "Evrak Başlığı", text: $gorselBaslik, placeholder: "Örn: Kartvizit, Numune, İrsaliye")
+                inputField(label: "Evrak Başlığı", text: $gorselBaslik, placeholder: "Örn: Numune, Sözleşme, Kartvizit")
                 
-                Button {
-                    guard !gorselBaslik.isEmpty else { return }
-                    let formatter = DateFormatter()
-                    formatter.dateFormat = "dd.MM.yyyy"
-                    let newG = MusteriTakipDetay(
-                        id: Int.random(in: 1000...9999),
-                        klasorId: klasor.id,
-                        cariId: klasor.cariId,
-                        baslik: gorselBaslik,
-                        icerik: "Fotoğraf / Belge Eklendi",
-                        tip: "Gorsel",
-                        tarih: formatter.string(from: Date())
-                    )
-                    gorseller.insert(newG, at: 0)
-                    Task {
-                        _ = try? await SupabaseService.shared.insert(into: "musteri_takip_detaylar", item: newG)
-                    }
-                    gorselBaslik = ""
-                } label: {
+                // DatePicker
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Evrak Tarihi").font(.system(size: 11, weight: .semibold)).foregroundColor(Color(hex: "8E8E93"))
+                    DatePicker("", selection: $gorselTarih, displayedComponents: .date)
+                        .datePickerStyle(.compact)
+                        .colorScheme(.dark)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(6)
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(8)
+                }
+                
+                // PhotosPicker Butonu
+                PhotosPicker(
+                    selection: $selectedPhotoItem,
+                    matching: .images,
+                    photoLibrary: .shared()
+                ) {
                     HStack(spacing: 6) {
-                        Image(systemName: "camera.fill")
-                        Text("Belgeyi Kaydet")
+                        Image(systemName: "photo.badge.plus")
+                            .font(.system(size: 14, weight: .bold))
+                        Text("Galeriden Fotoğraf / Belge Seç")
+                            .font(.system(size: 13, weight: .bold))
                     }
-                    .font(.system(size: 13, weight: .bold))
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, 11)
                     .background(Color(hex: "BF5AF2"))
                     .cornerRadius(10)
                 }
+                .onChange(of: selectedPhotoItem) { newItem in
+                    guard let item = newItem else { return }
+                    Task {
+                        if let data = try? await item.loadTransferable(type: Data.self),
+                           let uiImg = UIImage(data: data) {
+                            let compressed = uiImg.jpegData(compressionQuality: 0.6) ?? data
+                            let base64 = compressed.base64EncodedString()
+                            let isoTarih = ISO8601DateFormatter().string(from: gorselTarih)
+                            let safeBaslik = gorselBaslik.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Belge / Görsel" : gorselBaslik
+                            
+                            let newG = MusteriTakipDetay(
+                                id: IdGenerator.generateMobileRecordId(),
+                                klasorId: klasor.id,
+                                cariId: klasor.cariId,
+                                baslik: safeBaslik,
+                                icerik: "Fotoğraf / Evrak Eklendi",
+                                tip: "Gorsel",
+                                gorselBase64: base64,
+                                tarih: isoTarih
+                            )
+                            await MainActor.run {
+                                gorseller.insert(newG, at: 0)
+                                gorselBaslik = ""
+                                selectedPhotoItem = nil
+                            }
+                            Task {
+                                _ = try? await SupabaseService.shared.insert(into: "musteri_takip_detaylar", item: newG)
+                                touchKlasorSonIslemTarihi()
+                            }
+                        }
+                    }
+                }
             }
             
-            ForEach(gorseller) { g in
-                itemCard(title: g.baslik, subtitle: g.icerik ?? "", date: g.tarih, color: Color(hex: "BF5AF2")) {
-                    gorseller.removeAll { $0.id == g.id }
-                    Task {
-                        _ = try? await SupabaseService.shared.delete(table: "musteri_takip_detaylar", id: String(g.id))
+            // Görseller Galerisi
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                ForEach(gorseller) { g in
+                    VStack(alignment: .leading, spacing: 6) {
+                        // Görsel Önizleme
+                        ZStack(alignment: .topTrailing) {
+                            if let b64 = g.gorselBase64,
+                               let d = Data(base64Encoded: b64),
+                               let uiImg = UIImage(data: d) {
+                                Image(uiImage: uiImg)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(height: 110)
+                                    .frame(maxWidth: .infinity)
+                                    .clipped()
+                                    .cornerRadius(10)
+                                    .onTapGesture {
+                                        previewImage = uiImg
+                                        showFullScreenImage = true
+                                    }
+                            } else {
+                                ZStack {
+                                    Color.white.opacity(0.05)
+                                    Image(systemName: "doc.richtext.fill")
+                                        .font(.system(size: 32))
+                                        .foregroundColor(Color(hex: "BF5AF2"))
+                                }
+                                .frame(height: 110)
+                                .frame(maxWidth: .infinity)
+                                .cornerRadius(10)
+                            }
+                            
+                            // Sil Butonu
+                            Button {
+                                gorseller.removeAll { $0.id == g.id }
+                                Task {
+                                    _ = try? await SupabaseService.shared.delete(table: "musteri_takip_detaylar", id: String(g.id))
+                                }
+                            } label: {
+                                Image(systemName: "trash.circle.fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(Color(hex: "EF4444"))
+                                    .background(Color.black.clipShape(Circle()))
+                                    .padding(4)
+                            }
+                        }
+                        
+                        Text(g.baslik)
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                        
+                        Text(formatDisplayDate(g.tarih))
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(hex: "8E8E93"))
                     }
+                    .padding(10)
+                    .background(Color(hex: "121216"))
+                    .cornerRadius(12)
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08), lineWidth: 1))
                 }
             }
         }
@@ -434,25 +614,38 @@ public struct MusteriTakipDetayView: View {
                 inputField(label: "Not Başlığı", text: $notBaslik, placeholder: "Örn: Tahsilat Tercihi")
                 inputField(label: "Not İçeriği", text: $notIcerik, placeholder: "Müşteriye dair kritik hatırlatmalar...")
                 
+                // DatePicker
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Not Tarihi").font(.system(size: 11, weight: .semibold)).foregroundColor(Color(hex: "8E8E93"))
+                    DatePicker("", selection: $notTarih, displayedComponents: .date)
+                        .datePickerStyle(.compact)
+                        .colorScheme(.dark)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(6)
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(8)
+                }
+                
                 Button {
                     guard !notBaslik.isEmpty || !notIcerik.isEmpty else { return }
-                    let formatter = DateFormatter()
-                    formatter.dateFormat = "dd.MM.yyyy"
+                    let isoTarih = ISO8601DateFormatter().string(from: notTarih)
                     let newN = MusteriTakipDetay(
-                        id: Int.random(in: 1000...9999),
+                        id: IdGenerator.generateMobileRecordId(),
                         klasorId: klasor.id,
                         cariId: klasor.cariId,
                         baslik: notBaslik.isEmpty ? "Genel Not" : notBaslik,
                         icerik: notIcerik,
                         tip: "Not",
-                        tarih: formatter.string(from: Date())
+                        tarih: isoTarih
                     )
                     notlar.insert(newN, at: 0)
                     Task {
                         _ = try? await SupabaseService.shared.insert(into: "musteri_takip_detaylar", item: newN)
+                        touchKlasorSonIslemTarihi()
                     }
                     notBaslik = ""
                     notIcerik = ""
+                    notTarih = Date()
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "plus")
@@ -468,7 +661,7 @@ public struct MusteriTakipDetayView: View {
             }
             
             ForEach(notlar) { n in
-                itemCard(title: n.baslik, subtitle: n.icerik ?? "", date: n.tarih, color: Color(hex: "FF9F0A")) {
+                itemCard(title: n.baslik, subtitle: n.icerik ?? "", date: formatDisplayDate(n.tarih), color: Color(hex: "FF9F0A")) {
                     notlar.removeAll { $0.id == n.id }
                     Task {
                         _ = try? await SupabaseService.shared.delete(table: "musteri_takip_detaylar", id: String(n.id))
@@ -500,18 +693,19 @@ public struct MusteriTakipDetayView: View {
     }
     
     private func itemCard(title: String, subtitle: String, date: String, color: Color, onDelete: @escaping () -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
+        HStack(alignment: .top, spacing: 12) {
+            Circle().fill(color).frame(width: 8, height: 8).padding(.top, 5)
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(.system(size: 13, weight: .bold)).foregroundColor(.white)
-                Spacer()
-                Button(action: onDelete) {
-                    Image(systemName: "trash").font(.system(size: 11)).foregroundColor(Color(hex: "EF4444"))
+                if !subtitle.isEmpty {
+                    Text(subtitle).font(.system(size: 12)).foregroundColor(Color(hex: "E2E8F0"))
                 }
+                Text(date).font(.system(size: 10)).foregroundColor(Color(hex: "8E8E93"))
             }
-            if !subtitle.isEmpty {
-                Text(subtitle).font(.system(size: 12)).foregroundColor(Color(hex: "E2E8F0"))
+            Spacer()
+            Button(action: onDelete) {
+                Image(systemName: "trash").font(.system(size: 11)).foregroundColor(Color(hex: "EF4444"))
             }
-            Text(date).font(.system(size: 10)).foregroundColor(Color(hex: "8E8E93"))
         }
         .padding(14)
         .background(Color(hex: "121216"))
@@ -519,6 +713,7 @@ public struct MusteriTakipDetayView: View {
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.08), lineWidth: 1))
     }
     
+    // MARK: - Etiket & Renk Sheet (Buluta Gerçekten Kaydeder)
     private func etiketSheet() -> some View {
         VStack(spacing: 16) {
             Text("Klasör Etiketi ve Rengi").font(.system(size: 16, weight: .bold)).foregroundColor(.white).padding(.top, 20)
@@ -549,8 +744,19 @@ public struct MusteriTakipDetayView: View {
             }
             .padding(.horizontal, 20)
             
-            Button("Tamam") {
+            Button("Kaydet & Kapat") {
                 isEtiketModalOpen = false
+                let nowIso = ISO8601DateFormatter().string(from: Date())
+                Task {
+                    let payload: [String: Any] = [
+                        "etiket": klasorEtiket,
+                        "renk": klasorRenk,
+                        "son_islem_tarihi": nowIso
+                    ]
+                    if let data = try? JSONSerialization.data(withJSONObject: payload) {
+                        _ = try? await SupabaseService.shared.updateRaw(table: "musteri_takip_klasorler", id: String(klasor.id), data: data)
+                    }
+                }
             }
             .font(.system(size: 14, weight: .bold))
             .foregroundColor(.white)
@@ -565,7 +771,7 @@ public struct MusteriTakipDetayView: View {
         .presentationDetents([.medium])
     }
     
-    // MARK: - Müşteri CRM Raporu Oluştur ve Paylaş (Exact to MusteriTakipDetayScreen.tsx)
+    // MARK: - Müşteri CRM Raporu Oluştur ve Paylaş
     private func generateAndShareCRMReport() {
         isPdfGenerating = true
         
@@ -615,7 +821,7 @@ public struct MusteriTakipDetayView: View {
               <tr><th style='width: 140px;'>Tarih</th><th style='width: 200px;'>Görüşme Konusu</th><th>Detay ve Anlaşmalar</th></tr>
             </thead>
             <tbody>
-              \(gorusmeler.map { "<tr><td>\($0.tarih)</td><td><strong>\($0.baslik)</strong></td><td>\($0.icerik ?? "-")</td></tr>" }.joined())
+              \(gorusmeler.map { "<tr><td>\(formatDisplayDate($0.tarih, includeTime: true))</td><td><strong>\($0.baslik)</strong></td><td>\($0.icerik ?? "-")</td></tr>" }.joined())
             </tbody>
           </table>
           """)
@@ -628,7 +834,7 @@ public struct MusteriTakipDetayView: View {
               <tr><th style='width: 140px;'>Tarih</th><th style='width: 200px;'>Teklif / Ürün</th><th style='width: 120px;'>Verilen Fiyat</th><th>Açıklama</th></tr>
             </thead>
             <tbody>
-              \(fiyatlar.map { "<tr><td>\($0.tarih)</td><td><strong>\($0.baslik)</strong></td><td class='price-tag'>\(String(format: "%.2f", $0.fiyatBilgisi ?? 0)) \($0.paraBirimi ?? "₺")</td><td>\($0.icerik ?? "-")</td></tr>" }.joined())
+              \(fiyatlar.map { "<tr><td>\(formatDisplayDate($0.tarih))</td><td><strong>\($0.baslik)</strong></td><td class='price-tag'>\(String(format: "%.2f", $0.fiyatBilgisi ?? 0)) \($0.paraBirimi ?? "₺")</td><td>\($0.icerik ?? "-")</td></tr>" }.joined())
             </tbody>
           </table>
           """)
@@ -637,7 +843,7 @@ public struct MusteriTakipDetayView: View {
           <div class="section-title">3. Yüklenen Görseller ve Evraklar</div>
           \(gorseller.isEmpty ? "<div class='empty'>Kayıtlı evrak bulunmamaktadır.</div>" : """
           <ul>
-            \(gorseller.map { "<li><strong>\($0.baslik)</strong> - \($0.tarih) (\($0.icerik ?? ""))</li>" }.joined())
+            \(gorseller.map { "<li><strong>\($0.baslik)</strong> - \(formatDisplayDate($0.tarih)) (\($0.icerik ?? ""))</li>" }.joined())
           </ul>
           """)
 
@@ -649,7 +855,7 @@ public struct MusteriTakipDetayView: View {
               <tr><th style='width: 140px;'>Tarih</th><th style='width: 200px;'>Not Başlığı</th><th>Not İçeriği</th></tr>
             </thead>
             <tbody>
-              \(notlar.map { "<tr><td>\($0.tarih)</td><td><strong>\($0.baslik)</strong></td><td>\($0.icerik ?? "-")</td></tr>" }.joined())
+              \(notlar.map { "<tr><td>\(formatDisplayDate($0.tarih))</td><td><strong>\($0.baslik)</strong></td><td>\($0.icerik ?? "-")</td></tr>" }.joined())
             </tbody>
           </table>
           """)

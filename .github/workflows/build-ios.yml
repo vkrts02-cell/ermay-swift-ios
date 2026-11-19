@@ -66,13 +66,16 @@ jobs:
           cp Sources/ErmayMobil/Resources/Assets.xcassets/AppIcon.appiconset/*.png build/Payload/ErmayMobil.app/ || true
           cd build
           zip -qr ErmayMobil.ipa Payload
-          ls -lh ErmayMobil.ipa
+          cp ErmayMobil.ipa VK.ipa
+          ls -lh ErmayMobil.ipa VK.ipa
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ErmayMobil-iOS-IPA
-          path: build/ErmayMobil.ipa
+          path: |
+            build/ErmayMobil.ipa
+            build/VK.ipa
           retention-days: 14
 
       - name: Create GitHub Release with IPA
@@ -80,7 +83,9 @@ jobs:
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: Ermay Mobil iOS v1.0.${{ github.run_number }}
-          files: build/ErmayMobil.ipa
+          files: |
+            build/ErmayMobil.ipa
+            build/VK.ipa
           draft: false
           prerelease: false
         env:

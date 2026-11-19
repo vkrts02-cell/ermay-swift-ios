@@ -16,7 +16,7 @@ public struct DovizView: View {
     public init() {}
     
     public var hesaplananSonuc: Double {
-        let tutar = Double(girilenTutar) ?? 0.0
+        let tutar = Double(girilenTutar.replacingOccurrences(of: ",", with: ".")) ?? 0.0
         let usdRate = kurlar.first(where: { $0.kod == "USD" })?.satis ?? 50.37
         let eurRate = kurlar.first(where: { $0.kod == "EUR" })?.satis ?? 55.56
         let altinRate = kurlar.first(where: { $0.kod == "ALTIN" || $0.kod == "GA" })?.satis ?? 6280.54

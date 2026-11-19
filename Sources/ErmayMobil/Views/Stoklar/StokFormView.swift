@@ -155,11 +155,11 @@ public struct StokFormView: View {
             barkod: barkod.isEmpty ? nil : barkod,
             grupAdi: grupAdi.isEmpty ? "Genel" : grupAdi,
             birim: birim.isEmpty ? "Adet" : birim,
-            alisFiyati: Double(alisFiyati) ?? 0.0,
-            satisFiyati: Double(satisFiyati) ?? 0.0,
+            alisFiyati: Double(alisFiyati.replacingOccurrences(of: ",", with: ".")) ?? 0.0,
+            satisFiyati: Double(satisFiyati.replacingOccurrences(of: ",", with: ".")) ?? 0.0,
             kdvOrani: kdvOrani,
-            mevcutMiktar: Double(baslangicMiktar) ?? 0.0,
-            kritikMiktar: Double(kritikMiktar) ?? 5.0
+            mevcutMiktar: Double(baslangicMiktar.replacingOccurrences(of: ",", with: ".")) ?? 0.0,
+            kritikMiktar: Double(kritikMiktar.replacingOccurrences(of: ",", with: ".")) ?? 5.0
         )
         
         Task {

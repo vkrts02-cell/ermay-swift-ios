@@ -31,7 +31,7 @@ public struct KasaSayimView: View {
     
     public var fizikiToplam: Double {
         let banknotToplam = banknotlar.reduce(0.0) { $0 + $1.toplam }
-        let madeni = Double(madeniToplam) ?? 0.0
+        let madeni = Double(madeniToplam.replacingOccurrences(of: ",", with: ".")) ?? 0.0
         return banknotToplam + madeni
     }
     

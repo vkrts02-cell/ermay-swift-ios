@@ -1,4 +1,6 @@
 import SwiftUI
+import PhotosUI
+import UniformTypeIdentifiers
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -289,6 +291,12 @@ public struct AraclarView: View {
     @State private var yeniBelgeKategori: String = "Sözleşme"
     @State private var yeniBelgeTur: String = "PDF"
     @State private var yeniBelgeIcerik: String = ""
+    @State private var yeniBelgeBase64: String = ""
+    @State private var yeniBelgeBoyut: String = ""
+    @State private var selectedBelgePhotoItem: PhotosPickerItem? = nil
+    @State private var showFilePicker: Bool = false
+    @State private var previewImage: UIImage? = nil
+    @State private var showImagePreviewModal: Bool = false
     
     // 3. Döviz Kurları & Otomasyon
     @State private var usdRate: Double = 34.45
@@ -509,6 +517,35 @@ public struct AraclarView: View {
         .sheet(item: $pdfPreviewItem) { item in
             #if canImport(UIKit)
             PDFViewerModal(title: item.title, pdfData: item.data, fileName: item.fileName)
+            #endif
+        }
+        .fullScreenCover(isPresented: $showImagePreviewModal) {
+            #if canImport(UIKit)
+            if let img = previewImage {
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Button {
+                                showImagePreviewModal = false
+                                previewImage = nil
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 28))
+                                    .foregroundColor(.white)
+                                    .padding()
+                            }
+                        }
+                        Spacer()
+                        Image(uiImage: img)
+                            .resizable()
+                            .scaledToFit()
+                            .padding()
+                        Spacer()
+                    }
+                }
+            }
             #endif
         }
     }
@@ -744,7 +781,7 @@ public struct AraclarView: View {
                         RoundedRectangle(cornerRadius: 10)
                             .fill(Color(hex: "3B82F6").opacity(0.15))
                             .frame(width: 40, height: 40)
-                        Image(systemName: "doc.fill")
+                        Image(systemName: b.tur.localizedCaseInsensitiveContains("pdf") ? "doc.richtext.fill" : (b.tur.localizedCaseInsensitiveContains("jpg") || b.tur.localizedCaseInsensitiveContains("png") ? "photo.fill" : "doc.fill"))
                             .foregroundColor(Color(hex: "3B82F6"))
                     }
                     
@@ -752,12 +789,34 @@ public struct AraclarView: View {
                         Text(b.ad)
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(.white)
-                        Text("\(b.kategori) • \(b.tur) • \(String(b.tarih.prefix(10)))")
+                        Text("\(b.kategori) • \(b.tur) • \(b.boyut) • \(String(b.tarih.prefix(10)))")
                             .font(.system(size: 11))
                             .foregroundColor(Color(hex: "8E8E93"))
                     }
                     
                     Spacer()
+                    
+                    Button {
+                        openOrPreviewBelge(b)
+                    } label: {
+                        Image(systemName: "eye.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(Color(hex: "3B82F6"))
+                            .padding(8)
+                            .background(Color(hex: "3B82F6").opacity(0.12))
+                            .clipShape(Circle())
+                    }
+                    
+                    Button {
+                        shareBelge(b)
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(Color(hex: "10B981"))
+                            .padding(8)
+                            .background(Color(hex: "10B981").opacity(0.12))
+                            .clipShape(Circle())
+                    }
                     
                     Button {
                         deleteBelge(b)
@@ -959,15 +1018,71 @@ public struct AraclarView: View {
         guard let src = kaynakCari, var dst = hedefCari, src.id != dst.id else { return }
         isMergingCari = true
         Task {
+            let srcIdInt = Int(src.id) ?? 0
+            let dstIdInt = Int(dst.id) ?? 0
+            
+            // 1. Cari Hareketleri Aktar
+            let chPayload: [String: Any] = [
+                "cari_id": dstIdInt,
+                "cari_unvan": dst.unvan
+            ]
+            if let d = try? JSONSerialization.data(withJSONObject: chPayload) {
+                _ = try? await SupabaseService.shared.updateWhere(table: "cari_hareketler", filter: "cari_id=eq.\(srcIdInt)", data: d)
+            }
+            
+            // 2. Faturaları Aktar
+            let fPayload: [String: Any] = [
+                "cari_id": dstIdInt,
+                "cari_unvan": dst.unvan
+            ]
+            if let d = try? JSONSerialization.data(withJSONObject: fPayload) {
+                _ = try? await SupabaseService.shared.updateWhere(table: "faturalar", filter: "cari_id=eq.\(srcIdInt)", data: d)
+            }
+            
+            // 3. Sipariş ve Teklifleri Aktar
+            let stPayload: [String: Any] = [
+                "cari_id": dstIdInt,
+                "cari_unvan": dst.unvan
+            ]
+            if let d = try? JSONSerialization.data(withJSONObject: stPayload) {
+                _ = try? await SupabaseService.shared.updateWhere(table: "siparisler", filter: "cari_id=eq.\(srcIdInt)", data: d)
+                _ = try? await SupabaseService.shared.updateWhere(table: "teklifler", filter: "cari_id=eq.\(srcIdInt)", data: d)
+            }
+            
+            // 4. Çek ve Senetleri Aktar
+            let csPayload: [String: Any] = [
+                "cari_id": dstIdInt,
+                "cari_unvan": dst.unvan
+            ]
+            if let d = try? JSONSerialization.data(withJSONObject: csPayload) {
+                _ = try? await SupabaseService.shared.updateWhere(table: "cekler", filter: "cari_id=eq.\(srcIdInt)", data: d)
+                _ = try? await SupabaseService.shared.updateWhere(table: "senetler", filter: "cari_id=eq.\(srcIdInt)", data: d)
+            }
+            
+            // 5. Müşteri Takip Klasör ve Detaylarını Aktar
+            let mtPayload: [String: Any] = [
+                "cari_id": dstIdInt,
+                "cari_unvan": dst.unvan
+            ]
+            if let d = try? JSONSerialization.data(withJSONObject: mtPayload) {
+                _ = try? await SupabaseService.shared.updateWhere(table: "musteri_takip_klasorler", filter: "cari_id=eq.\(srcIdInt)", data: d)
+                _ = try? await SupabaseService.shared.updateWhere(table: "musteri_takip_detaylar", filter: "cari_id=eq.\(srcIdInt)", data: d)
+            }
+            
+            // 6. Hedef Cari Bakiyesini Güncelle
             dst.bakiye += src.bakiye
             await DataStore.shared.saveCari(dst, isUpdate: true)
+            
+            // 7. Kaynak Cariyi Kapat / Sil
             try? await SupabaseService.shared.delete(table: "cariler", id: src.id)
             await DataStore.shared.loadCarilerCacheFirst(forceCloudRefresh: true)
+            await DataStore.shared.loadFaturalarCacheFirst(forceCloudRefresh: true)
+            
             await MainActor.run {
                 isMergingCari = false
                 kaynakCari = nil
                 hedefCari = dst
-                statusBanner = "'\(src.unvan)' başarıyla '\(dst.unvan)' hesabına birleştirildi."
+                statusBanner = "'\(src.unvan)' carisinin tüm hareket, fatura ve belgeleri başarıyla '\(dst.unvan)' hesabına aktarıldı."
             }
         }
     }
@@ -1026,15 +1141,51 @@ public struct AraclarView: View {
         guard let src = kaynakStok, var dst = hedefStok, src.id != dst.id else { return }
         isMergingStok = true
         Task {
+            let srcIdInt = Int(src.id) ?? 0
+            let dstIdInt = Int(dst.id) ?? 0
+
+            // 1. Stok Hareketlerini Aktar
+            let shPayload: [String: Any] = [
+                "stok_id": dstIdInt,
+                "stok_kodu": dst.stokKodu,
+                "stok_adi": dst.stokAdi
+            ]
+            if let d = try? JSONSerialization.data(withJSONObject: shPayload) {
+                _ = try? await SupabaseService.shared.updateWhere(table: "stok_hareketler", filter: "stok_id=eq.\(srcIdInt)", data: d)
+            }
+
+            // 2. Fatura Kalemlerini Aktar
+            let fdPayload: [String: Any] = [
+                "stok_id": dstIdInt,
+                "stok_kodu": dst.stokKodu,
+                "stok_adi": dst.stokAdi
+            ]
+            if let d = try? JSONSerialization.data(withJSONObject: fdPayload) {
+                _ = try? await SupabaseService.shared.updateWhere(table: "fatura_detaylar", filter: "stok_id=eq.\(srcIdInt)", data: d)
+            }
+
+            // 3. Sipariş ve Teklif Kalemlerini Aktar
+            let sdPayload: [String: Any] = [
+                "stok_id": dstIdInt,
+                "stok_adi": dst.stokAdi
+            ]
+            if let d = try? JSONSerialization.data(withJSONObject: sdPayload) {
+                _ = try? await SupabaseService.shared.updateWhere(table: "siparis_detaylar", filter: "stok_id=eq.\(srcIdInt)", data: d)
+                _ = try? await SupabaseService.shared.updateWhere(table: "teklif_detaylar", filter: "stok_id=eq.\(srcIdInt)", data: d)
+            }
+
+            // 4. Hedef Ürün Stok Miktarını Güncelle
             dst.mevcutMiktar += src.mevcutMiktar
             await DataStore.shared.saveStok(dst, isUpdate: true)
+
+            // 5. Kaynak Ürünü Kapat / Sil
             try? await SupabaseService.shared.delete(table: "stoklar", id: src.id)
             await DataStore.shared.loadStoklarCacheFirst(forceCloudRefresh: true)
             await MainActor.run {
                 isMergingStok = false
                 kaynakStok = nil
                 hedefStok = dst
-                statusBanner = "'\(src.stokAdi)' başarıyla '\(dst.stokAdi)' kartına birleştirildi."
+                statusBanner = "'\(src.stokAdi)' ürününün tüm hareket ve fatura detayları başarıyla '\(dst.stokAdi)' kartına aktarıldı."
             }
         }
     }
@@ -1640,6 +1791,64 @@ public struct AraclarView: View {
         }
     }
     
+    private func openOrPreviewBelge(_ b: BelgeArsivKayit) {
+        let cleanBase64: String
+        if b.veri.contains(",") {
+            cleanBase64 = b.veri.components(separatedBy: ",").last ?? b.veri
+        } else {
+            cleanBase64 = b.veri
+        }
+        
+        if let rawData = Data(base64Encoded: cleanBase64, options: .ignoreUnknownCharacters) {
+            #if canImport(UIKit)
+            if let img = UIImage(data: rawData) {
+                previewImage = img
+                showImagePreviewModal = true
+                return
+            }
+            if b.tur.localizedCaseInsensitiveContains("pdf") || String(data: rawData.prefix(5), encoding: .utf8) == "%PDF-" {
+                pdfPreviewItem = PDFPreviewItem(title: b.ad, data: rawData, fileName: "\(b.ad).pdf")
+                return
+            }
+            #endif
+        }
+        
+        shareBelge(b)
+    }
+    
+    private func shareBelge(_ b: BelgeArsivKayit) {
+        #if canImport(UIKit)
+        let cleanBase64: String
+        if b.veri.contains(",") {
+            cleanBase64 = b.veri.components(separatedBy: ",").last ?? b.veri
+        } else {
+            cleanBase64 = b.veri
+        }
+        
+        var shareItems: [Any] = []
+        if let rawData = Data(base64Encoded: cleanBase64, options: .ignoreUnknownCharacters) {
+            if let img = UIImage(data: rawData) {
+                shareItems.append(img)
+            } else {
+                let tempUrl = FileManager.default.temporaryDirectory.appendingPathComponent("\(b.ad).\(b.tur.lowercased())")
+                try? rawData.write(to: tempUrl)
+                shareItems.append(tempUrl)
+            }
+        } else {
+            shareItems.append(b.veri.isEmpty ? b.ad : b.veri)
+        }
+        
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootVC = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController else { return }
+        
+        let activityVC = UIActivityViewController(activityItems: shareItems, applicationActivities: nil)
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = rootVC.view
+        }
+        rootVC.present(activityVC, animated: true)
+        #endif
+    }
+    
     private func deleteBelge(_ b: BelgeArsivKayit) {
         belgeler.removeAll { $0.id == b.id }
         Task {
@@ -1652,44 +1861,101 @@ public struct AraclarView: View {
         NavigationStack {
             ZStack {
                 Color(hex: "09090B").ignoresSafeArea()
-                VStack(spacing: 14) {
-                    toolInput("Belge Adı *", text: $yeniBelgeAd)
-                    Picker("Kategori", selection: $yeniBelgeKategori) {
-                        ForEach(["Sözleşme", "Dekont", "İrsaliye", "Resmi Belge", "Diğer"], id: \.self) { Text($0).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    toolInput("Dosya Türü (PDF / JPG / XLSX)", text: $yeniBelgeTur)
-                    toolInput("Açıklama / Not", text: $yeniBelgeIcerik)
-                    
-                    Button {
-                        guard !yeniBelgeAd.isEmpty else { return }
-                        let b = BelgeArsivKayit(
-                            ad: yeniBelgeAd,
-                            kategori: yeniBelgeKategori,
-                            tur: yeniBelgeTur,
-                            boyut: "128 KB",
-                            tarih: AppFormatters.isoDate.string(from: Date()),
-                            veri: yeniBelgeIcerik
-                        )
-                        belgeler.insert(b, at: 0)
-                        Task {
-                            try? await SupabaseService.shared.insert(into: "belge_arsiv", item: b)
+                ScrollView {
+                    VStack(spacing: 14) {
+                        toolInput("Belge Adı *", text: $yeniBelgeAd)
+                        Picker("Kategori", selection: $yeniBelgeKategori) {
+                            ForEach(["Sözleşme", "Dekont", "İrsaliye", "Resmi Belge", "Diğer"], id: \.self) { Text($0).tag($0) }
                         }
-                        yeniBelgeAd = ""
-                        yeniBelgeIcerik = ""
-                        showYeniBelgeModal = false
-                    } label: {
-                        Text("Belgeyi Arşive Kaydet")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color(hex: "2563EB"))
-                            .cornerRadius(12)
+                        .pickerStyle(.segmented)
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Dosya veya Fotoğraf")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(Color(hex: "8E8E93"))
+                            
+                            HStack(spacing: 12) {
+                                PhotosPicker(selection: $selectedBelgePhotoItem, matching: .images) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "photo.badge.plus")
+                                        Text("Fotoğraf")
+                                    }
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(Color(hex: "1F2937"))
+                                    .cornerRadius(10)
+                                }
+                                
+                                Button {
+                                    showFilePicker = true
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "doc.badge.plus")
+                                        Text("Dosya (PDF)")
+                                    }
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(Color(hex: "1F2937"))
+                                    .cornerRadius(10)
+                                }
+                            }
+                            
+                            if !yeniBelgeBoyut.isEmpty {
+                                HStack {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(Color(hex: "10B981"))
+                                    Text("Seçildi: \(yeniBelgeTur) • \(yeniBelgeBoyut)")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(Color(hex: "10B981"))
+                                }
+                                .padding(.top, 4)
+                            }
+                        }
+                        .padding(12)
+                        .background(Color(hex: "121216"))
+                        .cornerRadius(10)
+                        
+                        toolInput("Dosya Türü", text: $yeniBelgeTur)
+                        toolInput("Açıklama / Not", text: $yeniBelgeIcerik)
+                        
+                        Button {
+                            guard !yeniBelgeAd.isEmpty else { return }
+                            let finalVeri = yeniBelgeBase64.isEmpty ? yeniBelgeIcerik : yeniBelgeBase64
+                            let finalBoyut = yeniBelgeBoyut.isEmpty ? "\(max(1, finalVeri.count / 1024)) KB" : yeniBelgeBoyut
+                            let b = BelgeArsivKayit(
+                                ad: yeniBelgeAd,
+                                kategori: yeniBelgeKategori,
+                                tur: yeniBelgeTur,
+                                boyut: finalBoyut,
+                                tarih: AppFormatters.isoDate.string(from: Date()),
+                                veri: finalVeri
+                            )
+                            belgeler.insert(b, at: 0)
+                            Task {
+                                try? await SupabaseService.shared.insert(into: "belge_arsiv", item: b)
+                            }
+                            yeniBelgeAd = ""
+                            yeniBelgeIcerik = ""
+                            yeniBelgeBase64 = ""
+                            yeniBelgeBoyut = ""
+                            showYeniBelgeModal = false
+                        } label: {
+                            Text("Belgeyi Arşive Kaydet")
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(Color(hex: "2563EB"))
+                                .cornerRadius(12)
+                        }
+                        Spacer()
                     }
-                    Spacer()
+                    .padding(20)
                 }
-                .padding(20)
             }
             .navigationTitle("Yeni Belge Arşivle")
             .navigationBarTitleDisplayMode(.inline)
@@ -1698,8 +1964,50 @@ public struct AraclarView: View {
                     Button("Kapat") { showYeniBelgeModal = false }
                 }
             }
+            .onChange(of: selectedBelgePhotoItem) { newItem in
+                Task {
+                    guard let item = newItem,
+                          let data = try? await item.loadTransferable(type: Data.self) else { return }
+                    #if canImport(UIKit)
+                    if let image = UIImage(data: data),
+                       let compressed = image.jpegData(compressionQuality: 0.7) {
+                        await MainActor.run {
+                            yeniBelgeBase64 = "data:image/jpeg;base64," + compressed.base64EncodedString()
+                            yeniBelgeBoyut = "\(max(1, compressed.count / 1024)) KB"
+                            yeniBelgeTur = "JPG"
+                            if yeniBelgeAd.isEmpty {
+                                yeniBelgeAd = "Görsel-\(Int(Date().timeIntervalSince1970))"
+                            }
+                        }
+                        return
+                    }
+                    #endif
+                    await MainActor.run {
+                        yeniBelgeBase64 = data.base64EncodedString()
+                        yeniBelgeBoyut = "\(max(1, data.count / 1024)) KB"
+                        yeniBelgeTur = "Görsel"
+                    }
+                }
+            }
+            .fileImporter(isPresented: $showFilePicker, allowedContentTypes: [.pdf, .image, .item]) { result in
+                switch result {
+                case .success(let url):
+                    guard url.startAccessingSecurityScopedResource() else { return }
+                    defer { url.stopAccessingSecurityScopedResource() }
+                    if let data = try? Data(contentsOf: url) {
+                        yeniBelgeBase64 = data.base64EncodedString()
+                        yeniBelgeBoyut = "\(max(1, data.count / 1024)) KB"
+                        yeniBelgeTur = url.pathExtension.uppercased().isEmpty ? "PDF" : url.pathExtension.uppercased()
+                        if yeniBelgeAd.isEmpty {
+                            yeniBelgeAd = url.deletingPathExtension().lastPathComponent
+                        }
+                    }
+                case .failure:
+                    break
+                }
+            }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
     }
     
     private func yeniPortfoySheet() -> some View {

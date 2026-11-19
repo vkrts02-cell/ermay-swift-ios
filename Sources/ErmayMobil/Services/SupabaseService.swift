@@ -389,6 +389,12 @@ public final class SupabaseService: ObservableObject, @unchecked Sendable {
             queryItems.append(URLQueryItem(name: "is_deleted", value: "neq.true"))
         }
         
+        // Mali yıl izolasyonu: Mali yıla tabi operasyonel tablolarda aktif mali yılı filtrele
+        let fiscalYearTables = ["faturalar", "cari_hareketler", "kasa_hareketler", "banka_hareketler", "stok_hareketler"]
+        if fiscalYearTables.contains(table) && !filters.keys.contains("mali_yil") {
+            queryItems.append(URLQueryItem(name: "or", value: "(mali_yil.eq.\(activeFiscalYear),mali_yil.is.null)"))
+        }
+        
         for (key, val) in filters {
             queryItems.append(URLQueryItem(name: key, value: val))
         }
@@ -673,6 +679,38 @@ public final class SupabaseService: ObservableObject, @unchecked Sendable {
                 return
             }
             let errorMsg = String(data: resData, encoding: .utf8) ?? "Ham Güncelleme Başarısız"
+            if let missingCol = extractMissingColumn(from: errorMsg),
+               var dict = (try? JSONSerialization.jsonObject(with: currentData)) as? [String: Any],
+               dict.keys.contains(missingCol) {
+                recordUnsupportedColumn(table: table, column: missingCol)
+                dict.removeValue(forKey: missingCol)
+                if let nextData = try? JSONSerialization.data(withJSONObject: dict) {
+                    currentData = nextData
+                    continue
+                }
+            }
+            throw NSError(domain: "SupabaseError", code: (response as? HTTPURLResponse)?.statusCode ?? 500, userInfo: [NSLocalizedDescriptionKey: errorMsg])
+        }
+    }
+    
+    // MARK: - PostgREST Update With Custom Filter
+    public func updateWhere(table: String, filter: String, data: Data) async throws {
+        guard let url = URL(string: "\(baseUrl)/rest/v1/\(table)?\(filter)") else {
+            throw URLError(.badURL)
+        }
+        var currentData = stripUnsupportedColumns(table: table, data: data)
+        var retries = 5
+        while retries > 0 {
+            retries -= 1
+            var request = URLRequest(url: url)
+            request.httpMethod = "PATCH"
+            defaultHeaders(prefer: "return=minimal").forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
+            request.httpBody = currentData
+            let (resData, response) = try await session.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
+                return
+            }
+            let errorMsg = String(data: resData, encoding: .utf8) ?? "Güncelleme Başarısız"
             if let missingCol = extractMissingColumn(from: errorMsg),
                var dict = (try? JSONSerialization.jsonObject(with: currentData)) as? [String: Any],
                dict.keys.contains(missingCol) {

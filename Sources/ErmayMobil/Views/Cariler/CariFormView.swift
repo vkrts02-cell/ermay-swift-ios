@@ -270,7 +270,7 @@ public struct CariFormView: View {
             ilce: ilce,
             bakiye: cariToEdit?.bakiye ?? 0.0,
             bakiyeTuru: cariToEdit?.bakiyeTuru ?? "B",
-            riskLimiti: Double(riskLimiti) ?? 0.0,
+            riskLimiti: Double(riskLimiti.replacingOccurrences(of: ",", with: ".")) ?? 0.0,
             vadeGunu: Int(vadeGunu) ?? 0,
             odemePlani: odemePlani,
             ticaretSicilNo: ticaretSicilNo.isEmpty ? nil : ticaretSicilNo,

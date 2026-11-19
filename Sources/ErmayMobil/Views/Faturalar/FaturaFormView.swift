@@ -32,9 +32,10 @@ public struct FaturaFormView: View {
     private let birimListesi = ["Adet", "Kg", "Mt", "M2", "Paket", "Koli"]
     private let kdvOranlari: [Double] = [0.0, 1.0, 10.0, 20.0]
     
-    public init(initialTur: String = "SATIS", onSave: ((Fatura) -> Void)? = nil) {
-        let isAlis = initialTur.uppercased().contains("ALIS")
+    public init(initialTur: String = "SATIS", initialCari: CariKart? = nil, onSave: ((Fatura) -> Void)? = nil) {
+        let isAlis = initialTur.localizedCaseInsensitiveContains("alış") || initialTur.localizedCaseInsensitiveContains("alis")
         self._tur = State(initialValue: isAlis ? "Alış" : "Satış")
+        self._selectedCari = State(initialValue: initialCari)
         self.onSave = onSave
     }
     
