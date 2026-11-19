@@ -135,4 +135,37 @@ public final class DataStore: ObservableObject {
         await loadStoklarCacheFirst(forceCloudRefresh: true)
         await loadFaturalarCacheFirst(forceCloudRefresh: true)
     }
+
+    // MARK: - Save Helpers
+    public func saveStok(_ item: StokKart, isUpdate: Bool = false) async {
+        do {
+            if isUpdate {
+                try await SupabaseService.shared.update(table: "stoklar", id: item.id, item: item)
+            } else {
+                try await SupabaseService.shared.insert(into: "stoklar", item: item)
+            }
+            try await LocalDatabaseService.shared.upsertStoklar([item], replaceAll: false)
+        } catch {
+            let action = isUpdate ? "UPDATE" : "INSERT"
+            OfflineQueueService.shared.enqueue(action: action, table: "stoklar", recordId: item.id, payload: try? JSONEncoder().encode(item))
+            try? await LocalDatabaseService.shared.upsertStoklar([item], replaceAll: false)
+        }
+        await loadStoklarCacheFirst(forceCloudRefresh: false)
+    }
+
+    public func saveCari(_ item: CariKart, isUpdate: Bool = false) async {
+        do {
+            if isUpdate {
+                try await SupabaseService.shared.update(table: "cariler", id: item.id, item: item)
+            } else {
+                try await SupabaseService.shared.insert(into: "cariler", item: item)
+            }
+            try await LocalDatabaseService.shared.upsertCariler([item], replaceAll: false)
+        } catch {
+            let action = isUpdate ? "UPDATE" : "INSERT"
+            OfflineQueueService.shared.enqueue(action: action, table: "cariler", recordId: item.id, payload: try? JSONEncoder().encode(item))
+            try? await LocalDatabaseService.shared.upsertCariler([item], replaceAll: false)
+        }
+        await loadCarilerCacheFirst(forceCloudRefresh: false)
+    }
 }

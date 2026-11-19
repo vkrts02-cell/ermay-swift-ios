@@ -89,9 +89,13 @@ public final class ReportCalculationService {
         let (startDay, endDay, isAll) = parseDateRange(filter: filter)
         let dateSuffix = isAll ? "" : " (\(AppFormatters.shortDate.string(from: startDay)) - \(AppFormatters.shortDate.string(from: endDay)))"
         
-        let cariler: [CariKart] = (try? await SupabaseService.shared.fetch(from: "cariler")) ?? DataStore.shared.cariler
-        let stoklar: [StokKart] = (try? await SupabaseService.shared.fetch(from: "stoklar")) ?? DataStore.shared.stoklar
-        let faturalar: [Fatura] = (try? await SupabaseService.shared.fetch(from: "faturalar")) ?? DataStore.shared.faturalar
+        let defaultCariler = await MainActor.run { DataStore.shared.cariler }
+        let defaultStoklar = await MainActor.run { DataStore.shared.stoklar }
+        let defaultFaturalar = await MainActor.run { DataStore.shared.faturalar }
+
+        let cariler: [CariKart] = (try? await SupabaseService.shared.fetch(from: "cariler")) ?? defaultCariler
+        let stoklar: [StokKart] = (try? await SupabaseService.shared.fetch(from: "stoklar")) ?? defaultStoklar
+        let faturalar: [Fatura] = (try? await SupabaseService.shared.fetch(from: "faturalar")) ?? defaultFaturalar
         let kasaHareketler: [KasaHareket] = (try? await SupabaseService.shared.fetch(from: "kasa_hareketler")) ?? []
         let cariHareketler: [CariHareket] = (try? await SupabaseService.shared.fetch(from: "cari_hareketler")) ?? []
         let bankalar: [BankaKart] = (try? await SupabaseService.shared.fetch(from: "bankalar")) ?? []
@@ -1060,7 +1064,8 @@ public final class ReportCalculationService {
         let yillikHedefler: [SatisHedefRow] = (try? await SupabaseService.shared.fetch(from: "yillik_satis_hedefleri")) ?? []
         let aylikHedefler: [SatisHedefRow] = (try? await SupabaseService.shared.fetch(from: "satis_hedefleri")) ?? []
         let haftalikHedefler: [SatisHedefRow] = (try? await SupabaseService.shared.fetch(from: "haftalik_satis_hedefleri")) ?? []
-        let faturalar: [Fatura] = (try? await SupabaseService.shared.fetch(from: "faturalar")) ?? DataStore.shared.faturalar
+        let defaultFaturalar = await MainActor.run { DataStore.shared.faturalar }
+        let faturalar: [Fatura] = (try? await SupabaseService.shared.fetch(from: "faturalar")) ?? defaultFaturalar
         let satisFaturalari = faturalar.filter { $0.faturaTuru.localizedCaseInsensitiveContains("satış") || $0.faturaTuru.localizedCaseInsensitiveContains("satis") }
         
         var annual: [[String: Any]] = []
